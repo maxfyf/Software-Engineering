@@ -15,7 +15,8 @@ const router = createRouter({
         {
             path: '/task',
             name: 'task',
-            component: () => import('@/views/TaskView.vue')
+            component: () => import('@/views/TaskView.vue'),
+            meta: { requiresAuth: true }
         },
         {
             path: '/settings',
@@ -24,6 +25,25 @@ const router = createRouter({
             meta: { requiresAuth: true }
         }
     ]
+})
+
+// 全局前置路由守卫
+router.beforeEach((to, from, next) => {
+    // 检查是否需要登录
+    if (to.meta.requiresAuth) {
+        const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true'
+        
+        if (!isLoggedIn) {
+            // 未登录，重定向到登录页
+            next('/login')
+        } else {
+            // 已登录，继续访问
+            next()
+        }
+    } else {
+        // 不需要登录的页面，直接访问
+        next()
+    }
 })
 
 export default router
