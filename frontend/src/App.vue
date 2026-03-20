@@ -1,6 +1,7 @@
 <script setup lang="js">
 import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { handleLogout } from '@/store/user.js'
 
 const isLoggedIn = ref(false)    //是否已登录
 const route = useRoute()
@@ -10,78 +11,76 @@ watch(() => route.path, (newPath) => {
   console.log('路径变化：', newPath)
   activeIndex.value = newPath
 }, { immediate: true })
-
-const handleSelect = (key) => {
-  console.log('导航到:', key)
-}
-
-const handleLogin = () => {
-  /*TODO: 登录
-  * 1. 从后端加载用户信息与所有任务，存储到store/user.js
-  * 2. 切换页面到/task页面
-  * 3. 将isLoggedIn置为true */
-}
-
-const handleLogout = () => {
-  /*TODO: 登出
-  * 1. 删去store/user.js中的用户数据
-  * 2. 将isLoggedIn置为false
-  * 3. 切换页面到login页面 */
-}
 </script>
 
 <template>
-  <el-header class="navbar">
+  <el-menu
+    mode="horizontal"
+    :default-active="activeIndex"
+    class="navbar"
+    :router="true"
+  >
     <!-- 网站信息 -->
-    <div class="site">
-      <img src="/src/assets/images/logo.jpg" class="logo" alt="Logo">
-      <span class="site-name">协作式任务管理系统</span>
-    </div>
-
-    <div v-if="isLoggedIn">
-      <el-menu
-          :default-active="activeIndex"
-          mode="horizontal"
-          router
-          @select="handleSelect"
-          class="main-menu"
-      >
-        <el-menu-item index="/task">📋 我的任务</el-menu-item>
-        <el-menu-item index="/settings">⚙️ 设置</el-menu-item>
-      </el-menu>
+    <img src="/src/assets/images/logo.jpg" class="logo" alt="Logo">
+    <span class="site-name">协作式任务管理系统</span>
+    <div v-if="isLoggedIn" class="routes">
+      <el-menu-item index="/task" class="route">
+        📋&nbsp;我的任务
+      </el-menu-item>
+      <el-menu-item index="/settings" class="route">
+        ⚙️&nbsp;设置
+      </el-menu-item>
     </div>
 
     <!-- 账户信息 -->
     <div class="account">
-      <div v-if="isLoggedIn">
-        <span class="username">
-          {{123/*TODO: 从store/user.js加载用户名*/}}
-        </span>
-        <el-button @click="handleLogout" type="danger" style="margin-right: 20px">
-          登出
-        </el-button>
-      </div>
-
-      <div v-else>
-        <span class="info">
-          未登录
-        </span>
-      </div>
+      <span v-if="isLoggedIn">
+        <el-popover
+          placement="bottom"
+          width="200px"
+          height="200px"
+          trigger="hover"
+          popper-class="hover-popover"
+        >
+          <template #reference>
+            <span class="username">
+              {{123/*TODO: 从store/user.js加载用户名*/}}
+            </span>
+          </template>
+          <div>
+            <h2 class="popover-title">{{ 123/*TODO: username*/ }}</h2>
+            <p class="popover-info"><strong>Full Name:</strong> {{ 123/*TODO: first name*/ }} {{ 123/*TODO: last name*/ }}</p>
+            <p class="popover-info"><strong>Email:</strong> {{ 123/*TODO: email*/ }}</p>
+            <div class="popover-button">
+              <el-button
+                  type="danger"
+                  class="logout-button"
+                  @click="handleLogout"
+              >
+              退出登录
+            </el-button>
+            </div>
+          </div>
+        </el-popover>
+      </span>
+      <span v-else class="info">
+        未登录
+      </span>
     </div>
-  </el-header>
+  </el-menu>
 
   <main class="main">
     <router-view></router-view>
   </main>
 
   <footer class="footer">
-    <p class="copyright">&copy; 2026 封逸凡、徐熙竣、丁泓森、赵冠杰、陈熙睿团队</p>
+    <p class="copyright">&copy; 2026 封逸凡、徐熙竣、丁泓森、赵冠杰、陈熙睿团队版权所有</p>
   </footer>
 </template>
 
 <style scoped>
 .navbar {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
@@ -89,60 +88,90 @@ const handleLogout = () => {
   height: 50px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  border-bottom: 1px solid #f0f0f0;
-  z-index: 1000;
-  transition: all 0.3s ease;
-}
-
-.site {
-  display: flex;
-  align-items: center;
 }
 
 .logo {
-  margin-left: 15px;
+  margin-left: 20px;
   width: 40px;
   height: auto;
 }
 
 .site-name {
   margin-left: 15px;
+  margin-right: 15px;
   font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
   font-weight: 800;
   font-size: 30px;
-
   background: linear-gradient(135deg, #4ab7ff, #1e6ef0);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-
   text-shadow: 0 0 20px rgba(0, 160, 255, 0.3);
+}
 
-  display: inline-block;
+.routes {
+  display: flex;
+  margin-left: 10px;
+}
+
+.route {
+  font-size: large;
+  cursor: pointer;
+}
+
+.route:hover {
+  text-shadow: 2px 2px 3px rgba(0,0,0,0.5);
 }
 
 .account {
   position: absolute;
   right: 0;
+  display: flex;
+  align-items: center;
 }
 
 .username {
-  font-size: medium;
-  margin-right: 10px;
-  color: black;
+  font-size: large;
+  margin-right: 30px;
+  color: #409eff;
+  cursor: pointer;
+}
+
+.popover-title {
+  font-weight: bold;
+  text-align: center;
+}
+
+.popover-info {
+  padding: 0 10px;
+}
+
+.popover-button {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.logout-button {
+  width: 100px;
+  height: 30px;
+  font-size: 15px;
 }
 
 .info {
   font-size: large;
-  margin-right: 20px;
+  margin-right: 30px;
   color: black;
 }
 
 .main {
-  display: flex;
-  color: white;
+  position: absolute;
+  top: 50px;
+  bottom: 30px;
+  left: 0;
+  right: 0;
+  background-color: #ececec;
+  overflow-y: auto;
 }
 
 .footer {
@@ -151,7 +180,7 @@ const handleLogout = () => {
   left: 0;
   right: 0;
   height: 30px;
-  background-color: #c0c0c0;
+  background-color: #d8d8d8;
   display: flex;
   align-items: center;
   justify-content: center;
