@@ -135,15 +135,26 @@ export const handleRegister = async ({
         })
         
         ElMessage.success('注册成功！请登录')
-        
-        // 切换到登录界面
+
         router.push('/login')
-        return true
+        
+        // 6. 将除了 username 以外的变量全部重置为空串
+        return {
+            success: true,
+            resetFields: {
+                firstTimePassword: '',
+                repeatedPassword: '',
+                firstName: '',
+                lastName: '',
+                phone: '',
+                email: ''
+            }
+        }
         
     } catch (error) {
         console.error('注册失败:', error)
         ElMessage.error('注册失败，请稍后重试')
-        return false
+        return { success: false }
     }
 }
 
