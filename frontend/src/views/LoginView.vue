@@ -31,8 +31,9 @@ const onHandleRegister = async () => {
     email: email.value
   })
   
-  // 重置除 username 外的所有字段
+  // 重置除了 username 以外的所有字段
   if (result && result.success && result.resetFields) {
+    username.value = result.resetFields.username
     first_time_password.value = result.resetFields.firstTimePassword
     repeated_password.value = result.resetFields.repeatedPassword
     first_name.value = result.resetFields.firstName
