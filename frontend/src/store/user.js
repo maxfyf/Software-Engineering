@@ -88,7 +88,7 @@ export const handleRegister = async ({
      * 2. 在前端检查电话号码是否为 8 位或 11 位数字，若不满足要求，反馈相应结果
      * 3. 在前端检查邮箱字符串是否符合"(Σ*)@(Σ*).com"的格式，若不满足要求，反馈相应结果
      * 4. 在后端查找该用户名是否已经被注册过，若已经注册过，反馈相应结果
-     * 5. 将新建的用户信息加入到后端数据库，提示"注册成功"，并返回登录界面，将除了 username 以外的变量全部重置为空串
+     * 5. 将新建的用户信息加入到后端数据库，提示"注册成功"，并返回登录界面，将变量全部重置为空串
      */
     
     // 1. 验证用户名格式
@@ -138,10 +138,11 @@ export const handleRegister = async ({
 
         router.push('/login')
         
-        // 6. 将除了 username 以外的变量全部重置为空串
+        // 6. 将变量全部重置为空串
         return {
             success: true,
             resetFields: {
+                username: '',
                 firstTimePassword: '',
                 repeatedPassword: '',
                 firstName: '',
