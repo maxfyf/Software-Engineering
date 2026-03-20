@@ -11,7 +11,7 @@ const last_name = ref('')    //姓
 const phone = ref('')    //电话号码
 const email = ref('')    //电子邮箱
 
-// 调用登录处理函数
+// 登录处理
 const onHandleLogin = () => {
   handleLogin({
     username: username.value,
@@ -19,9 +19,9 @@ const onHandleLogin = () => {
   })
 }
 
-// 调用注册处理函数
-const onHandleRegister = () => {
-  handleRegister({
+// 注册处理
+const onHandleRegister = async () => {
+  const result = await handleRegister({
     username: username.value,
     firstTimePassword: first_time_password.value,
     repeatedPassword: repeated_password.value,
@@ -30,6 +30,16 @@ const onHandleRegister = () => {
     phone: phone.value,
     email: email.value
   })
+  
+  // 重置除 username 外的所有字段
+  if (result && result.success && result.resetFields) {
+    first_time_password.value = result.resetFields.firstTimePassword
+    repeated_password.value = result.resetFields.repeatedPassword
+    first_name.value = result.resetFields.firstName
+    last_name.value = result.resetFields.lastName
+    phone.value = result.resetFields.phone
+    email.value = result.resetFields.email
+  }
 }
 </script>
 
