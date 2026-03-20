@@ -1,11 +1,30 @@
 <script setup lang="js">
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { handleLogout } from '@/store/user.js'
+import { handleLogout, currentUser } from '@/store/user.js'
+import { isLoggedIn } from '@/store/user.js'
 
-const isLoggedIn = ref(false)    //是否已登录
 const route = useRoute()
 const activeIndex = ref('/')    //当前网页路径
+
+// 页面加载时检查登录状态
+onMounted(() => {
+    const savedIsLoggedIn = localStorage.getItem('isLoggedIn') === 'true'
+    const savedUsername = localStorage.getItem('username')
+    
+    console.log('App 挂载时检查登录状态:', { savedIsLoggedIn, savedUsername })
+    
+    if (savedIsLoggedIn && savedUsername) {
+        isLoggedIn.value = true
+        // 从 localStorage 加载用户名（完整信息应该从后端获取）
+        currentUser.username = savedUsername
+        console.log('已恢复登录状态，用户名:', savedUsername)
+        // TODO: 这里可以从后端重新获取完整的用户信息
+    } else {
+        isLoggedIn.value = false
+        console.log('未登录状态')
+    }
+})
 
 watch(() => route.path, (newPath) => {
   console.log('路径变化：', newPath)
@@ -44,13 +63,13 @@ watch(() => route.path, (newPath) => {
         >
           <template #reference>
             <span class="username">
-              {{123/*TODO: 从store/user.js加载用户名*/}}
+              {{ currentUser.username }}
             </span>
           </template>
           <div>
-            <h2 class="popover-title">{{ 123/*TODO: username*/ }}</h2>
-            <p class="popover-info"><strong>Full Name:</strong> {{ 123/*TODO: first name*/ }} {{ 123/*TODO: last name*/ }}</p>
-            <p class="popover-info"><strong>Email:</strong> {{ 123/*TODO: email*/ }}</p>
+            <h2 class="popover-title">{{ currentUser.username }}</h2>
+            <p class="popover-info"><strong>Full Name:</strong> {{ currentUser.firstName }} {{ currentUser.lastName }}</p>
+            <p class="popover-info"><strong>Email:</strong> {{ currentUser.email }}</p>
             <div class="popover-button">
               <el-button
                   type="danger"
