@@ -11,6 +11,26 @@ const last_name = ref('')    //姓
 const phone = ref('')    //电话号码
 const email = ref('')    //电子邮箱
 
+// 调用登录处理函数
+const onHandleLogin = () => {
+  handleLogin({
+    username: username.value,
+    password: password.value
+  })
+}
+
+// 调用注册处理函数
+const onHandleRegister = () => {
+  handleRegister({
+    username: username.value,
+    firstTimePassword: first_time_password.value,
+    repeatedPassword: repeated_password.value,
+    firstName: first_name.value,
+    lastName: last_name.value,
+    phone: phone.value,
+    email: email.value
+  })
+}
 </script>
 
 <script>
@@ -85,7 +105,7 @@ export default {
               <el-button
                   type="primary"
                   class="login-button"
-                  @click="handleLogin"
+                  @click="onHandleLogin"
               >
                 <span class="login-button-text">登录</span>
               </el-button>
@@ -140,9 +160,9 @@ export default {
               <el-button
                   type="primary"
                   class="login-button"
-                  @click="handleRegister"
+                  @click="onHandleRegister"
               >
-                <span class="login-button-text">登录</span>
+                <span class="login-button-text">注册</span>
               </el-button>
             </div>
           </div>
