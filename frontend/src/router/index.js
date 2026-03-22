@@ -15,7 +15,15 @@ const router = createRouter({
         {
             path: '/task',
             name: 'task',
-            component: () => import('@/views/TaskView.vue')
+            component: () => import('@/views/TaskView.vue'),
+            redirect: '/task/all',
+            children: [
+                {
+                    path: 'all',
+                    name: 'allTasks',
+                    component: () => import('@/views/task/AllTasksView.vue')
+                }
+            ]
         },
         {
             path: '/settings',

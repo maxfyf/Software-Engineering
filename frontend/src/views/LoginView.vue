@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="js">
 import { ref } from 'vue'
 import { handleLogin, handleRegister } from '@/store/user.js'
 
@@ -13,7 +13,7 @@ const email = ref('')    //电子邮箱
 
 </script>
 
-<script>
+<script lang="js">
 export default {
   data() {
     return {

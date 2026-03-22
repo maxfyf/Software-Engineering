@@ -1,7 +1,7 @@
 @import 'base.css';
 
 html, body {
-  overflow: hidden !important;
+  overflow: auto;
   height: 100vh !important;
   width: 100vw !important;
   position: fixed !important;
@@ -14,7 +14,9 @@ html, body {
 }
 
 #app {
-  max-width: 1280px;
+  overflow: auto;
+  height: 100vh !important;
+  width: 100vw !important;
   margin: 0 auto;
   padding: 2rem;
   font-weight: normal;

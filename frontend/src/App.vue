@@ -1,14 +1,14 @@
 <script setup lang="js">
 import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { List, Setting } from "@element-plus/icons-vue";
 import { handleLogout } from '@/store/user.js'
 
-const isLoggedIn = ref(false)    //是否已登录
+const isLoggedIn = ref(true)    //是否已登录
 const route = useRoute()
 const activeIndex = ref('/')    //当前网页路径
 
 watch(() => route.path, (newPath) => {
-  console.log('路径变化：', newPath)
   activeIndex.value = newPath
 }, { immediate: true })
 </script>
@@ -25,10 +25,16 @@ watch(() => route.path, (newPath) => {
     <span class="site-name">协作式任务管理系统</span>
     <div v-if="isLoggedIn" class="routes">
       <el-menu-item index="/task" class="route">
-        📋&nbsp;我的任务
+        <el-icon>
+          <List/>
+        </el-icon>
+        我的任务
       </el-menu-item>
       <el-menu-item index="/settings" class="route">
-        ⚙️&nbsp;设置
+        <el-icon>
+          <Setting/>
+        </el-icon>
+        设置
       </el-menu-item>
     </div>
 
@@ -69,13 +75,16 @@ watch(() => route.path, (newPath) => {
     </div>
   </el-menu>
 
-  <main class="main">
-    <router-view></router-view>
+  <main v-if="isLoggedIn" class="main-without-footer">
+    <router-view/>
   </main>
 
-  <footer class="footer">
-    <p class="copyright">&copy; 2026 封逸凡、徐熙竣、丁泓森、赵冠杰、陈熙睿团队版权所有</p>
-  </footer>
+  <main v-else class="main-with-footer">
+    <router-view/>
+    <footer class="footer">
+      <p class="copyright">&copy; 2026 封逸凡、徐熙竣、丁泓森、赵冠杰、陈熙睿团队版权所有</p>
+    </footer>
+  </main>
 </template>
 
 <style scoped>
@@ -164,14 +173,24 @@ watch(() => route.path, (newPath) => {
   color: black;
 }
 
-.main {
+.main-without-footer {
+  position: absolute;
+  top: 50px;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #ececec;
+  overflow: auto;
+}
+
+.main-with-footer {
   position: absolute;
   top: 50px;
   bottom: 30px;
   left: 0;
   right: 0;
   background-color: #ececec;
-  overflow-y: auto;
+  overflow: auto;
 }
 
 .footer {
