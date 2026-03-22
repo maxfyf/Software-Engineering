@@ -1,6 +1,7 @@
 <script setup lang="js">
 import { ref, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { List, Setting } from "@element-plus/icons-vue";
 import { handleLogout, currentUser } from '@/store/user.js'
 import { isLoggedIn } from '@/store/user.js'
 
@@ -11,9 +12,9 @@ const activeIndex = ref('/')    //当前网页路径
 onMounted(() => {
     const savedIsLoggedIn = localStorage.getItem('isLoggedIn') === 'true'
     const savedUsername = localStorage.getItem('username')
-    
+
     console.log('App 挂载时检查登录状态:', { savedIsLoggedIn, savedUsername })
-    
+
     if (savedIsLoggedIn && savedUsername) {
         isLoggedIn.value = true
         // 从 localStorage 加载用户名（完整信息应该从后端获取）
@@ -44,10 +45,16 @@ watch(() => route.path, (newPath) => {
     <span class="site-name">协作式任务管理系统</span>
     <div v-if="isLoggedIn" class="routes">
       <el-menu-item index="/task" class="route">
-        📋&nbsp;我的任务
+        <el-icon>
+          <List/>
+        </el-icon>
+        我的任务
       </el-menu-item>
       <el-menu-item index="/settings" class="route">
-        ⚙️&nbsp;设置
+        <el-icon>
+          <Setting/>
+        </el-icon>
+        设置
       </el-menu-item>
     </div>
 
@@ -88,13 +95,16 @@ watch(() => route.path, (newPath) => {
     </div>
   </el-menu>
 
-  <main class="main">
-    <router-view></router-view>
+  <main v-if="isLoggedIn" class="main-without-footer">
+    <router-view/>
   </main>
 
-  <footer class="footer">
-    <p class="copyright">&copy; 2026 封逸凡、徐熙竣、丁泓森、赵冠杰、陈熙睿团队版权所有</p>
-  </footer>
+  <main v-else class="main-with-footer">
+    <router-view/>
+    <footer class="footer">
+      <p class="copyright">&copy; 2026 封逸凡、徐熙竣、丁泓森、赵冠杰、陈熙睿团队版权所有</p>
+    </footer>
+  </main>
 </template>
 
 <style scoped>
@@ -183,14 +193,24 @@ watch(() => route.path, (newPath) => {
   color: black;
 }
 
-.main {
+.main-without-footer {
+  position: absolute;
+  top: 50px;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #ececec;
+  overflow: auto;
+}
+
+.main-with-footer {
   position: absolute;
   top: 50px;
   bottom: 30px;
   left: 0;
   right: 0;
   background-color: #ececec;
-  overflow-y: auto;
+  overflow: auto;
 }
 
 .footer {

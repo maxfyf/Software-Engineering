@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="js">
 import { ref } from 'vue'
 import { handleLogin, handleRegister } from '@/store/user.js'
 
@@ -44,7 +44,7 @@ const onHandleRegister = async () => {
 }
 </script>
 
-<script>
+<script lang="js">
 export default {
   data() {
     return {
