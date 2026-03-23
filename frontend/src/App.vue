@@ -1,11 +1,17 @@
 <script setup lang="js">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { List, Setting } from "@element-plus/icons-vue";
 import { handleLogout, currentUser } from '@/store/user.js'
 import { isLoggedIn } from '@/store/user.js'
 
 const route = useRoute()
+const activeMenu = computed(() => {
+  if (route.path.startsWith('/task')) {
+    return '/task'
+  }
+  return route.path
+})
 const activeIndex = ref('/')    //当前网页路径
 
 // 页面加载时检查登录状态
@@ -36,7 +42,7 @@ watch(() => route.path, (newPath) => {
 <template>
   <el-menu
     mode="horizontal"
-    :default-active="activeIndex"
+    :default-active="activeMenu"
     class="navbar"
     :router="true"
   >

@@ -1,8 +1,8 @@
 <script setup lang="js">
 import { ref, computed } from 'vue';
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
-import Search from "@/components/Search.vue"
-import { Plus, View, Delete } from "@element-plus/icons-vue";
+import Search from "@/components/Search.vue";
+import { Plus, View, Edit, Delete } from "@element-plus/icons-vue";
 
 // TODO: 改成实际用户所有任务名称字符串数组
 const dataset = ['apple', 'banana', 'pear', 'peach']
@@ -18,7 +18,7 @@ const data1 = {
 };
 const data2 = {
   title: "task2",
-  status: "新建",
+  status: "待办",
   priority: "中"
 }
 const taskData = ref([data1, data2]);
@@ -28,12 +28,24 @@ const handleNew = () => {
 
 }
 
-//TODO: 查看任务详情
+const viewDialogVisible = ref(false)    // 查看任务窗口是否可见
+
+const closeViewDialog = () => {
+  viewDialogVisible.value = false
+}
+
 const viewDetail = () => {
+  viewDialogVisible.value = true
+  // TODO: 查看任务详情
 
 }
 
-//TODO: 删除任务
+// TODO: 编辑任务
+const editTask = () => {
+
+}
+
+// TODO: 删除任务
 const deleteTask = () => {
 
 }
@@ -89,12 +101,19 @@ const handleCurrentChange = (page) => {
             <el-table-column prop="priority" label="优先级" min-width="15%" align="center" />
             <el-table-column fixed="right" label="操作" min-width="15%" align="center">
               <template v-slot:default="scope">
-                <el-button link type="primary" @click="viewDetail">
+                <el-button link type="text" @click="viewDetail">
                   <el-icon>
                     <View/>
                   </el-icon>
                 </el-button>
-                <el-button link type="danger" @click="deleteTask">
+
+                <el-button link type="text" @click="editTask">
+                  <el-icon>
+                    <Edit/>
+                  </el-icon>
+                </el-button>
+
+                <el-button link type="text" class="delete-button" @click="deleteTask">
                   <el-icon>
                     <Delete/>
                   </el-icon>
@@ -114,6 +133,26 @@ const handleCurrentChange = (page) => {
           class="pagination"
       />
     </div>
+
+    <el-dialog
+        v-model="viewDialogVisible"
+        width="500px"
+        center
+        :before-close="closeViewDialog"
+    >
+      <template #header>
+        <span class="dialog-title">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;任务详情</span>
+      </template>
+      <div class="dialog-content-wrapper">
+        <p class="dialog-content"><span class="key">任务标题：</span>TODO</p>
+        <p class="dialog-content"><span class="key">描述：</span>TODO</p>
+        <p class="dialog-content"><span class="key">状态：</span>TODO</p>
+        <p class="dialog-content"><span class="key">优先级：</span>TODO</p>
+        <p class="dialog-content"><span class="key">截止时间：</span>TODO</p>
+        <p class="dialog-content"><span class="key">创建时间：</span>TODO</p>
+        <p class="dialog-content"><span class="key">更新时间：</span>TODO</p>
+      </div>
+    </el-dialog>
   </HeaderWrapper>
 </template>
 
@@ -167,11 +206,45 @@ const handleCurrentChange = (page) => {
 
 .task-table {
   width: 100%;
-  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2)
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
+}
+
+.delete-button:hover {
+  color: #f56c6c !important;
 }
 
 .pagination {
   display: flex;
   justify-content: flex-end;
+}
+
+:deep(.el-pagination .el-pager li) {
+  background-color: transparent !important;
+}
+
+:deep(.el-pagination .btn-prev),
+:deep(.el-pagination .btn-next) {
+  background-color: transparent !important;
+  color: black !important;
+}
+
+.dialog-title {
+  color: black;
+  font-weight: bold;
+  font-size: 20px;
+}
+
+.dialog-content-wrapper {
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.dialog-content {
+  padding: 0 20px;
+  font-size: 18px;
+}
+
+.key {
+  font-weight: bold;
 }
 </style>

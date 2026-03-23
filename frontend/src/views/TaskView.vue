@@ -1,9 +1,15 @@
 <script setup lang="js">
 import SidebarWrapper from "@/components/SidebarWrapper.vue";
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute } from "vue-router";
 
 const route = useRoute()
+const activeMenu = computed(() => {
+  if (route.path.startsWith('/task/edit')) {
+    return '/task/all'
+  }
+  return route.path
+})
 const activeIndex = ref('/task/')    //当前网页路径
 
 watch(() => route.path, (newPath) => {
@@ -16,7 +22,7 @@ watch(() => route.path, (newPath) => {
     <template #sidebar>
       <el-menu
           mode="vertical"
-          :default-active="activeIndex"
+          :default-active="activeMenu"
           class="sidebar-menu"
           :router="true"
       >
@@ -26,9 +32,7 @@ watch(() => route.path, (newPath) => {
       </el-menu>
     </template>
 
-    <div>
-      <router-view/>
-    </div>
+    <router-view/>
   </SidebarWrapper>
 </template>
 

@@ -48,7 +48,7 @@
 }
 
 .content {
-  height: 100%;
-  flex-grow: 1;
+  flex: 1;
+  overflow: auto;
 }
 </style>

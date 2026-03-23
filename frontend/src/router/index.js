@@ -23,6 +23,11 @@ const router = createRouter({
                     path: 'all',
                     name: 'allTasks',
                     component: () => import('@/views/task/AllTasksView.vue')
+                },
+                {
+                    path: 'edit',
+                    name: 'editTask',
+                    component: () => import('@/views/task/EditTaskView.vue')
                 }
             ]
         },
