@@ -1,11 +1,58 @@
-<script setup>
+<script setup lang="js">
+import SidebarWrapper from "@/components/SidebarWrapper.vue";
+import { ref, watch } from 'vue';
+import { useRoute } from "vue-router";
 
+const route = useRoute()
+const activeIndex = ref('/task/')    //当前网页路径
+
+watch(() => route.path, (newPath) => {
+  activeIndex.value = newPath
+}, { immediate: true })
 </script>
 
 <template>
+  <SidebarWrapper>
+    <template #sidebar>
+      <el-menu
+          mode="vertical"
+          :default-active="activeIndex"
+          class="sidebar-menu"
+          :router="true"
+      >
+        <el-menu-item index="/task/all" class="secondary-route">
+          全部任务
+        </el-menu-item>
+      </el-menu>
+    </template>
 
+    <div>
+      <router-view/>
+    </div>
+  </SidebarWrapper>
 </template>
 
 <style scoped>
+.sidebar-menu {
+  width: 100%;
+  flex-grow: 1;
+  border: transparent;
+}
 
+.secondary-route {
+  width: 100%;
+  height: 45px;
+  border-style: solid;
+  border-width: thin;
+  border-color: lightgray;
+  border-top: transparent;
+  border-left: transparent;
+  border-right: transparent;
+  font-size: large;
+  cursor: pointer;
+}
+
+.secondary-route:hover {
+  text-shadow: 2px 2px 3px rgba(0,0,0,0.5);
+}
 </style>

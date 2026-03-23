@@ -16,7 +16,15 @@ const router = createRouter({
             path: '/task',
             name: 'task',
             component: () => import('@/views/TaskView.vue'),
-            meta: { requiresAuth: true }
+            meta: { requiresAuth: true },
+            redirect: '/task/all',
+            children: [
+                {
+                    path: 'all',
+                    name: 'allTasks',
+                    component: () => import('@/views/task/AllTasksView.vue')
+                }
+            ]
         },
         {
             path: '/settings',
@@ -32,7 +40,7 @@ router.beforeEach((to, from, next) => {
     // 检查是否需要登录
     if (to.meta.requiresAuth) {
         const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true'
-        
+
         if (!isLoggedIn) {
             // 未登录，重定向到登录页
             next('/login')
