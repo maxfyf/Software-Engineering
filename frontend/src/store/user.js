@@ -11,6 +11,17 @@ export const userInfo = {
     email: ''          // 电子邮箱
 }
 
+// 任务数据结构
+export const taskInfo = {
+    title: '',
+    description: '',
+    status: '',
+    priority: '',
+    deadline: '',
+    createdAt: '',
+    updatedAt: ''
+}
+
 // 当前登录用户信息
 export const currentUser = reactive({ ...userInfo })
 
