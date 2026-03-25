@@ -10,7 +10,11 @@ const activeMenu = computed(() => {
   if (route.path.startsWith('/task')) {
     return '/task'
   }
-  return route.path
+  else if (route.path.startsWith('/settings')) {
+    return '/settings'
+  }
+  else
+    return route.path
 })
 const activeIndex = ref('/')    //当前网页路径
 
@@ -235,5 +239,4 @@ watch(() => route.path, (newPath) => {
   color: black;
   font-size: medium;
 }
-
 </style>

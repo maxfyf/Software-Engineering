@@ -5,10 +5,14 @@ import { useRoute } from "vue-router";
 
 const route = useRoute()
 const activeMenu = computed(() => {
-  if (route.path.startsWith('/task/edit')) {
+  if (route.path.startsWith('/task/all')) {
     return '/task/all'
   }
-  return route.path
+  else if (route.path.startsWith('/task/edit')) {
+    return '/task/all'
+  }
+  else
+    return route.path
 })
 const activeIndex = ref('/task/')    //当前网页路径
 
@@ -57,6 +61,7 @@ watch(() => route.path, (newPath) => {
 }
 
 .secondary-route:hover {
+  color: #409eff;
   text-shadow: 2px 2px 3px rgba(0,0,0,0.5);
 }
 </style>

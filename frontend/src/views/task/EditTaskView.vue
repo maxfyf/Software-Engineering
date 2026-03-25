@@ -41,7 +41,7 @@ const saveChanges = () => {
         </el-button>
         <span class="route">
           <span>全部任务</span>
-          <span>&nbsp;>&nbsp;</span>
+          <pan>&nbsp;>&nbsp;</pan>
           <span v-if="isNew" class="present-directory">
             新建任务
           </span>
@@ -70,7 +70,7 @@ const saveChanges = () => {
               class="description"
               v-model="newDescription"
               type="textarea"
-              :rows="6"
+              :rows="10"
           />
         </div>
 
@@ -171,17 +171,11 @@ const saveChanges = () => {
 }
 
 .box-card {
-  flex: 1;
-  margin-left: 35px;
-  margin-right: 35px;
+  width: 90%;
+  height: 90%;
   border-radius: 10px;
-  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
-}
-
-.box-card:hover {
-  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
 }
 
 .item {
@@ -225,10 +219,6 @@ const saveChanges = () => {
 .priority {
   width: 70px;
   font-size: 15px;
-}
-
-:deep(.el-card__footer) {
-  border-top: none;
 }
 
 .footer {

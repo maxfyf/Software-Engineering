@@ -5,7 +5,7 @@ const router = createRouter({
     routes: [
         {
             path: '/',
-            redirect: '/login'
+            redirect: '/task/edit'
         },
         {
             path: '/login',
@@ -35,7 +35,15 @@ const router = createRouter({
             path: '/settings',
             name: 'settings',
             component: () => import('@/views/SettingsView.vue'),
-            meta: { requiresAuth: true }
+            meta: { requiresAuth: true },
+            redirect: '/settings/info',
+            children: [
+                {
+                    path: 'info',
+                    name: 'userInfo',
+                    component: () => import('@/views/settings/UserInfoView.vue'),
+                }
+            ]
         }
     ]
 })

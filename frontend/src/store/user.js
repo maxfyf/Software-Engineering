@@ -170,6 +170,11 @@ export const handleRegister = async ({
     }
 }
 
+// TODO
+export const handleCancelAccount = () => {
+
+}
+
 export const handleLogin = async ({ username, password }) => {
     /*TODO: 登录
      * 1. 在后端数据库中查询该用户，并反馈"用户不存在"、"密码错误"或"登录成功"三种结果
