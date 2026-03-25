@@ -3,51 +3,106 @@ import { ref, computed } from 'vue';
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import Search from "@/components/Search.vue";
 import { Plus, View, Edit, Delete } from "@element-plus/icons-vue";
+import { ElMessage, ElMessageBox } from 'element-plus';
+import router from '@/router';
+import { currentUser } from '@/store/user.js';
 
-// TODO: 改成实际用户所有任务名称字符串数组
-const dataset = ['apple', 'banana', 'pear', 'peach']
+// 实际用户所有任务名称字符串数组
+const dataset = computed(() => taskData.value.map(task => task.title))
 
-// TODO: 改成实际选中选项后的回调函数（切换页面到指定任务对应的页面）
-const handleSelect = () => {}
+// 实际选中选项后的回调函数（切换页面到指定任务对应的页面）
+const handleSelect = (taskName) => {
+  console.log('选中任务:', taskName)
+  const task = taskData.value.find(t => t.title === taskName)
+  if (task) {
+    currentTask.value = task
+    viewDialogVisible.value = true
+  }
+}
+
 
 // TODO: 任务数据，可直接使用原始taskInfo数组，程序将根据taskInfo结构体中的prop名自动填表
-const data1 = {
-  title: "task1",
-  status: "进行中",
-  priority: "高"
-};
-const data2 = {
-  title: "task2",
-  status: "待办",
-  priority: "中"
-}
-const taskData = ref([data1, data2]);
+const taskData = ref([
+  {
+    id: 1,
+    title: "完成前端登录界面",
+    description: "实现用户登录、注册的前端界面",
+    status: "进行中",
+    priority: "高",
+    deadline: "2026-04-01",
+    createdAt: "2026-03-20",
+    updatedAt: "2026-03-20"
+  },
+  {
+    id: 2,
+    title: "完成后端API接口",
+    description: "实现用户注册、登录的后端接口",
+    status: "进行中",
+    priority: "中",
+    deadline: "2026-04-05",
+    createdAt: "2026-03-20",
+    updatedAt: "2026-03-20"
+  }
+])
 
-// TODO: 新建任务
+// 新建任务
 const handleNew = () => {
-
+  console.log('新建任务')
+  // 跳转到编辑页面，并传递 isNew 参数
+  router.push({
+    path: '/task/edit',
+    query: { isNew: 'true' }
+  })
 }
 
 const viewDialogVisible = ref(false)    // 查看任务窗口是否可见
+const currentTask = ref(null)           // 当前查看的任务
 
 const closeViewDialog = () => {
   viewDialogVisible.value = false
 }
 
-const viewDetail = () => {
+const viewDetail = (row) => {
+  currentTask.value = row
   viewDialogVisible.value = true
-  // TODO: 查看任务详情
-
 }
 
-// TODO: 编辑任务
-const editTask = () => {
-
+// 编辑任务
+const editTask = (row) => {
+  console.log('编辑任务:', row)
+  // 跳转到编辑页面，传递任务ID
+  router.push({
+    path: '/task/edit',
+    query: { 
+      isNew: 'false',
+      taskId: row.id 
+    }
+  })
 }
 
 // TODO: 删除任务
-const deleteTask = () => {
-
+const deleteTask = (row) => {
+  ElMessageBox.confirm(
+    `确定要删除任务"${row.title}"吗？`,
+    '删除确认',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(() => {
+    // TODO: 调用后端 API 删除任务
+    console.log('删除任务:', row.id)
+    // 从列表中移除（模拟）
+    const index = taskData.value.findIndex(t => t.id === row.id)
+    if (index !== -1) {
+      taskData.value.splice(index, 1)
+    }
+    ElMessage.success('任务已删除')
+  }).catch(() => {
+    // 取消删除
+    console.log('取消删除')
+  })
 }
 
 const currentPage = ref(1)    // 当前数据页
@@ -101,19 +156,19 @@ const handleCurrentChange = (page) => {
             <el-table-column prop="priority" label="优先级" min-width="15%" align="center" />
             <el-table-column fixed="right" label="操作" min-width="15%" align="center">
               <template v-slot:default="scope">
-                <el-button link type="text" @click="viewDetail">
+                <el-button link type="text" @click="viewDetail(scope.row)">
                   <el-icon>
                     <View/>
                   </el-icon>
                 </el-button>
 
-                <el-button link type="text" @click="editTask">
+                <el-button link type="text" @click="editTask(scope.row)">
                   <el-icon>
                     <Edit/>
                   </el-icon>
                 </el-button>
 
-                <el-button link type="text" class="delete-button" @click="deleteTask">
+                <el-button link type="text" class="delete-button" @click="deleteTask(scope.row)">
                   <el-icon>
                     <Delete/>
                   </el-icon>
@@ -144,13 +199,13 @@ const handleCurrentChange = (page) => {
         <span class="dialog-title">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;任务详情</span>
       </template>
       <div class="dialog-content-wrapper">
-        <p class="dialog-content"><span class="key">任务标题：</span>TODO</p>
-        <p class="dialog-content"><span class="key">描述：</span>TODO</p>
-        <p class="dialog-content"><span class="key">状态：</span>TODO</p>
-        <p class="dialog-content"><span class="key">优先级：</span>TODO</p>
-        <p class="dialog-content"><span class="key">截止时间：</span>TODO</p>
-        <p class="dialog-content"><span class="key">创建时间：</span>TODO</p>
-        <p class="dialog-content"><span class="key">更新时间：</span>TODO</p>
+        <p class="dialog-content"><span class="key">任务标题：</span>{{ currentTask.title }}</p>
+        <p class="dialog-content"><span class="key">描述：</span>{{ currentTask.description }}</p>
+        <p class="dialog-content"><span class="key">状态：</span>{{ currentTask.status }}</p>
+        <p class="dialog-content"><span class="key">优先级：</span>{{ currentTask.priority }}</p>
+        <p class="dialog-content"><span class="key">截止时间：</span>{{ currentTask.deadline }}</p>
+        <p class="dialog-content"><span class="key">创建时间：</span>{{ currentTask.createdAt }}</p>
+        <p class="dialog-content"><span class="key">更新时间：</span>{{ currentTask.updatedAt }}</p>
       </div>
     </el-dialog>
   </HeaderWrapper>
