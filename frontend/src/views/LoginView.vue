@@ -12,8 +12,8 @@ const phone = ref('')    //电话号码
 const email = ref('')    //电子邮箱
 
 // 登录处理
-const onHandleLogin = () => {
-  handleLogin({
+const onHandleLogin = async () => {
+  await handleLogin({
     username: username.value,
     password: password.value
   })
