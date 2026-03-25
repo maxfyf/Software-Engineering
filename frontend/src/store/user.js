@@ -13,6 +13,7 @@ export const userInfo = {
 
 // 任务数据结构
 export const taskInfo = {
+    id: null,
     title: '',
     description: '',
     status: '',
@@ -33,6 +34,42 @@ export const resetUserInfo = () => {
     Object.keys(userInfo).forEach(key => {
         currentUser[key] = userInfo[key]
     })
+}
+
+// 当前用户的任务列表
+export const taskList = ref([])
+
+// 重置任务列表
+export const resetTaskList = () => {
+    taskList.value = []
+}
+
+// 添加任务
+export const addTask = (task) => {
+    const newTask = {
+        ...taskInfo,
+        ...task,
+        id: Date.now(),  // 临时 ID
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    }
+    taskList.value.push(newTask)
+    return newTask
+}
+
+// 删除任务
+export const removeTask = (taskId) => {
+    const index = taskList.value.findIndex(t => t.id === taskId)
+    if (index !== -1) {
+        taskList.value.splice(index, 1)
+        return true
+    }
+    return false
+}
+
+// 根据 ID 获取任务
+export const getTaskById = (taskId) => {
+    return taskList.value.find(t => t.id === taskId)
 }
 
 /**
@@ -197,9 +234,9 @@ export const handleLogin = async ({ username, password }) => {
         currentUser.phone = '12345678'  // TODO: 从后端获取
         currentUser.email = 'john@example.com'  // TODO: 从后端获取
         
-        // 保存登录状态到 localStorage
-        localStorage.setItem('isLoggedIn', 'true')
-        localStorage.setItem('username', username)
+        // 保存登录状态到 sessionStorage
+        sessionStorage.setItem('isLoggedIn', 'true')
+        sessionStorage.setItem('username', username)
         
         // 3. 将 isLoggedIn 置为 true
         isLoggedIn.value = true
@@ -228,9 +265,9 @@ export const handleLogout = () => {
     // 1. 删除用户数据
     resetUserInfo()
     
-    // 清除 localStorage 中的登录状态
-    localStorage.removeItem('isLoggedIn')
-    localStorage.removeItem('username')
+    // 清除 sessionStorage 中的登录状态
+    sessionStorage.removeItem('isLoggedIn')
+    sessionStorage.removeItem('username')
     
     // 2. 更新登录状态为 false
     isLoggedIn.value = false
