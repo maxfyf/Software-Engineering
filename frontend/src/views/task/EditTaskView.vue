@@ -41,7 +41,7 @@ const saveChanges = () => {
         </el-button>
         <span class="route">
           <span>全部任务</span>
-          <pan>&nbsp;>&nbsp;</pan>
+          <span>&nbsp;>&nbsp;</span>
           <span v-if="isNew" class="present-directory">
             新建任务
           </span>
