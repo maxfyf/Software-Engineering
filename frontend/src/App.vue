@@ -20,14 +20,14 @@ const activeIndex = ref('/')    //当前网页路径
 
 // 页面加载时检查登录状态
 onMounted(() => {
-    const savedIsLoggedIn = localStorage.getItem('isLoggedIn') === 'true'
-    const savedUsername = localStorage.getItem('username')
+    const savedIsLoggedIn = sessionStorage.getItem('isLoggedIn') === 'true'
+    const savedUsername = sessionStorage.getItem('username')
 
     console.log('App 挂载时检查登录状态:', { savedIsLoggedIn, savedUsername })
 
     if (savedIsLoggedIn && savedUsername) {
         isLoggedIn.value = true
-        // 从 localStorage 加载用户名（完整信息应该从后端获取）
+        // 从 sessionStorage 加载用户名（完整信息应该从后端获取）
         currentUser.username = savedUsername
         console.log('已恢复登录状态，用户名:', savedUsername)
         // TODO: 这里可以从后端重新获取完整的用户信息
