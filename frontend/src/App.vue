@@ -105,13 +105,9 @@ watch(() => route.path, (newPath) => {
     </div>
   </el-menu>
 
-  <main v-if="isLoggedIn" class="main-without-footer">
+  <main class="main">
     <router-view/>
-  </main>
-
-  <main v-else class="main-with-footer">
-    <router-view/>
-    <footer class="footer">
+    <footer v-if="isLoggedIn === false" class="footer">
       <p class="copyright">&copy; 2026 封逸凡、徐熙竣、丁泓森、赵冠杰、陈熙睿团队版权所有</p>
     </footer>
   </main>
@@ -203,20 +199,10 @@ watch(() => route.path, (newPath) => {
   color: black;
 }
 
-.main-without-footer {
+.main {
   position: absolute;
   top: 50px;
   bottom: 0;
-  left: 0;
-  right: 0;
-  background-color: #ececec;
-  overflow: auto;
-}
-
-.main-with-footer {
-  position: absolute;
-  top: 50px;
-  bottom: 30px;
   left: 0;
   right: 0;
   background-color: #ececec;
