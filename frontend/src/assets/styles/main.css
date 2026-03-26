@@ -65,3 +65,7 @@ a,
 .el-dialog {
   border-radius: 10px !important;
 }
+
+.el-message-box {
+  border-radius: 10px !important;
+}

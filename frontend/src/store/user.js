@@ -1,4 +1,4 @@
-import { ElMessage } from 'element-plus'
+import {ElMessage, ElMessageBox} from 'element-plus'
 import router from '@/router'
 import { reactive, ref } from 'vue'
 
@@ -119,7 +119,7 @@ export const validateEmail = (emailAddr) => {
     if (!emailAddr) {
         return false
     }
-    return /^[^@]+@[^@]+\.com$/.test(emailAddr)
+    return /^[^@]+@[^@]+\.[^@]$/.test(emailAddr)
 }
 
 export const handleRegister = async ({
@@ -134,20 +134,20 @@ export const handleRegister = async ({
     /*TODO: 注册
      * 1. 在前端检查密码是否符合要求，以及两次输入密码的字符串是否相同，若不满足要求，反馈相应判定结果
      * 2. 在前端检查电话号码是否为 8 位或 11 位数字，若不满足要求，反馈相应结果
-     * 3. 在前端检查邮箱字符串是否符合"(Σ*)@(Σ*).com"的格式，若不满足要求，反馈相应结果
+     * 3. 在前端检查邮箱字符串是否符合"(Σ*)@(Σ*).(Σ*)"的格式，若不满足要求，反馈相应结果
      * 4. 在后端查找该用户名是否已经被注册过，若已经注册过，反馈相应结果
      * 5. 将新建的用户信息加入到后端数据库，提示"注册成功"，并返回登录界面，将变量全部重置为空串
      */
     
     // 1. 验证用户名格式
     if (!validateUsername(username)) {
-        ElMessage.error('用户名只允许包含字母、数字、下划线，长度为 4～20')
+        ElMessage.error('用户名只允许包含字母、数字、下划线，长度为4～20')
         return false
     }
     
     // 2. 验证密码格式
     if (!validatePassword(firstTimePassword)) {
-        ElMessage.error('密码长度不少于 6 位，且必须同时包含字母和数字')
+        ElMessage.error('密码长度不少于6位，且必须同时包含字母和数字')
         return false
     }
     
@@ -159,13 +159,13 @@ export const handleRegister = async ({
     
     // 4. 验证电话号码格式
     if (!validatePhone(phone)) {
-        ElMessage.error('电话号码必须为 8 位或 11 位数字')
+        ElMessage.error('电话号码必须为8位或11位数字')
         return false
     }
     
     // 5. 验证邮箱格式
     if (!validateEmail(email)) {
-        ElMessage.error('邮箱格式不正确，应为 "xxx@xxx.com"')
+        ElMessage.error('邮箱格式不正确，应为"xxx@xxx.xxx"')
         return false
     }
     
@@ -182,7 +182,7 @@ export const handleRegister = async ({
             email
         })
         
-        ElMessage.success('注册成功！请登录')
+        ElMessage.success('注册成功')
 
         router.push('/login')
         
@@ -202,7 +202,7 @@ export const handleRegister = async ({
         
     } catch (error) {
         console.error('注册失败:', error)
-        ElMessage.error('注册失败，请稍后重试')
+        ElMessage.error('注册失败')
         return { success: false }
     }
 }
@@ -261,19 +261,32 @@ export const handleLogout = () => {
      * 2. 将 App.vue 中的 isLoggedIn 置为 false
      * 3. 切换页面到 login 页面
      * */
-    
-    // 1. 删除用户数据
-    resetUserInfo()
-    
-    // 清除 sessionStorage 中的登录状态
-    sessionStorage.removeItem('isLoggedIn')
-    sessionStorage.removeItem('username')
-    
-    // 2. 更新登录状态为 false
-    isLoggedIn.value = false
-    
-    ElMessage.success('已退出登录')
-    
-    // 3. 切换页面到 login 页面
-    router.push('/login')
+
+    ElMessageBox.confirm(
+        '确认退出登录？',
+        '',
+        {
+            confirmButtonText: '确定',
+            confirmButtonType: 'danger',
+            cancelButtonText: '取消',
+            type: undefined
+        }
+    ).then(() => {
+        // 1. 删除用户数据
+        resetUserInfo()
+
+        // 清除 sessionStorage 中的登录状态
+        sessionStorage.removeItem('isLoggedIn')
+        sessionStorage.removeItem('username')
+
+        // 2. 更新登录状态为 false
+        isLoggedIn.value = false
+
+        ElMessage.success('登出成功')
+
+        // 3. 切换页面到 login 页面
+        router.push('/login')
+    }).catch(() => {
+        // 取消，留在当前页面
+    })
 }

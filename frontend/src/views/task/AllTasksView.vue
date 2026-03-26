@@ -84,11 +84,12 @@ const editTask = (row) => {
 const deleteTask = (row) => {
   ElMessageBox.confirm(
     `确定要删除任务"${row.title}"吗？`,
-    '删除确认',
+    '',
     {
       confirmButtonText: '确定',
+      confirmButtonType: 'danger',
       cancelButtonText: '取消',
-      type: 'warning'
+      type: undefined
     }
   ).then(() => {
     // TODO: 调用后端 API 删除任务

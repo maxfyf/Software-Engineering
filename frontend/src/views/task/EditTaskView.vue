@@ -74,11 +74,12 @@ const handleBack = () => {
   if (hasChanges || isNew.value) {
     ElMessageBox.confirm(
       info,
-      '提示',
+      '',
       {
         confirmButtonText: '确定',
+        confirmButtonType: 'danger',
         cancelButtonText: '取消',
-        type: 'warning'
+        type: undefined
       }
     ).then(() => {
       router.push('/task/all')
