@@ -51,7 +51,7 @@ watch(() => route.path, (newPath) => {
     :router="true"
   >
     <!-- 网站信息 -->
-    <img src="/src/assets/images/logo.jpg" class="logo" alt="Logo">
+    <img src="/src/assets/images/logo.png" class="logo" alt="Logo">
     <span class="site-name">协作式任务管理系统</span>
     <div v-if="isLoggedIn" class="routes">
       <el-menu-item index="/task" class="route">
