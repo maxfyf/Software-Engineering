@@ -61,3 +61,7 @@ a,
 .el-card__footer {
   border-top: none !important;
 }
+
+.el-dialog {
+  border-radius: 10px !important;
+}

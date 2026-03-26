@@ -67,11 +67,13 @@ const resetForm = () => {
 // TODO: 回退到AllTaskView，若为新建任务，取消该任务；若为编辑任务，取消编辑记录
 const handleBack = () => {
   // 检查是否有未保存的更改
-  const hasChanges = newTitle.value || newDescription.value || newDate.value
+  const hasChanges = newTitle.value || newDescription.value || newStatus.value ||
+      newPriority.value || newDate.value
+  const info = isNew.value ? '您新建的任务尚未保存，确定要离开吗？' : '您有未保存的更改，确定要离开吗？'
   
-  if (hasChanges) {
+  if (hasChanges || isNew.value) {
     ElMessageBox.confirm(
-      '您有未保存的更改，确定要离开吗？',
+      info,
       '提示',
       {
         confirmButtonText: '确定',
@@ -91,14 +93,14 @@ const handleBack = () => {
 // TODO: 保存所有更改并回退到'/task/all'页面
 const saveChanges = () => {
   // 表单验证
-  if (!newTitle.value.trim()) {
+  if (!newTitle.value) {
     ElMessage.warning('请输入任务标题')
     return
   }
   
   const taskData = {
-    title: newTitle.value.trim(),
-    description: newDescription.value.trim(),
+    title: newTitle.value,
+    description: newDescription.value,
     status: newStatus.value,
     priority: newPriority.value,
     deadline: newDate.value
@@ -167,7 +169,7 @@ const saveChanges = () => {
               class="description"
               v-model="newDescription"
               type="textarea"
-              :rows="6"
+              :rows="10"
           />
         </div>
 
@@ -262,23 +264,14 @@ const saveChanges = () => {
 .main-content-wrapper {
   width: 100%;
   height: 100%;
-  display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .box-card {
-  flex: 1;
-  margin-left: 35px;
-  margin-right: 35px;
-  border-radius: 10px;
-  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1);
+  margin: 35px;
   display: flex;
   flex-direction: column;
-}
-
-.box-card:hover {
-  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
 }
 
 .item {
