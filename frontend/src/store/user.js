@@ -1,5 +1,4 @@
 import {ElMessage, ElMessageBox} from 'element-plus'
-import router from '@/router'
 import { reactive, ref } from 'vue'
 
 // 用户数据结构
@@ -45,6 +44,7 @@ export const resetTaskList = () => {
 }
 
 // 添加任务
+// TODO: 调用后端创建任务 API
 export const addTask = (task) => {
     const newTask = {
         ...taskInfo,
@@ -58,6 +58,7 @@ export const addTask = (task) => {
 }
 
 // 删除任务
+// TODO: 调用后端删除任务 API
 export const removeTask = (taskId) => {
     const index = taskList.value.findIndex(t => t.id === taskId)
     if (index !== -1) {
@@ -67,7 +68,7 @@ export const removeTask = (taskId) => {
     return false
 }
 
-// 根据 ID 获取任务
+// TODO: 根据ID从后端获取任务详情
 export const getTaskById = (taskId) => {
     return taskList.value.find(t => t.id === taskId)
 }
@@ -131,13 +132,6 @@ export const handleRegister = async ({
     phone,
     email
 }) => {
-    /*TODO: 注册
-     * 1. 在前端检查密码是否符合要求，以及两次输入密码的字符串是否相同，若不满足要求，反馈相应判定结果
-     * 2. 在前端检查电话号码是否为 8 位或 11 位数字，若不满足要求，反馈相应结果
-     * 3. 在前端检查邮箱字符串是否符合"(Σ*)@(Σ*).(Σ*)"的格式，若不满足要求，反馈相应结果
-     * 4. 在后端查找该用户名是否已经被注册过，若已经注册过，反馈相应结果
-     * 5. 将新建的用户信息加入到后端数据库，提示"注册成功"，并返回登录界面，将变量全部重置为空串
-     */
     
     // 1. 验证用户名格式
     if (!validateUsername(username)) {
@@ -171,9 +165,8 @@ export const handleRegister = async ({
     
     try {
         // TODO: 调用后端注册 API
-        // const response = await axios.post('/api/register', { ... })
         
-        // 模拟注册成功（后续替换为真实 API 调用）
+        // 模拟注册成功（替换为真实 API 调用）
         console.log('注册信息:', {
             username,
             firstName,
@@ -183,8 +176,6 @@ export const handleRegister = async ({
         })
         
         ElMessage.success('注册成功')
-
-        router.push('/login')
         
         // 6. 将变量全部重置为空串
         return {
@@ -207,32 +198,48 @@ export const handleRegister = async ({
     }
 }
 
-// TODO
-export const handleCancelAccount = () => {
 
+export const handleCancelAccount = () => {
+    // TODO: 调用后端注销账号 API
+    return new Promise((resolve) => {
+        ElMessageBox.confirm(
+            '注销账号后，您的所有数据将被删除且无法恢复，确定要注销吗？',
+            '',
+            {
+                confirmButtonText: '确定注销',
+                confirmButtonType: 'danger',
+                cancelButtonText: '取消',
+                type: undefined
+            }
+        ).then(() => {
+            resetUserInfo()
+            resetTaskList()
+            sessionStorage.removeItem('isLoggedIn')
+            sessionStorage.removeItem('username')
+            isLoggedIn.value = false
+            ElMessage.success('账号已注销')
+            resolve({ success: true, redirect: '/login' })
+        }).catch(() => {
+            resolve({ success: false })
+        })
+    })
 }
 
 export const handleLogin = async ({ username, password }) => {
-    /*TODO: 登录
-     * 1. 在后端数据库中查询该用户，并反馈"用户不存在"、"密码错误"或"登录成功"三种结果
-     * 2. 从后端加载用户信息与所有任务，存储到该文件
-     * 3. 将 App.vue 中的 isLoggedIn 置为 true
-     * 4. 切换页面到/task 页面
-     * */
-    
+
     try {
         // TODO: 调用后端登录 API
-        // const response = await axios.post('/api/login', { username, password })
         
         // 模拟登录成功（后续替换为真实 API 调用）
         console.log('登录信息:', { username })
         
+        // TODO: 从后端获取用户信息
         // 2. 从后端加载用户信息（目前使用模拟数据）
         currentUser.username = username
-        currentUser.firstName = 'John'  // TODO: 从后端获取
-        currentUser.lastName = 'Doe'    // TODO: 从后端获取
-        currentUser.phone = '12345678'  // TODO: 从后端获取
-        currentUser.email = 'john@example.com'  // TODO: 从后端获取
+        currentUser.firstName = 'John'  
+        currentUser.lastName = 'Doe'    
+        currentUser.phone = '12345678'  
+        currentUser.email = 'john@example.com'  
         
         // 保存登录状态到 sessionStorage
         sessionStorage.setItem('isLoggedIn', 'true')
@@ -244,49 +251,36 @@ export const handleLogin = async ({ username, password }) => {
         ElMessage.success('登录成功')
         
         // 4. 切换页面到/task 页面
-        router.push('/task')
-        return true
+        return { success: true, redirect: '/task' }
         
     } catch (error) {
         console.error('登录失败:', error)
-        // TODO: 根据后端返回的错误信息显示不同提示
         ElMessage.error('用户名或密码错误')
         return false
     }
 }
 
 export const handleLogout = () => {
-    /*TODO: 登出
-     * 1. 删去用户数据
-     * 2. 将 App.vue 中的 isLoggedIn 置为 false
-     * 3. 切换页面到 login 页面
-     * */
 
-    ElMessageBox.confirm(
-        '确认退出登录？',
-        '',
-        {
-            confirmButtonText: '确定',
-            confirmButtonType: 'danger',
-            cancelButtonText: '取消',
-            type: undefined
-        }
-    ).then(() => {
-        // 1. 删除用户数据
-        resetUserInfo()
-
-        // 清除 sessionStorage 中的登录状态
-        sessionStorage.removeItem('isLoggedIn')
-        sessionStorage.removeItem('username')
-
-        // 2. 更新登录状态为 false
-        isLoggedIn.value = false
-
-        ElMessage.success('登出成功')
-
-        // 3. 切换页面到 login 页面
-        router.push('/login')
-    }).catch(() => {
-        // 取消，留在当前页面
+    return new Promise((resolve) => {
+        ElMessageBox.confirm(
+            '确认退出登录？',
+            '',
+            {
+                confirmButtonText: '确定',
+                confirmButtonType: 'danger',
+                cancelButtonText: '取消',
+                type: undefined
+            }
+        ).then(() => {
+            resetUserInfo()
+            sessionStorage.removeItem('isLoggedIn')
+            sessionStorage.removeItem('username')
+            isLoggedIn.value = false
+            ElMessage.success('登出成功')
+            resolve({ success: true, redirect: '/login' })
+        }).catch(() => {
+            resolve({ success: false })
+        })
     })
 }
