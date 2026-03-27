@@ -69,3 +69,18 @@ a,
 .el-message-box {
   border-radius: 10px !important;
 }
+
+.el-select__popper .el-popper__arrow {
+  display: none !important;
+}
+
+.el-picker__popper .el-popper__arrow,
+.el-date-picker__popper .el-popper__arrow,
+.el-picker-panel__popper .el-popper__arrow {
+  display: none !important;
+}
+
+.el-popover {
+  border-radius: 10px !important;
+  margin-top: 10px !important;
+}
