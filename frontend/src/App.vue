@@ -1,11 +1,11 @@
 <script setup lang="js">
 import { ref, watch, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { List, Setting } from "@element-plus/icons-vue";
-import { handleLogout, currentUser } from '@/store/user.js'
-import { isLoggedIn } from '@/store/user.js'
+import { handleLogout, currentUser, isLoggedIn } from '@/store/user.js'
 
 const route = useRoute()
+const router = useRouter()
 const activeMenu = computed(() => {
   if (route.path.startsWith('/task')) {
     return '/task'
@@ -27,15 +27,22 @@ onMounted(() => {
 
     if (savedIsLoggedIn && savedUsername) {
         isLoggedIn.value = true
-        // 从 sessionStorage 加载用户名（完整信息应该从后端获取）
+        // TODO: 页面刷新后从后端重新获取完整用户信息
         currentUser.username = savedUsername
         console.log('已恢复登录状态，用户名:', savedUsername)
-        // TODO: 这里可以从后端重新获取完整的用户信息
     } else {
         isLoggedIn.value = false
         console.log('未登录状态')
     }
 })
+
+// 退出登录处理
+const onHandleLogout = async () => {
+  const result = await handleLogout()
+  if (result && result.success && result.redirect) {
+    router.push(result.redirect)
+  }
+}
 
 watch(() => route.path, (newPath) => {
   console.log('路径变化：', newPath)
@@ -91,7 +98,7 @@ watch(() => route.path, (newPath) => {
               <el-button
                   type="danger"
                   class="logout-button"
-                  @click="handleLogout"
+                  @click="onHandleLogout"
               >
               退出登录
             </el-button>
