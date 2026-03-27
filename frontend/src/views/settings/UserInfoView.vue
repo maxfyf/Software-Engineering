@@ -1,6 +1,16 @@
 <script setup lang="js">
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
-import { handleCancelAccount } from "@/store/user.js";
+import { useRouter } from 'vue-router';
+import { currentUser, handleCancelAccount } from "@/store/user.js"
+
+const router = useRouter();
+
+const onHandleCancelAccount = async () => {
+  const result = await handleCancelAccount()
+  if (result && result.success && result.redirect) {
+    router.push(result.redirect)
+  }
+}
 </script>
 
 <template>
@@ -13,18 +23,18 @@ import { handleCancelAccount } from "@/store/user.js";
 
     <div class="main-content-wrapper">
       <el-card class="box-card">
-        <p class="item"><span class="key">用户名：</span>TODO</p>
-        <p class="item"><span class="key">名：</span>TODO</p>
-        <p class="item"><span class="key">姓：</span>TODO</p>
-        <p class="item"><span class="key">电话号码：</span>TODO</p>
-        <p class="item"><span class="key">电子邮箱：</span>TODO</p>
+        <p class="item"><span class="key">用户名：</span>{{ currentUser.username || '未设置' }}</p>
+        <p class="item"><span class="key">名：</span>{{ currentUser.firstName || '未设置' }}</p>
+        <p class="item"><span class="key">姓：</span>{{ currentUser.lastName || '未设置' }}</p>
+        <p class="item"><span class="key">电话号码：</span>{{ currentUser.phone || '未设置' }}</p>
+        <p class="item"><span class="key">电子邮箱：</span>{{ currentUser.email || '未设置' }}</p>
 
         <template #footer>
           <div class="footer">
             <el-button
                 class="cancel-button"
                 type="danger"
-                @click="handleCancelAccount"
+                @click="onHandleCancelAccount"
             >
               注销账号
             </el-button>

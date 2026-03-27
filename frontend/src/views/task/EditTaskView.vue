@@ -1,27 +1,47 @@
 <script setup lang="js">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted} from "vue";
 import { Back } from "@element-plus/icons-vue";
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { taskList, addTask, getTaskById } from '@/store/user.js';
 
 const route = useRoute();
 const router = useRouter();
 
 const taskId = ref(null)
-
 const isNew = ref(true);
-const newTitle = ref(isNew ? '' : 'TODO: 原标题')
-const newDescription = ref(isNew ? '' : 'TODO: 原描述')
-const newStatus = ref(isNew ? '待办' : 'TODO: 原状态')
-const newPriority = ref(isNew ? '中' : 'TODO: 原优先级')
+const originalTask = ref(null)  
+const isLeaving = ref(false)
+
+const newTitle = ref('')
+const newDescription = ref('')
+const newStatus = ref('待办')
+const newPriority = ref('中')
+const newDate = ref('')
 
 const pastDate = (time) => {
   return time.getTime() < Date.now() - 8.64e7
 }
-const newDate=ref(isNew ? '' : 'TODO: 原截止时间')
 
 const taskTitle = computed(() => isNew.value ? '' : newTitle.value)
+
+// 检查是否有修改
+const hasChanges = () => {
+  if (isNew.value) {
+    // 新建模式：任何输入都算有修改
+    return newTitle.value || newDescription.value || newDate.value
+  }
+  
+  // 编辑模式：和原始任务比较
+  if (!originalTask.value) return false
+  
+  return newTitle.value !== originalTask.value.title ||
+         newDescription.value !== (originalTask.value.description || '') ||
+         newStatus.value !== originalTask.value.status ||
+         newPriority.value !== originalTask.value.priority ||
+         newDate.value !== (originalTask.value.deadline || '')
+}
 
 // 页面加载时，根据路由参数初始化数据
 onMounted(() => {
@@ -32,7 +52,7 @@ onMounted(() => {
     // 编辑模式
     isNew.value = false
     taskId.value = parseInt(taskIdParam)
-    // TODO: 从后端或 store 加载任务数据
+    // TODO: 从后端加载任务详情
     // 模拟加载已有任务数据
     loadTaskData(taskId.value)
   } else {
@@ -45,18 +65,23 @@ onMounted(() => {
 
 // 加载任务数据（编辑模式）
 const loadTaskData = (id) => {
-  // TODO: 调用后端 API 获取任务详情
   console.log('加载任务数据, ID:', id)
-  // 模拟数据
-  newTitle.value = '示例任务标题'
-  newDescription.value = '示例任务描述'
-  newStatus.value = '进行中'
-  newPriority.value = '高'
-  newDate.value = '2026-04-01'
+  const task = getTaskById(id)
+  if (task) {
+    originalTask.value = task
+    
+    // 设置表单值
+    newTitle.value = task.title
+    newDescription.value = task.description || ''
+    newStatus.value = task.status
+    newPriority.value = task.priority
+    newDate.value = task.deadline || ''
+  }
 }
 
 // 重置表单
 const resetForm = () => {
+  originalTask.value = null
   newTitle.value = ''
   newDescription.value = ''
   newStatus.value = '待办'
@@ -64,14 +89,11 @@ const resetForm = () => {
   newDate.value = ''
 }
 
-// TODO: 回退到AllTaskView，若为新建任务，取消该任务；若为编辑任务，取消编辑记录
+// 回退到AllTaskView，若为新建任务，取消该任务；若为编辑任务，取消编辑记录
 const handleBack = () => {
-  // 检查是否有未保存的更改
-  const hasChanges = newTitle.value || newDescription.value || newStatus.value ||
-      newPriority.value || newDate.value
   const info = isNew.value ? '您新建的任务尚未保存，确定要离开吗？' : '您有未保存的更改，确定要离开吗？'
   
-  if (hasChanges || isNew.value) {
+  if (hasChanges()) {
     ElMessageBox.confirm(
       info,
       '',
@@ -82,16 +104,18 @@ const handleBack = () => {
         type: undefined
       }
     ).then(() => {
+      isLeaving.value = true
       router.push('/task/all')
     }).catch(() => {
       // 取消，留在当前页面
     })
   } else {
+    isLeaving.value = true
     router.push('/task/all')
   }
 }
 
-// TODO: 保存所有更改并回退到'/task/all'页面
+// 保存所有更改并回退到'/task/all'页面
 const saveChanges = () => {
   // 表单验证
   if (!newTitle.value) {
@@ -109,20 +133,56 @@ const saveChanges = () => {
   
   if (isNew.value) {
     // 新建任务
-    console.log('新建任务:', taskData)
-    // TODO: 调用后端 API 创建任务
+    // TODO: 调用后端创建任务 API
+    addTask(taskData)  // 调用 addTask
     ElMessage.success('任务创建成功')
   } else {
     // 更新任务
-    console.log('更新任务, ID:', taskId.value, '数据:', taskData)
-    // TODO: 调用后端 API 更新任务
+    // TODO: 调用后端更新任务 API
+    const index = taskList.value.findIndex(t => t.id === taskId.value)
+    if (index !== -1) {
+      taskList.value[index] = {
+        ...taskList.value[index],
+        ...taskData,
+        updatedAt: new Date().toISOString()
+      }
+    }
     ElMessage.success('任务更新成功')
   }
   
   // 返回任务列表
+  resetForm()
+  isLeaving.value = true  // 标记正在离开，跳过守卫
   router.push('/task/all')
-
 }
+
+// 路由守卫：离开页面前检查
+onBeforeRouteLeave((to, from, next) => {
+  if (isLeaving.value) {
+    next()
+    return
+  }
+  
+  if (hasChanges()) {
+    ElMessageBox.confirm(
+      isNew.value ? '您新建的任务尚未保存，确定要离开吗？' : '您有未保存的更改，确定要离开吗？',
+      '',
+      {
+        confirmButtonText: '确定',
+        confirmButtonType: 'danger',
+        cancelButtonText: '取消',
+        type: undefined
+      }
+    ).then(() => {
+      next()
+    }).catch(() => {
+      next(false)
+    })
+  } else {
+    next()
+  }
+})
+
 </script>
 
 <template>

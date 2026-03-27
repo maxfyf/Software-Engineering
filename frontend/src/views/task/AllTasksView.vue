@@ -4,16 +4,17 @@ import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import Search from "@/components/Search.vue";
 import { Plus, View, Edit, Delete } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from 'element-plus';
-import router from '@/router';
-import { currentUser } from '@/store/user.js';
+import { useRouter } from 'vue-router';
+import { taskList, removeTask } from '@/store/user.js';
 
+const router = useRouter();
 // 实际用户所有任务名称字符串数组
-const dataset = computed(() => taskData.value.map(task => task.title))
+const dataset = computed(() => taskList.value.map(task => task.title))
 
 // 实际选中选项后的回调函数（切换页面到指定任务对应的页面）
 const handleSelect = (taskName) => {
   console.log('选中任务:', taskName)
-  const task = taskData.value.find(t => t.title === taskName)
+  const task = taskList.value.find(t => t.title === taskName)
   if (task) {
     currentTask.value = task
     viewDialogVisible.value = true
@@ -21,29 +22,31 @@ const handleSelect = (taskName) => {
 }
 
 
-// TODO: 任务数据，可直接使用原始taskInfo数组，程序将根据taskInfo结构体中的prop名自动填表
-const taskData = ref([
-  {
-    id: 1,
-    title: "完成前端登录界面",
-    description: "实现用户登录、注册的前端界面",
-    status: "进行中",
-    priority: "高",
-    deadline: "2026-04-01",
-    createdAt: "2026-03-20",
-    updatedAt: "2026-03-20"
-  },
-  {
-    id: 2,
-    title: "完成后端API接口",
-    description: "实现用户注册、登录的后端接口",
-    status: "进行中",
-    priority: "中",
-    deadline: "2026-04-05",
-    createdAt: "2026-03-20",
-    updatedAt: "2026-03-20"
-  }
-])
+// TODO: 任务数据，从后端获取用户的任务列表
+if (taskList.value.length === 0) {
+  taskList.value = [
+    {
+      id: 1,
+      title: "完成前端登录界面",
+      description: "实现用户登录、注册的前端界面",
+      status: "进行中",
+      priority: "高",
+      deadline: "2026-04-01",
+      createdAt: "2026-03-20",
+      updatedAt: "2026-03-20"
+    },
+    {
+      id: 2,
+      title: "完成后端API接口",
+      description: "实现用户注册、登录的后端接口",
+      status: "进行中",
+      priority: "中",
+      deadline: "2026-04-05",
+      createdAt: "2026-03-20",
+      updatedAt: "2026-03-20"
+    }
+  ]
+}
 
 // 新建任务
 const handleNew = () => {
@@ -80,7 +83,7 @@ const editTask = (row) => {
   })
 }
 
-// TODO: 删除任务
+// 删除任务
 const deleteTask = (row) => {
   ElMessageBox.confirm(
     `确定要删除任务"${row.title}"吗？`,
@@ -92,33 +95,39 @@ const deleteTask = (row) => {
       type: undefined
     }
   ).then(() => {
-    // TODO: 调用后端 API 删除任务
-    console.log('删除任务:', row.id)
-    // 从列表中移除（模拟）
-    const index = taskData.value.findIndex(t => t.id === row.id)
-    if (index !== -1) {
-      taskData.value.splice(index, 1)
-    }
+    removeTask(row.id)
     ElMessage.success('任务已删除')
   }).catch(() => {
-    // 取消删除
     console.log('取消删除')
   })
 }
 
 const currentPage = ref(1)    // 当前数据页
 const pageSize = ref(10)    // 每页数据条数
-const total = computed(() => taskData.value.length)    // 总数据条数
+const total = computed(() => taskList.value.length)    // 总数据条数
 const pageData = computed(() => {    // 当前页面数据
   const start = (currentPage.value - 1) * pageSize.value
   const end = start + pageSize.value
-  return taskData.value.slice(start, end)
+  return taskList.value.slice(start, end)
 })
 
 // 切换页面
 const handleCurrentChange = (page) => {
   currentPage.value = page
 }
+
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return '未设置'
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).replace(/\//g, '-')
+}
+
+
 </script>
 
 <template>
@@ -205,8 +214,8 @@ const handleCurrentChange = (page) => {
         <p class="dialog-content"><span class="key">状态：</span>{{ currentTask.status }}</p>
         <p class="dialog-content"><span class="key">优先级：</span>{{ currentTask.priority }}</p>
         <p class="dialog-content"><span class="key">截止时间：</span>{{ currentTask.deadline }}</p>
-        <p class="dialog-content"><span class="key">创建时间：</span>{{ currentTask.createdAt }}</p>
-        <p class="dialog-content"><span class="key">更新时间：</span>{{ currentTask.updatedAt }}</p>
+        <p class="dialog-content"><span class="key">创建时间：</span>{{ formatDate(currentTask.createdAt) }}</p>
+        <p class="dialog-content"><span class="key">更新时间：</span>{{ formatDate(currentTask.updatedAt) }}</p>
       </div>
     </el-dialog>
   </HeaderWrapper>

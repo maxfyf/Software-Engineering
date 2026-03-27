@@ -1,7 +1,10 @@
 <script setup lang="js">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { handleLogin, handleRegister } from '@/store/user.js'
 
+
+const router = useRouter()
 const username = ref('')    //用户名
 const password = ref('')    //登录密码
 const first_time_password = ref('')    //注册密码
@@ -13,10 +16,10 @@ const email = ref('')    //电子邮箱
 
 // 登录处理
 const onHandleLogin = async () => {
-  await handleLogin({
-    username: username.value,
-    password: password.value
-  })
+  const result = await handleLogin({ username: username.value, password: password.value })
+  if (result && result.success && result.redirect) {
+    router.push(result.redirect)
+  }
 }
 
 // 注册处理
@@ -32,14 +35,17 @@ const onHandleRegister = async () => {
   })
   
   // 重置除了 username 以外的所有字段
-  if (result && result.success && result.resetFields) {
-    username.value = result.resetFields.username
-    first_time_password.value = result.resetFields.firstTimePassword
-    repeated_password.value = result.resetFields.repeatedPassword
-    first_name.value = result.resetFields.firstName
-    last_name.value = result.resetFields.lastName
-    phone.value = result.resetFields.phone
-    email.value = result.resetFields.email
+  if (result && result.success) {
+    if (result.redirect) router.push(result.redirect)
+    if (result.resetFields) {
+      username.value = result.resetFields.username
+      first_time_password.value = result.resetFields.firstTimePassword
+      repeated_password.value = result.resetFields.repeatedPassword
+      first_name.value = result.resetFields.firstName
+      last_name.value = result.resetFields.lastName
+      phone.value = result.resetFields.phone
+      email.value = result.resetFields.email
+    }
   }
 }
 </script>
