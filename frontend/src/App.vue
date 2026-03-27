@@ -80,8 +80,8 @@ watch(() => route.path, (newPath) => {
       <span v-if="isLoggedIn">
         <el-popover
           placement="bottom"
-          width="200px"
-          height="200px"
+          width="300px"
+          height="250px"
           trigger="hover"
           popper-class="hover-popover"
         >
@@ -92,8 +92,9 @@ watch(() => route.path, (newPath) => {
           </template>
           <div>
             <h2 class="popover-title">{{ currentUser.username }}</h2>
-            <p class="popover-info"><strong>Full Name:</strong> {{ currentUser.firstName }} {{ currentUser.lastName }}</p>
-            <p class="popover-info"><strong>Email:</strong> {{ currentUser.email }}</p>
+            <p class="popover-info"><span class="key">全名：</span> {{ currentUser.lastName }} {{ currentUser.firstName }}</p>
+            <p class="popover-info"><span class="key">电话号码：</span> {{ currentUser.phone }}</p>
+            <p class="popover-info"><span class="key">电子邮箱：</span> {{ currentUser.email }}</p>
             <div class="popover-button">
               <el-button
                   type="danger"
@@ -185,7 +186,11 @@ watch(() => route.path, (newPath) => {
 }
 
 .popover-info {
-  padding: 0 10px;
+  padding: 3px 10px;
+}
+
+.key {
+  font-weight: bold;
 }
 
 .popover-button {
