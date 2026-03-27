@@ -64,8 +64,8 @@ import { handleCancelAccount } from "@/store/user.js";
 }
 
 .box-card {
-  width: 95%;
-  height: 95%;
+  width: 90%;
+  height: 90%;
   display: flex;
   flex-direction: column;
 }
@@ -90,7 +90,7 @@ import { handleCancelAccount } from "@/store/user.js";
 }
 
 .cancel-button {
-  width: 100px;
+  width: 150px;
   height: 100%;
   font-size: 20px;
 }

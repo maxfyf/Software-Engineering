@@ -265,12 +265,14 @@ const saveChanges = () => {
 .main-content-wrapper {
   width: 100%;
   height: 100%;
+  display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .box-card {
-  margin: 35px;
+  width: 90%;
+  height: 90%;
   display: flex;
   flex-direction: column;
 }
