@@ -49,26 +49,26 @@ export const highlightTaskId = ref(null)
 
 // 添加任务
 export const addTask = async (task) => {
+    let newTask
     try {
         const res = await api.createTask({
             ...task,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         })
-        const newTask = res.data
-        taskList.value.push(newTask)
-        return newTask
+        newTask = res.data
     } catch (error) {
-        const newTask = {
+        newTask = {
             ...taskInfo,
             ...task,
-            id: Date.now(),  // 临时 ID
+            id: Date.now(),
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         }
-        taskList.value.push(newTask)
-        return newTask
     }
+    highlightTaskId.value = newTask.id
+    taskList.value.push(newTask)
+    return newTask
 }
 
 // 删除任务

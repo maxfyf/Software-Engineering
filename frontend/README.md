@@ -41,6 +41,7 @@ frontend/                                    # 前端根目录
 |	|	├── Search.vue                       # 搜索框
 |	|	└── SidebarWrapper.vue               # 侧边栏
 |	├── request/                             # API前端接口
+|   |   └── api.js                           # 基于Axios实现的前后端通信API
 |	├── router/                              # 界面路由
 |	|	└── index.js                         # 界面路由表与历史记录
 |	├── store/                               # 前端暂存数据

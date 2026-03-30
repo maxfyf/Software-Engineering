@@ -118,7 +118,7 @@ const handleBack = () => {
 const saveChanges = async () => {
   // 表单验证
   if (!newTitle.value) {
-    ElMessage.warning('请输入任务标题')
+    ElMessage.error('任务标题不能为空')
     return
   }
   
