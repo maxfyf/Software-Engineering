@@ -9,7 +9,7 @@ export default {
     // 搜索数据集
     data: {
       type: Array,
-      default: []
+      default: () => []
     },
 
     // 下拉框最大高度
@@ -37,7 +37,8 @@ export default {
         maxHeight: `${this.maxHeight}px`
       },
       value: '',
-      hasDropdownPosition: false
+      hasDropdownPosition: false,
+      blurTimeout: null
     };
   },
 
@@ -86,13 +87,18 @@ export default {
       if (this.searchText) {
         this.showDropdown = true
       }
+      if (this.blurTimeout) {
+        clearTimeout(this.blurTimeout)
+        this.blurTimeout = null
+      }
     },
 
     // 搜索框失去焦点
     handleBlur() {
       setTimeout(() => {
         this.showDropdown = false
-      }, 100)
+        this.blurTimeout = null
+      }, 150)
     },
 
     // 获取输入框位置
@@ -130,9 +136,15 @@ export default {
 
     // 选中下拉框中的某一项
     selectOption(str) {
-      this.handleBlur();
+      if (this.blurTimeout) {
+        clearTimeout(this.blurTimeout)
+        this.blurTimeout = null
+      }
+
       this.value = str
       this.searchText = str
+
+      this.showDropdown = false
 
       this.$emit('select', str)
       this.$emit('input', str)
