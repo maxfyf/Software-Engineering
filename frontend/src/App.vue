@@ -2,7 +2,7 @@
 import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { List, Setting } from "@element-plus/icons-vue";
-import { handleLogout, currentUser, isLoggedIn } from '@/store/user.js'
+import { handleLogout, currentUser, isLoggedIn, initUserInfo } from '@/store/user.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,21 +23,8 @@ watch(() => route.path, (newPath) => {
 }, { immediate: true })
 
 // 页面加载时检查登录状态
-onMounted(() => {
-    const savedIsLoggedIn = sessionStorage.getItem('isLoggedIn') === 'true'
-    const savedUsername = sessionStorage.getItem('username')
-
-    console.log('App 挂载时检查登录状态:', { savedIsLoggedIn, savedUsername })
-
-    if (savedIsLoggedIn && savedUsername) {
-        isLoggedIn.value = true
-        // TODO: 页面刷新后从后端重新获取完整用户信息
-        currentUser.username = savedUsername
-        console.log('已恢复登录状态，用户名:', savedUsername)
-    } else {
-        isLoggedIn.value = false
-        console.log('未登录状态')
-    }
+onMounted(async () => {
+    await initUserInfo()
 })
 
 // 退出登录处理
