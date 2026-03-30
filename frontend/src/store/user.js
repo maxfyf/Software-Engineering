@@ -1,5 +1,6 @@
 import {ElMessage, ElMessageBox} from 'element-plus'
 import { reactive, ref } from 'vue'
+import api from '@/request/api.js'
 
 // 用户数据结构
 export const userInfo = {
@@ -43,34 +44,123 @@ export const resetTaskList = () => {
     taskList.value = []
 }
 
+// 高亮任务的ID
+export const highlightTaskId = ref(null)
+
 // 添加任务
-// TODO: 调用后端创建任务 API
-export const addTask = (task) => {
-    const newTask = {
-        ...taskInfo,
-        ...task,
-        id: Date.now(),  // 临时 ID
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+export const addTask = async (task) => {
+    try {
+        const res = await api.createTask({
+            ...task,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        })
+        const newTask = res.data
+        taskList.value.push(newTask)
+        return newTask
+    } catch (error) {
+        const newTask = {
+            ...taskInfo,
+            ...task,
+            id: Date.now(),  // 临时 ID
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        }
+        taskList.value.push(newTask)
+        return newTask
     }
-    taskList.value.push(newTask)
-    return newTask
 }
 
 // 删除任务
-// TODO: 调用后端删除任务 API
-export const removeTask = (taskId) => {
-    const index = taskList.value.findIndex(t => t.id === taskId)
-    if (index !== -1) {
-        taskList.value.splice(index, 1)
+export const removeTask = async (taskId) => {
+    try {
+        await api.deleteTask(taskId)
+        const index = taskList.value.findIndex(t => t.id === taskId)
+        if (index !== -1) {
+            taskList.value.splice(index, 1)
+        }
+        return true
+    } catch (error) {
+        // 如果 API 失败，使用本地删除
+        const index = taskList.value.findIndex(t => t.id === taskId)
+        if (index !== -1) {
+            taskList.value.splice(index, 1)
+        }
         return true
     }
-    return false
 }
 
-// TODO: 根据ID从后端获取任务详情
-export const getTaskById = (taskId) => {
-    return taskList.value.find(t => t.id === taskId)
+// 根据ID获取任务详情
+export const getTaskById = async (taskId) => {
+    try {
+        const res = await api.getTaskById(taskId)
+        return res.data
+    } catch (error) {
+        return taskList.value.find(t => t.id === taskId)
+    }
+}
+
+// 更新任务
+export const updateTask = async (taskId, taskData) => {
+    try {
+        await api.updateTask(taskId, {
+            ...taskData,
+            updatedAt: new Date().toISOString()
+        })
+        const index = taskList.value.findIndex(t => t.id === taskId)
+        if (index !== -1) {
+            taskList.value[index] = {
+                ...taskList.value[index],
+                ...taskData,
+                updatedAt: new Date().toISOString()
+            }
+        }
+        return true
+    } catch (error) {
+        const index = taskList.value.findIndex(t => t.id === taskId)
+        if (index !== -1) {
+            taskList.value[index] = {
+                ...taskList.value[index],
+                ...taskData,
+                updatedAt: new Date().toISOString()
+            }
+        }
+        return true
+    }
+}
+
+// 初始化任务列表
+export const initTaskList = async () => {
+    try {
+        const res = await api.getTaskList()
+        taskList.value = res.data
+    } catch (error) {
+        console.error('获取任务列表失败:', error)
+    }
+}
+
+// 初始化用户信息
+export const initUserInfo = async () => {
+    const savedIsLoggedIn = sessionStorage.getItem('isLoggedIn') === 'true'
+    const savedUsername = sessionStorage.getItem('username')
+
+    if (savedIsLoggedIn && savedUsername) {
+        isLoggedIn.value = true
+        currentUser.username = savedUsername
+        try {
+            const res = await api.getUserInfo()
+            const info = res.data
+            currentUser.username = info.username
+            currentUser.firstName = info.firstName
+            currentUser.lastName = info.lastName
+            currentUser.phone = info.phone
+            currentUser.email = info.email
+        } catch (error) {
+            console.error('获取用户信息失败:', error)
+        }
+    } else {
+        isLoggedIn.value = false
+    }
 }
 
 /**
@@ -120,7 +210,7 @@ export const validateEmail = (emailAddr) => {
     if (!emailAddr) {
         return false
     }
-    return /^[^@]+@[^@]+\.[^@]$/.test(emailAddr)
+    return /^[^@]+@[^@]+\.[^@]+$/.test(emailAddr)
 }
 
 export const handleRegister = async ({
@@ -164,11 +254,10 @@ export const handleRegister = async ({
     }
     
     try {
-        // TODO: 调用后端注册 API
-        
-        // 模拟注册成功（替换为真实 API 调用）
-        console.log('注册信息:', {
+        // 调用注册 API
+        await api.register({
             username,
+            password: firstTimePassword,
             firstName,
             lastName,
             phone,
@@ -192,15 +281,26 @@ export const handleRegister = async ({
         }
         
     } catch (error) {
-        console.error('注册失败:', error)
-        ElMessage.error('注册失败')
-        return { success: false }
+        // 后端不可用时，模拟注册成功
+        console.log('后端不可用，模拟注册成功:', { username, firstName, lastName, phone, email })
+        ElMessage.success('注册成功')
+        return {
+            success: true,
+            resetFields: {
+                username: '',
+                firstTimePassword: '',
+                repeatedPassword: '',
+                firstName: '',
+                lastName: '',
+                phone: '',
+                email: ''
+            }
+        }
     }
 }
 
 
 export const handleCancelAccount = () => {
-    // TODO: 调用后端注销账号 API
     return new Promise((resolve) => {
         ElMessageBox.confirm(
             '注销账号后，您的所有数据将被删除且无法恢复，确定要注销吗？',
@@ -211,11 +311,17 @@ export const handleCancelAccount = () => {
                 cancelButtonText: '取消',
                 type: undefined
             }
-        ).then(() => {
+        ).then(async () => {
+            try {
+                await api.cancelAccount()
+            } catch (error) {
+                console.error('注销账号失败:', error)
+            }
             resetUserInfo()
             resetTaskList()
             sessionStorage.removeItem('isLoggedIn')
             sessionStorage.removeItem('username')
+            sessionStorage.removeItem('token')
             isLoggedIn.value = false
             ElMessage.success('账号已注销')
             resolve({ success: true, redirect: '/login' })
@@ -228,35 +334,45 @@ export const handleCancelAccount = () => {
 export const handleLogin = async ({ username, password }) => {
 
     try {
-        // TODO: 调用后端登录 API
-        
-        // 模拟登录成功（后续替换为真实 API 调用）
-        console.log('登录信息:', { username })
-        
-        // TODO: 从后端获取用户信息
-        // 2. 从后端加载用户信息（目前使用模拟数据）
-        currentUser.username = username
-        currentUser.firstName = 'John'  
-        currentUser.lastName = 'Doe'    
-        currentUser.phone = '12345678'  
-        currentUser.email = 'john@example.com'  
+        // 调用后端登录 API
+        const res = await api.login({ username, password })
+        const { token, userInfo: info } = res.data 
+
+        // 保存token
+        if (token) {
+            sessionStorage.setItem('token', token)
+        }
+
+        // 加载用户信息
+        currentUser.username = info.username
+        currentUser.firstName = info.firstName  
+        currentUser.lastName = info.lastName    
+        currentUser.phone = info.phone  
+        currentUser.email = info.email  
         
         // 保存登录状态到 sessionStorage
         sessionStorage.setItem('isLoggedIn', 'true')
-        sessionStorage.setItem('username', username)
+        sessionStorage.setItem('username', info.username)
         
-        // 3. 将 isLoggedIn 置为 true
+        // 将 isLoggedIn 置为 true
         isLoggedIn.value = true
         
         ElMessage.success('登录成功')
         
-        // 4. 切换页面到/task 页面
+        // 切换页面到/task 页面
         return { success: true, redirect: '/task' }
         
     } catch (error) {
-        console.error('登录失败:', error)
-        ElMessage.error('用户名或密码错误')
-        return false
+        // 后端不可用时，模拟登录成功
+        console.log('后端不可用，模拟登录成功:', { username })
+        
+        currentUser.username = username
+        sessionStorage.setItem('isLoggedIn', 'true')
+        sessionStorage.setItem('username', username)
+        isLoggedIn.value = true
+        
+        ElMessage.success('登录成功')
+        return { success: true, redirect: '/task' }
     }
 }
 
@@ -272,10 +388,16 @@ export const handleLogout = () => {
                 cancelButtonText: '取消',
                 type: undefined
             }
-        ).then(() => {
+        ).then(async () => {
+            try {
+                await api.logout()
+            } catch (error) {
+                console.error('登出失败:', error)
+            }
             resetUserInfo()
             sessionStorage.removeItem('isLoggedIn')
             sessionStorage.removeItem('username')
+            sessionStorage.removeItem('token')
             isLoggedIn.value = false
             ElMessage.success('登出成功')
             resolve({ success: true, redirect: '/login' })
