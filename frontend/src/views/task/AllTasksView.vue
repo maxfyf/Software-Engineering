@@ -11,16 +11,35 @@ const router = useRouter();
 // 实际用户所有任务名称字符串数组
 const dataset = computed(() => taskList.value.map(task => task.title))
 
+// 高亮任务的ID
+const highlightTaskId = ref(null)
+
 // 实际选中选项后的回调函数（切换页面到指定任务对应的页面）
 const handleSelect = (taskName) => {
   console.log('选中任务:', taskName)
   const task = taskList.value.find(t => t.title === taskName)
   if (task) {
+    // 找到任务在列表中的索引
+    const index = taskList.value.findIndex(t => t.id === task.id)
+    // 计算该任务所在的页码
+    const targetPage = Math.floor(index / pageSize.value) + 1
+    // 切换到对应页面
+    currentPage.value = targetPage
+    
+    highlightTaskId.value = task.id
+
     currentTask.value = task
     viewDialogVisible.value = true
   }
 }
 
+// 表格行样式回调
+const tableRowClassName = ({ row }) => {
+  if (row.id === highlightTaskId.value) {
+    return 'highlight-row'
+  }
+  return ''
+}
 
 // TODO: 任务数据，从后端获取用户的任务列表
 if (taskList.value.length === 0) {
@@ -160,7 +179,7 @@ const formatDate = (dateStr) => {
 
       <el-row>
         <el-col>
-          <el-table :data="pageData" stripe class="task-table">
+          <el-table :data="pageData" stripe class="task-table" :row-class-name="tableRowClassName">
             <el-table-column prop="title" label="任务名称" min-width="50%" align="left" />
             <el-table-column prop="status" label="状态" min-width="20%" align="center" />
             <el-table-column prop="priority" label="优先级" min-width="15%" align="center" />
@@ -311,5 +330,30 @@ const formatDate = (dateStr) => {
 
 .key {
   font-weight: bold;
+}
+
+
+:deep(.el-table__row.highlight-row) {
+  background-color: #ecf5ff !important;
+}
+
+:deep(.el-table__row.highlight-row td) {
+  background-color: #ecf5ff !important;
+}
+
+:deep(.el-table__row--striped.highlight-row) {
+  background-color: #ecf5ff !important;
+}
+
+:deep(.el-table__row--striped.highlight-row td) {
+  background-color: #ecf5ff !important;
+}
+
+:deep(.el-table__row:not(.highlight-row)) {
+  background-color: transparent !important;
+}
+
+:deep(.el-table__row:not(.highlight-row) td) {
+  background-color: transparent !important;
 }
 </style>
