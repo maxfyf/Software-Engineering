@@ -56,6 +56,7 @@ export const addTask = (task) => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
     }
+    highlightTaskId.value = newTask.id
     taskList.value.push(newTask)
     return newTask
 }
