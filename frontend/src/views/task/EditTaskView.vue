@@ -4,7 +4,7 @@ import { Back } from "@element-plus/icons-vue";
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { taskList, addTask, getTaskById } from '@/store/user.js';
+import { taskList, addTask, getTaskById, updateTask } from '@/store/user.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -44,7 +44,7 @@ const hasChanges = () => {
 }
 
 // 页面加载时，根据路由参数初始化数据
-onMounted(() => {
+onMounted(async () => {
   const isNewParam = route.query.isNew
   const taskIdParam = route.query.taskId
   
@@ -52,9 +52,8 @@ onMounted(() => {
     // 编辑模式
     isNew.value = false
     taskId.value = parseInt(taskIdParam)
-    // TODO: 从后端加载任务详情
-    // 模拟加载已有任务数据
-    loadTaskData(taskId.value)
+    // 从后端加载任务详情
+    await loadTaskData(taskId.value)
   } else {
     // 新建模式
     isNew.value = true
@@ -64,9 +63,9 @@ onMounted(() => {
 })
 
 // 加载任务数据（编辑模式）
-const loadTaskData = (id) => {
+const loadTaskData = async (id) => {
   console.log('加载任务数据, ID:', id)
-  const task = getTaskById(id)
+  const task = await getTaskById(id)
   if (task) {
     originalTask.value = task
     
@@ -116,7 +115,7 @@ const handleBack = () => {
 }
 
 // 保存所有更改并回退到'/task/all'页面
-const saveChanges = () => {
+const saveChanges = async () => {
   // 表单验证
   if (!newTitle.value) {
     ElMessage.warning('请输入任务标题')
@@ -133,20 +132,22 @@ const saveChanges = () => {
   
   if (isNew.value) {
     // 新建任务
-    // TODO: 调用后端创建任务 API
-    addTask(taskData)  // 调用 addTask
+    let idx = taskList.value.findIndex(t => t.title === newTitle.value)
+    if(idx !== -1) {
+      ElMessage.error('该任务已存在')
+      return
+    }
+    await addTask(taskData) 
     ElMessage.success('任务创建成功')
   } else {
     // 更新任务
-    // TODO: 调用后端更新任务 API
-    const index = taskList.value.findIndex(t => t.id === taskId.value)
-    if (index !== -1) {
-      taskList.value[index] = {
-        ...taskList.value[index],
-        ...taskData,
-        updatedAt: new Date().toISOString()
-      }
+    let idx = taskList.value.findIndex(t => t.title === newTitle.value
+        && t.id !== taskId.value)
+    if(idx !== -1) {
+      ElMessage.error('任务标题重复')
+      return
     }
+    await updateTask(taskId.value, taskData)
     ElMessage.success('任务更新成功')
   }
   

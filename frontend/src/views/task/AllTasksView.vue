@@ -1,18 +1,20 @@
 <script setup lang="js">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import Search from "@/components/Search.vue";
 import { Plus, View, Edit, Delete } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useRouter } from 'vue-router';
-import { taskList, removeTask } from '@/store/user.js';
+import { taskList, highlightTaskId,removeTask, initTaskList } from '@/store/user.js';
 
 const router = useRouter();
 // 实际用户所有任务名称字符串数组
 const dataset = computed(() => taskList.value.map(task => task.title))
 
-// 高亮任务的ID
-const highlightTaskId = ref(null)
+// 页面加载时获取任务列表
+onMounted(async () => {
+  await initTaskList()
+})
 
 // 实际选中选项后的回调函数（切换页面到指定任务对应的页面）
 const handleSelect = (taskName) => {
@@ -41,32 +43,6 @@ const tableRowClassName = ({ row }) => {
   return ''
 }
 
-// TODO: 任务数据，从后端获取用户的任务列表
-if (taskList.value.length === 0) {
-  taskList.value = [
-    {
-      id: 1,
-      title: "完成前端登录界面",
-      description: "实现用户登录、注册的前端界面",
-      status: "进行中",
-      priority: "高",
-      deadline: "2026-04-01",
-      createdAt: "2026-03-20",
-      updatedAt: "2026-03-20"
-    },
-    {
-      id: 2,
-      title: "完成后端API接口",
-      description: "实现用户注册、登录的后端接口",
-      status: "进行中",
-      priority: "中",
-      deadline: "2026-04-05",
-      createdAt: "2026-03-20",
-      updatedAt: "2026-03-20"
-    }
-  ]
-}
-
 // 新建任务
 const handleNew = () => {
   console.log('新建任务')
@@ -86,12 +62,14 @@ const closeViewDialog = () => {
 
 const viewDetail = (row) => {
   currentTask.value = row
+  highlightTaskId.value = row.id
   viewDialogVisible.value = true
 }
 
 // 编辑任务
 const editTask = (row) => {
   console.log('编辑任务:', row)
+  highlightTaskId.value = row.id
   // 跳转到编辑页面，传递任务ID
   router.push({
     path: '/task/edit',
@@ -104,6 +82,7 @@ const editTask = (row) => {
 
 // 删除任务
 const deleteTask = (row) => {
+  highlightTaskId.value = null
   ElMessageBox.confirm(
     `确定要删除任务"${row.title}"吗？`,
     '',
@@ -332,7 +311,6 @@ const formatDate = (dateStr) => {
   font-weight: bold;
 }
 
-
 :deep(.el-table__row.highlight-row) {
   background-color: #ecf5ff !important;
 }
@@ -349,11 +327,4 @@ const formatDate = (dateStr) => {
   background-color: #ecf5ff !important;
 }
 
-:deep(.el-table__row:not(.highlight-row)) {
-  background-color: transparent !important;
-}
-
-:deep(.el-table__row:not(.highlight-row) td) {
-  background-color: transparent !important;
-}
 </style>
