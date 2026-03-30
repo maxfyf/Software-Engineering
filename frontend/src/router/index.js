@@ -10,7 +10,8 @@ const router = createRouter({
         {
             path: '/login',
             name: 'login',
-            component: () => import('@/views/LoginView.vue')
+            component: () => import('@/views/LoginView.vue'),
+            meta: { isLoginPage: true }
         },
         {
             path: '/task',
@@ -50,21 +51,22 @@ const router = createRouter({
 
 // 全局前置路由守卫
 router.beforeEach((to, from, next) => {
-    // 检查是否需要登录
-    if (to.meta.requiresAuth) {
-        const isLoggedIn = sessionStorage.getItem('isLoggedIn') === 'true'
-
-        if (!isLoggedIn) {
-            // 未登录，重定向到登录页
-            next('/login')
-        } else {
-            // 已登录，继续访问
-            next()
-        }
-    } else {
-        // 不需要登录的页面，直接访问
-        next()
+    const isLoggedIn = sessionStorage.getItem('isLoggedIn') === 'true'
+    
+    // 已登录且要访问登录页，阻止导航
+    if (isLoggedIn && to.meta.isLoginPage) {
+        next(false)
+        return
     }
+    
+    // 如果未登录且要访问需要登录的页面
+    if (to.meta.requiresAuth && !isLoggedIn) {
+        next('/login')
+        return
+    }
+    
+    // 其他情况正常放行
+    next()
 })
 
 export default router
