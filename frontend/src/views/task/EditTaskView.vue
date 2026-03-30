@@ -119,7 +119,7 @@ const handleBack = () => {
 const saveChanges = () => {
   // 表单验证
   if (!newTitle.value) {
-    ElMessage.warning('请输入任务标题')
+    ElMessage.error('任务标题不能为空')
     return
   }
   
@@ -133,11 +133,22 @@ const saveChanges = () => {
   
   if (isNew.value) {
     // 新建任务
+    let idx = taskList.value.findIndex(t => t.title === newTitle.value)
     // TODO: 调用后端创建任务 API
+    if(idx !== -1) {
+      ElMessage.error('该任务已存在')
+      return
+    }
     addTask(taskData)  // 调用 addTask
     ElMessage.success('任务创建成功')
   } else {
     // 更新任务
+    let idx = taskList.value.findIndex(t => t.title === newTitle.value
+        && t.id !== taskId.value)
+    if(idx !== -1) {
+      ElMessage.error('任务标题重复')
+      return
+    }
     // TODO: 调用后端更新任务 API
     const index = taskList.value.findIndex(t => t.id === taskId.value)
     if (index !== -1) {
