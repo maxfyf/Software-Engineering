@@ -4,7 +4,7 @@ import { Back } from "@element-plus/icons-vue";
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { taskList, addTask, getTaskById } from '@/store/user.js';
+import { taskList, highlightTaskId, addTask, getTaskById } from '@/store/user.js';
 
 const route = useRoute();
 const router = useRouter();

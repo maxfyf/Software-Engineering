@@ -43,6 +43,9 @@ export const resetTaskList = () => {
     taskList.value = []
 }
 
+// 高亮任务的ID
+export const highlightTaskId = ref(null)
+
 // 添加任务
 // TODO: 调用后端创建任务 API
 export const addTask = (task) => {
