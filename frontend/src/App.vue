@@ -1,22 +1,26 @@
 <script setup lang="js">
-import { ref, watch, computed, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { List, Setting } from "@element-plus/icons-vue";
 import { handleLogout, currentUser, isLoggedIn } from '@/store/user.js'
 
 const route = useRoute()
 const router = useRouter()
-const activeMenu = computed(() => {
-  if (route.path.startsWith('/task')) {
-    return '/task'
-  }
-  else if (route.path.startsWith('/settings')) {
-    return '/settings'
-  }
-  else
-    return route.path
-})
-const activeIndex = ref('/')    //当前网页路径
+
+// 导航栏选中状态
+const activeMenu = ref('/task')
+
+
+// 监听路由变化，更新导航栏选中状态
+watch(() => route.path, (newPath) => {
+    if (newPath.startsWith('/task')) {
+        activeMenu.value = '/task'
+    } else if (newPath.startsWith('/settings')) {
+        activeMenu.value = '/settings'
+    } else {
+        activeMenu.value = newPath
+    }
+}, { immediate: true })
 
 // 页面加载时检查登录状态
 onMounted(() => {
@@ -43,17 +47,13 @@ const onHandleLogout = async () => {
     router.push(result.redirect)
   }
 }
-
-watch(() => route.path, (newPath) => {
-  console.log('路径变化：', newPath)
-  activeIndex.value = newPath
-}, { immediate: true })
 </script>
 
 <template>
   <el-menu
     mode="horizontal"
     :default-active="activeMenu"
+    :key="activeMenu"
     class="navbar"
     :router="true"
   >
@@ -61,13 +61,13 @@ watch(() => route.path, (newPath) => {
     <img src="/src/assets/images/logo.png" class="logo" alt="Logo">
     <span class="site-name">协作式任务管理系统</span>
     <div v-if="isLoggedIn" class="routes">
-      <el-menu-item index="/task" class="route">
+      <el-menu-item index="/task" class="route" :class="{ 'active-border': activeMenu === '/task' }">
         <el-icon>
           <List/>
         </el-icon>
         我的任务
       </el-menu-item>
-      <el-menu-item index="/settings" class="route">
+      <el-menu-item index="/settings" class="route" :class="{ 'active-border': activeMenu === '/settings' }">
         <el-icon>
           <Setting/>
         </el-icon>
@@ -236,5 +236,9 @@ watch(() => route.path, (newPath) => {
 .copyright {
   color: black;
   font-size: medium;
+}
+
+.active-border {
+  border-bottom: 2px solid #409eff !important;
 }
 </style>
