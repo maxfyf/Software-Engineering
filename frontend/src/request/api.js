@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
-// ===================== 1. Axios 基础配置 =====================
+// Axios 基础配置
 const service = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
     timeout: 10000,
@@ -51,7 +51,7 @@ const request = {
     delete: (url, params = {}) => service.delete(url, { params })
 }
 
-// ===================== 2. API 接口封装 =====================
+// API 接口封装
 const api = {
     // 用户模块
     register: (data) => request.post('/user/register', data),
