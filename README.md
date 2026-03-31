@@ -148,6 +148,6 @@ project_root/                                    # 项目根目录
 
    随后按住Ctrl键点击链接，可以预览项目上线后前端网页的实际效果，并对相关功能进行测试。
 
-- 开发模式前端服务地址：http://localhost:5173/
-- 构建模式前端服务地址：http://localhost:4173/
+- 开发模式前端网页地址：http://localhost:5173/
+- 构建模式前端网页地址：http://localhost:4173/
 
