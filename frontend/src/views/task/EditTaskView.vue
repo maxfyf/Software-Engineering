@@ -266,6 +266,7 @@ onBeforeRouteLeave((to, from, next) => {
               format="YYYY-MM-DD"
               value-format="YYYY-MM-DD"
               :disabled-date="pastDate"
+              :editable="false"
               clearable
           />
         </div>
