@@ -49,23 +49,12 @@ export const highlightTaskId = ref(null)
 
 // 添加任务
 export const addTask = async (task) => {
-    let newTask
-    try {
-        const res = await api.createTask({
-            ...task,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        })
-        newTask = res.data
-    } catch (error) {
-        newTask = {
-            ...taskInfo,
-            ...task,
-            id: Date.now(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        }
-    }
+    const res = await api.createTask({
+        ...task,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    })
+    const newTask = res.data
     highlightTaskId.value = newTask.id
     taskList.value.push(newTask)
     return newTask
@@ -73,60 +62,35 @@ export const addTask = async (task) => {
 
 // 删除任务
 export const removeTask = async (taskId) => {
-    try {
-        await api.deleteTask(taskId)
-        const index = taskList.value.findIndex(t => t.id === taskId)
-        if (index !== -1) {
-            taskList.value.splice(index, 1)
-        }
-        return true
-    } catch (error) {
-        // 如果 API 失败，使用本地删除
-        const index = taskList.value.findIndex(t => t.id === taskId)
-        if (index !== -1) {
-            taskList.value.splice(index, 1)
-        }
-        return true
+    await api.deleteTask(taskId)
+    const index = taskList.value.findIndex(t => t.id === taskId)
+    if (index !== -1) {
+        taskList.value.splice(index, 1)
     }
+    return true
 }
 
 // 根据ID获取任务详情
 export const getTaskById = async (taskId) => {
-    try {
-        const res = await api.getTaskById(taskId)
-        return res.data
-    } catch (error) {
-        return taskList.value.find(t => t.id === taskId)
-    }
+    const res = await api.getTaskById(taskId)
+    return res.data
 }
 
 // 更新任务
 export const updateTask = async (taskId, taskData) => {
-    try {
-        await api.updateTask(taskId, {
+    await api.updateTask(taskId, {
+        ...taskData,
+        updatedAt: new Date().toISOString()
+    })
+    const index = taskList.value.findIndex(t => t.id === taskId)
+    if (index !== -1) {
+        taskList.value[index] = {
+            ...taskList.value[index],
             ...taskData,
             updatedAt: new Date().toISOString()
-        })
-        const index = taskList.value.findIndex(t => t.id === taskId)
-        if (index !== -1) {
-            taskList.value[index] = {
-                ...taskList.value[index],
-                ...taskData,
-                updatedAt: new Date().toISOString()
-            }
         }
-        return true
-    } catch (error) {
-        const index = taskList.value.findIndex(t => t.id === taskId)
-        if (index !== -1) {
-            taskList.value[index] = {
-                ...taskList.value[index],
-                ...taskData,
-                updatedAt: new Date().toISOString()
-            }
-        }
-        return true
     }
+    return true
 }
 
 // 初始化任务列表
@@ -258,9 +222,9 @@ export const handleRegister = async ({
         await api.register({
             username,
             password: firstTimePassword,
-            firstName,
-            lastName,
-            phone,
+            first_name: firstName,
+            last_name: lastName,
+            phone_number: phone,
             email
         })
         
@@ -282,20 +246,9 @@ export const handleRegister = async ({
         
     } catch (error) {
         // 后端不可用时，模拟注册成功
-        console.log('后端不可用，模拟注册成功:', { username, firstName, lastName, phone, email })
-        ElMessage.success('注册成功')
-        return {
-            success: true,
-            resetFields: {
-                username: '',
-                firstTimePassword: '',
-                repeatedPassword: '',
-                firstName: '',
-                lastName: '',
-                phone: '',
-                email: ''
-            }
-        }
+        const msg = error.response?.data?.detail || error.response?.data?.msg || '注册失败'
+        ElMessage.error(msg)
+        return { success: false }
     }
 }
 
@@ -363,16 +316,9 @@ export const handleLogin = async ({ username, password }) => {
         return { success: true, redirect: '/task' }
         
     } catch (error) {
-        // 后端不可用时，模拟登录成功
-        console.log('后端不可用，模拟登录成功:', { username })
-        
-        currentUser.username = username
-        sessionStorage.setItem('isLoggedIn', 'true')
-        sessionStorage.setItem('username', username)
-        isLoggedIn.value = true
-        
-        ElMessage.success('登录成功')
-        return { success: true, redirect: '/task' }
+        const msg = error.response?.data?.detail || error.response?.data?.msg || '用户名或密码错误'
+        ElMessage.error(msg)
+        return { success: false }
     }
 }
 
