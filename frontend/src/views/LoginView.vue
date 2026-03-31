@@ -16,7 +16,10 @@ const email = ref('')    //电子邮箱
 
 // 登录处理
 const onHandleLogin = async () => {
-  const result = await handleLogin({ username: username.value, password: password.value })
+  const result = await handleLogin({
+    username: username.value,
+    password: password.value
+  })
   if (result && result.success && result.redirect) {
     router.push(result.redirect)
   }
@@ -82,7 +85,11 @@ export default {
           <span class="text">让您的团队工作更高效</span>
           <br>
         </div>
-        <img src="/src/assets/images/login_page_decoration.png" class="decoration" alt="Decoration">
+        <img
+            src="/src/assets/images/login_page_decoration.png"
+            class="decoration"
+            alt="Decoration"
+        >
       </div>
 
       <!-- 页面右侧为注册登录窗口 -->

@@ -48,13 +48,21 @@ const onHandleLogout = async () => {
     <img src="/src/assets/images/logo.png" class="logo" alt="Logo">
     <span class="site-name">协作式任务管理系统</span>
     <div v-if="isLoggedIn" class="routes">
-      <el-menu-item index="/task" class="route" :class="{ 'active-border': activeMenu === '/task' }">
+      <el-menu-item
+          index="/task"
+          class="route"
+          :class="{ 'active-border': activeMenu === '/task' }"
+      >
         <el-icon>
           <List/>
         </el-icon>
         我的任务
       </el-menu-item>
-      <el-menu-item index="/settings" class="route" :class="{ 'active-border': activeMenu === '/settings' }">
+      <el-menu-item
+          index="/settings"
+          class="route"
+          :class="{ 'active-border': activeMenu === '/settings' }"
+      >
         <el-icon>
           <Setting/>
         </el-icon>
@@ -78,10 +86,21 @@ const onHandleLogout = async () => {
             </span>
           </template>
           <div>
-            <h2 class="popover-title">{{ currentUser.username }}</h2>
-            <p class="popover-info"><span class="key">全名：</span> {{ currentUser.lastName }}{{ currentUser.firstName }}</p>
-            <p class="popover-info"><span class="key">电话号码：</span> {{ currentUser.phone }}</p>
-            <p class="popover-info"><span class="key">电子邮箱：</span> {{ currentUser.email }}</p>
+            <h2 class="popover-title">
+              {{ currentUser.username }}
+            </h2>
+            <p class="popover-info">
+              <span class="key">全名：</span>
+              {{ currentUser.lastName }}{{ currentUser.firstName }}
+            </p>
+            <p class="popover-info">
+              <span class="key">电话号码：</span>
+              {{ currentUser.phone }}
+            </p>
+            <p class="popover-info">
+              <span class="key">电子邮箱：</span>
+              {{ currentUser.email }}
+            </p>
             <div class="popover-button">
               <el-button
                   type="danger"
