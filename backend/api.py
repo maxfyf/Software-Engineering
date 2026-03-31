@@ -105,9 +105,9 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 @app.post("/api/user/login")
 def login(request: LoginRequest, db: Session = Depends(get_db)):
     """用户登录"""
-    user = crud.authenticate_user(db, request.username, request.password)
+    user, error_msg = crud.authenticate_user(db, request.username, request.password)
     if not user:
-        raise HTTPException(status_code=401, detail="用户名或密码错误")
+        raise HTTPException(status_code=401, detail=error_msg or "用户名或密码错误")
     
     # 生成 Token
     token = create_access_token({"sub": user.username})
