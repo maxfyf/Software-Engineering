@@ -33,8 +33,8 @@ class Token(BaseModel):
 class TaskCreate(BaseModel):
     title: str = Field(..., max_length=100)
     description: Optional[str] = None
-    status: Optional[str] = "todo"
-    priority: Optional[str] = "medium"
+    status: str = "待办"
+    priority: str = "中"
     due_date: Optional[datetime] = None
 
 # 用于接收更新任务的数据
