@@ -1,8 +1,0 @@
-[core]
-	repositoryformatversion = 0
-	filemode = false
-	bare = true
-	symlinks = false
-	ignorecase = true
-[remote "origin"]
-	url = https://codehub.devcloud.cn-north-4.huaweicloud.com/1aaa4f6432f748d0b436f1ad42a5304c/Software-Engineering.git
