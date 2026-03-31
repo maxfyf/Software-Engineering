@@ -238,6 +238,8 @@ export const handleRegister = async ({
             }
         }
     } catch (error) {
+        const msg = error.response?.data?.detail || error.response?.data?.msg || '注册失败'
+        ElMessage.error(msg)
         return { success: false }
     }
 }

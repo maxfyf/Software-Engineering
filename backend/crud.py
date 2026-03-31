@@ -32,14 +32,14 @@ def create_user(db: Session, user: schemas.UserCreate) -> models.User:
 
 # 登录相关
 
-def authenticate_user(db: Session, username: str, password: str) -> models.User | None:
-    """验证用户登录（API层调用此函数，如果返回None说明账号或密码错误）"""
+def authenticate_user(db: Session, username: str, password: str) -> tuple[models.User | None, str | None]:
+    """验证用户登录并返回具体失败原因"""
     user = get_user_by_username(db, username)
     if not user:
-        return None
+        return None, "用户不存在"
     if not security.verify_password(password, user.password_hash):
-        return None
-    return user
+        return None, "密码错误"
+    return user, None
 
 # 任务相关（创建、查询、更新、删除）
 
