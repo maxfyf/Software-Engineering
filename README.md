@@ -89,13 +89,13 @@ project_root/                                    # 项目根目录
 
 ##### 3.1 环境准备
 
-- 后端依赖安装：确保电脑上已安装 Python 3.9+，打开命令行切换到 `backend/`目录后执行
+- 后端依赖安装：确保电脑上已安装 Python 3.9+，打开命令行并切换到 `backend/`目录后执行
 
   ```bash
   pip install -r requirements.txt
   ```
 
-- 前端依赖安装：确保电脑上已安装Node.js，打开命令行切换到`frontend/`目录后执行
+- 前端依赖安装：确保电脑上已安装Node.js，打开命令行并切换到`frontend/`目录后执行
 
   ```bash
   npm install
