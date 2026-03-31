@@ -154,8 +154,8 @@ def cancel_account(current_user: User = Depends(get_current_user), db: Session =
 
 @app.get("/api/task/list")
 def get_task_list(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """获取任务列表 - 所有用户可见所有任务"""
-    tasks = db.query(Task).all()
+    """获取任务列表 - 仅当前用户的任务"""
+    tasks = db.query(Task).filter(Task.owner_username == current_user.username).all()
     
     task_list = []
     for task in tasks:
@@ -175,11 +175,11 @@ def get_task_list(current_user: User = Depends(get_current_user), db: Session = 
 
 @app.get("/api/task/{task_id}")
 def get_task(task_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """获取任务详情 - 所有用户可见"""
-    task = db.query(Task).filter(Task.id == task_id).first()
+    """获取任务详情 - 仅自己的任务"""
+    task = db.query(Task).filter(Task.id == task_id, Task.owner_username == current_user.username).first()
     
     if not task:
-        raise HTTPException(status_code=404, detail="任务不存在")
+        raise HTTPException(status_code=404, detail="任务不存在或无权限查看")
     
     return success_response("获取成功", {
         "id": task.id,
@@ -227,11 +227,11 @@ def create_task(task: TaskCreateRequest, current_user: User = Depends(get_curren
 
 @app.put("/api/task/{task_id}")
 def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """更新任务 - 所有用户可编辑"""
-    task = db.query(Task).filter(Task.id == task_id).first()
+    """更新任务 - 仅自己的任务可编辑"""
+    task = db.query(Task).filter(Task.id == task_id, Task.owner_username == current_user.username).first()
     
     if not task:
-        raise HTTPException(status_code=404, detail="任务不存在")
+        raise HTTPException(status_code=404, detail="任务不存在或无权限编辑")
     
     if task_update.title is not None:
         task.title = task_update.title
@@ -254,11 +254,11 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
 
 @app.delete("/api/task/{task_id}")
 def delete_task(task_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """删除任务 - 所有用户可删除"""
-    task = db.query(Task).filter(Task.id == task_id).first()
+    """删除任务 - 仅自己的任务可删除"""
+    task = db.query(Task).filter(Task.id == task_id, Task.owner_username == current_user.username).first()
     
     if not task:
-        raise HTTPException(status_code=404, detail="任务不存在")
+        raise HTTPException(status_code=404, detail="任务不存在或无权限删除")
     
     db.delete(task)
     db.commit()
