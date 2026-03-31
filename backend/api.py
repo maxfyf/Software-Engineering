@@ -1,283 +1,272 @@
-from datetime import datetime, timedelta, timezone
-from typing import Annotated, Optional, Dict, Any
-import jwt
-from jwt.exceptions import InvalidTokenError
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from pydantic import BaseModel
+# backend/api.py - 统一的 FastAPI 后端入口
+
+from fastapi import FastAPI, Depends, HTTPException, status, Header
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from pydantic import BaseModel, Field
+from typing import Optional
+from datetime import datetime
 
+from database import get_db, Base, engine
+from models import User, Task
+from schemas import UserCreate
+from security import verify_password, get_password_hash, create_access_token
+import crud
 
-# to get a string like this run:
-# openssl rand -hex 32
-SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+# ===================== 初始化数据库 =====================
+Base.metadata.create_all(bind=engine)
 
-# 数据库配置
-SQLALCHEMY_DATABASE_URL = "sqlite:///test.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+# ===================== 创建应用 =====================
+app = FastAPI(title="协作式任务管理系统 API")
 
+# CORS 配置 - 允许前端跨域访问
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# FastAPI应用初始化
-app = FastAPI(title="软工Lab1 - 整合版API层", debug=True)
+# ===================== Pydantic 请求模型 =====================
 
-# 模型定义
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-class TokenData(BaseModel):
-    username: Optional[str] = None
-
-# 用户请求模型
-class UserRequest(BaseModel):
+class LoginRequest(BaseModel):
     username: str
     password: str
 
-# 任务模型
-class TaskCreate(BaseModel):
-    title: str
-    content: str
-    status: Optional[str] = "pending"
+class TaskCreateRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = None
+    status: str = "待办"
+    priority: str = "中"
+    deadline: Optional[str] = None
 
-class TaskUpdate(BaseModel):
+class TaskUpdateRequest(BaseModel):
     title: Optional[str] = None
-    content: Optional[str] = None
+    description: Optional[str] = None
     status: Optional[str] = None
+    priority: Optional[str] = None
+    deadline: Optional[str] = None
 
-# 通用响应模型
-class ApiResponse(BaseModel):
-    success: bool
-    msg: str
-    data: Optional[Dict[str, Any]] = None
+# ===================== 统一响应格式 =====================
 
+def success_response(msg: str, data=None):
+    return {"success": True, "msg": msg, "data": data}
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/user/login")
+def error_response(msg: str):
+    return {"success": False, "msg": msg, "data": None}
 
-# 数据库会话依赖
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# ===================== 依赖：获取当前用户 =====================
 
-DBDep = Annotated[Session, Depends(get_db)]
-TokenDep = Annotated[str, Depends(oauth2_scheme)]
-
-# 工具函数
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-async def get_current_user(token: TokenDep, db: DBDep):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="登录状态已过期，请重新登录",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+def get_current_user(authorization: str = Header(None), db: Session = Depends(get_db)):
+    """从 Authorization header 获取当前用户"""
+    from jose import jwt
+    from security import SECRET_KEY, ALGORITHM
+    
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="未登录"
+        )
+    
+    token = authorization.replace("Bearer ", "")
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-        token_data = TokenData(username=username)
-    except InvalidTokenError:
-        raise credentials_exception
-    # 模拟数据库查询用户
-    if token_data.username is None:
-        raise credentials_exception
-    return {"username": token_data.username, "id": 1}
+        username = payload.get("sub")
+        if not username:
+            raise HTTPException(status_code=401, detail="无效Token")
+    except Exception:
+        raise HTTPException(status_code=401, detail="登录已过期")
+    
+    user = crud.get_user_by_username(db, username)
+    if not user:
+        raise HTTPException(status_code=401, detail="用户不存在")
+    
+    return user
 
-UserDep = Annotated[Dict[str, Any], Depends(get_current_user)]
+# ===================== 用户模块 =====================
 
-# 路由定义
-# 用户模块路由
-user_router = APIRouter(prefix="/user", tags=["用户模块"])
-# 任务模块路由
-task_router = APIRouter(prefix="/task", tags=["任务模块"])
+@app.post("/api/user/register")
+def register(user: UserCreate, db: Session = Depends(get_db)):
+    """用户注册"""
+    # 检查用户名是否已存在
+    if crud.get_user_by_username(db, user.username):
+        raise HTTPException(status_code=400, detail="用户名已存在")
+    
+    # 检查邮箱是否已存在
+    if user.email and crud.get_user_by_email(db, user.email):
+        raise HTTPException(status_code=400, detail="该邮箱已被注册")
+    
+    # 创建用户
+    db_user = crud.create_user(db, user)
+    
+    return success_response("注册成功", {"username": db_user.username})
 
-# 用户模块接口
-@user_router.post("/register", response_model=ApiResponse)
-def register(user: UserRequest, db: DBDep):
-    # 后端打印请求信息
-    print(f"【注册接口】收到请求 - 用户名：{user.username}，密码：{user.password}")
-    # 校验逻辑
-    if not user.username or not user.password:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="用户名和密码不能为空"
-        )
-    # 返回前端可显示的响应
-    return ApiResponse(
-        success=True,
-        msg="注册成功",
-        data=None
-    )
+@app.post("/api/user/login")
+def login(request: LoginRequest, db: Session = Depends(get_db)):
+    """用户登录"""
+    user = crud.authenticate_user(db, request.username, request.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+    
+    # 生成 Token
+    token = create_access_token({"sub": user.username})
+    
+    return success_response("登录成功", {
+        "token": token,
+        "userInfo": {
+            "username": user.username,
+            "firstName": user.first_name,
+            "lastName": user.last_name,
+            "phone": user.phone_number,
+            "email": user.email
+        }
+    })
 
-@user_router.post("/login", response_model=ApiResponse)
-def login(user: UserRequest, db: DBDep):
-    # 后端打印请求信息
-    print(f"【登录接口】收到请求 - 用户名：{user.username}，密码：{user.password}")
-    # 校验逻辑
-    if len(user.password) < 6:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="密码长度不能少于6位"
-        )
-    # 生成Token
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
-    )
-    # 返回前端可显示的响应
-    return ApiResponse(
-        success=True,
-        msg="登录成功",
-        data={"token": access_token}
-    )
+@app.post("/api/user/logout")
+def logout():
+    """用户登出"""
+    return success_response("登出成功")
 
-@user_router.post("/logout", response_model=ApiResponse)
-def logout(current_user: UserDep, db: DBDep):
-    # 后端打印请求信息
-    print(f"【登出接口】收到请求 - 用户名：{current_user['username']}")
-    # 返回前端响应
-    return ApiResponse(
-        success=True,
-        msg="登出成功",
-        data=None
-    )
+@app.get("/api/user/info")
+def get_user_info(current_user: User = Depends(get_current_user)):
+    """获取当前用户信息"""
+    return success_response("获取成功", {
+        "username": current_user.username,
+        "firstName": current_user.first_name,
+        "lastName": current_user.last_name,
+        "phone": current_user.phone_number,
+        "email": current_user.email
+    })
 
-@user_router.get("/info", response_model=ApiResponse)
-def get_user_info(current_user: UserDep, db: DBDep):
-    # 后端打印请求信息
-    print(f"【用户信息接口】收到请求 - 用户名：{current_user['username']}")
-    # 模拟用户信息
-    user_info = {
-        "username": current_user["username"],
-        "id": current_user["id"],
-        "email": f"{current_user['username']}@test.com"
-    }
-    # 返回前端响应
-    return ApiResponse(
-        success=True,
-        msg="获取用户信息成功",
-        data=user_info
-    )
+@app.delete("/api/user/cancel")
+def cancel_account(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """注销账号"""
+    db.delete(current_user)
+    db.commit()
+    return success_response("账号已注销")
 
-@user_router.delete("/cancel", response_model=ApiResponse)
-def cancel_account(current_user: UserDep, db: DBDep):
-    # 后端打印请求信息
-    print(f"【注销账号接口】收到请求 - 用户名：{current_user['username']}")
-    # 返回前端响应
-    return ApiResponse(
-        success=True,
-        msg="账号注销成功",
-        data=None
-    )
+# ===================== 任务模块 =====================
 
-# 任务模块接口
-@task_router.get("/list", response_model=ApiResponse)
-def get_task_list(current_user: UserDep, db: DBDep):
-    # 后端打印请求信息
-    print(f"【任务列表接口】收到请求 - 用户名：{current_user['username']}")
-    # 模拟任务列表数据
-    task_list = [
-        {"id": 1, "title": "任务1", "content": "完成Lab1", "status": "pending"},
-        {"id": 2, "title": "任务2", "content": "整合前后端", "status": "done"}
-    ]
-    # 返回前端响应
-    return ApiResponse(
-        success=True,
-        msg="获取任务列表成功",
-        data=task_list
-    )
+@app.get("/api/task/list")
+def get_task_list(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """获取任务列表 - 所有用户可见所有任务"""
+    tasks = db.query(Task).all()
+    
+    task_list = []
+    for task in tasks:
+        task_list.append({
+            "id": task.id,
+            "title": task.title,
+            "description": task.description,
+            "status": task.status,
+            "priority": task.priority,
+            "deadline": task.due_date.strftime("%Y-%m-%d") if task.due_date else None,
+            "createdAt": task.created_at.strftime("%Y-%m-%d %H:%M:%S") if task.created_at else None,
+            "updatedAt": task.updated_at.strftime("%Y-%m-%d %H:%M:%S") if task.updated_at else None,
+            "owner": task.owner_username
+        })
+    
+    return success_response("获取成功", task_list)
 
-@task_router.get("/{taskId}", response_model=ApiResponse)
-def get_task_by_id(taskId: int, current_user: UserDep, db: DBDep):
-    # 后端打印请求信息
-    print(f"【任务详情接口】收到请求 - 用户名：{current_user['username']},任务ID:{taskId}")
-    # 模拟任务数据
-    task_detail = {
-        "id": taskId,
-        "title": f"任务{taskId}",
-        "content": f"这是任务{taskId}的详情",
-        "status": "pending",
-        "create_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-    # 返回前端响应
-    return ApiResponse(
-        success=True,
-        msg=f"获取任务{taskId}详情成功",
-        data=task_detail
-    )
-
-@task_router.post("/create", response_model=ApiResponse)
-def create_task(task: TaskCreate, current_user: UserDep, db: DBDep):
-    # 后端打印请求信息
-    print(f"【创建任务接口】收到请求 - 用户名：{current_user['username']}，任务标题：{task.title}")
-    # 模拟创建任务
-    new_task = {
-        "id": 999,
+@app.get("/api/task/{task_id}")
+def get_task(task_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """获取任务详情 - 所有用户可见"""
+    task = db.query(Task).filter(Task.id == task_id).first()
+    
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    
+    return success_response("获取成功", {
+        "id": task.id,
         "title": task.title,
-        "content": task.content,
+        "description": task.description,
         "status": task.status,
-        "create_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-    # 返回前端响应
-    return ApiResponse(
-        success=True,
-        msg="任务创建成功",
-        data=new_task
+        "priority": task.priority,
+        "deadline": task.due_date.strftime("%Y-%m-%d") if task.due_date else None,
+        "createdAt": task.created_at.strftime("%Y-%m-%d %H:%M:%S") if task.created_at else None,
+        "updatedAt": task.updated_at.strftime("%Y-%m-%d %H:%M:%S") if task.updated_at else None,
+        "owner": task.owner_username
+    })
+
+@app.post("/api/task/create")
+def create_task(task: TaskCreateRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """创建任务"""
+    db_task = Task(
+        title=task.title,
+        description=task.description,
+        status=task.status,
+        priority=task.priority,
+        owner_username=current_user.username
     )
+    
+    if task.deadline:
+        try:
+            db_task.due_date = datetime.strptime(task.deadline, "%Y-%m-%d")
+        except:
+            pass
+    
+    db.add(db_task)
+    db.commit()
+    db.refresh(db_task)
+    
+    return success_response("创建成功", {
+        "id": db_task.id,
+        "title": db_task.title,
+        "description": db_task.description,
+        "status": db_task.status,
+        "priority": db_task.priority,
+        "deadline": task.deadline,
+        "createdAt": db_task.created_at.strftime("%Y-%m-%d %H:%M:%S") if db_task.created_at else None,
+        "updatedAt": db_task.updated_at.strftime("%Y-%m-%d %H:%M:%S") if db_task.updated_at else None
+    })
 
-@task_router.put("/{taskId}", response_model=ApiResponse)
-def update_task(taskId: int, task: TaskUpdate, current_user: UserDep, db: DBDep):
-    # 后端打印请求信息
-    print(f"【更新任务接口】收到请求 - 用户名：{current_user['username']},任务ID:{taskId}，更新内容:{task.dict()}")
-    # 模拟更新后的数据
-    updated_task = {
-        "id": taskId,
-        "title": task.title or f"任务{taskId}",
-        "content": task.content or f"这是任务{taskId}的原始内容",
-        "status": task.status or "pending",
-        "update_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-    # 返回前端响应
-    return ApiResponse(
-        success=True,
-        msg=f"任务{taskId}更新成功",
-        data=updated_task
-    )
+@app.put("/api/task/{task_id}")
+def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """更新任务 - 所有用户可编辑"""
+    task = db.query(Task).filter(Task.id == task_id).first()
+    
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    
+    if task_update.title is not None:
+        task.title = task_update.title
+    if task_update.description is not None:
+        task.description = task_update.description
+    if task_update.status is not None:
+        task.status = task_update.status
+    if task_update.priority is not None:
+        task.priority = task_update.priority
+    if task_update.deadline is not None:
+        try:
+            task.due_date = datetime.strptime(task_update.deadline, "%Y-%m-%d")
+        except:
+            pass
+    
+    db.commit()
+    db.refresh(task)
+    
+    return success_response("更新成功")
 
-@task_router.delete("/{taskId}", response_model=ApiResponse)
-def delete_task(taskId: int, current_user: UserDep, db: DBDep):
-    # 后端打印请求信息
-    print(f"【删除任务接口】收到请求 - 用户名：{current_user['username']}，任务ID：{taskId}")
-    # 返回前端响应
-    return ApiResponse(
-        success=True,
-        msg=f"任务{taskId}删除成功",
-        data=None
-    )
+@app.delete("/api/task/{task_id}")
+def delete_task(task_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """删除任务 - 所有用户可删除"""
+    task = db.query(Task).filter(Task.id == task_id).first()
+    
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    
+    db.delete(task)
+    db.commit()
+    
+    return success_response("删除成功")
 
-# 挂载路由
-app.include_router(user_router)
-app.include_router(task_router)
+# ===================== 健康检查 =====================
 
-# 启动入口
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+@app.get("/")
+def root():
+    return {"message": "API 服务运行中", "status": "ok"}
+
+@app.get("/api/health")
+def health():
+    return {"status": "ok"}
