@@ -298,7 +298,6 @@ export const handleLogin = async ({ username, password }) => {
         sessionStorage.setItem('isLoggedIn', 'true')
         sessionStorage.setItem('username', info.username)
         
-        // 将 isLoggedIn 置为 true
         isLoggedIn.value = true
         highlightTaskId.value = null
 
