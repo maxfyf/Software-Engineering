@@ -7,15 +7,15 @@ from database import Base
 
 # 定义任务状态的枚举类，方便规范数据
 class TaskStatus(str, enum.Enum):
-    TODO = "todo"               # 待办
-    IN_PROGRESS = "in_progress" # 进行中
-    DONE = "done"               # 已完成
+    TODO = "待办"               
+    IN_PROGRESS = "进行中" 
+    DONE = "已完成"               
 
 # 定义优先级的枚举类
 class TaskPriority(str, enum.Enum):
-    LOW = "low"       # 低
-    MEDIUM = "medium" # 中
-    HIGH = "high"     # 高
+    LOW = "低"      
+    MEDIUM = "中"
+    HIGH = "高"    
 
 class User(Base):
     __tablename__ = "users"
