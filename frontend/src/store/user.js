@@ -238,8 +238,6 @@ export const handleRegister = async ({
             }
         }
     } catch (error) {
-        const msg = error.response?.data?.detail || error.response?.data?.msg || '注册失败'
-        ElMessage.error(msg)
         return { success: false }
     }
 }
@@ -308,8 +306,6 @@ export const handleLogin = async ({ username, password }) => {
         return { success: true, redirect: '/task' }
         
     } catch (error) {
-        const msg = error.response?.data?.detail || error.response?.data?.msg || '用户名或密码错误'
-        ElMessage.error(msg)
         return { success: false }
     }
 }
