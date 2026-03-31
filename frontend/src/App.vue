@@ -67,7 +67,7 @@ const onHandleLogout = async () => {
       <span v-if="isLoggedIn">
         <el-popover
           placement="bottom"
-          width="300px"
+          width="350px"
           height="250px"
           trigger="hover"
           popper-class="hover-popover"
@@ -79,7 +79,7 @@ const onHandleLogout = async () => {
           </template>
           <div>
             <h2 class="popover-title">{{ currentUser.username }}</h2>
-            <p class="popover-info"><span class="key">全名：</span> {{ currentUser.lastName }} {{ currentUser.firstName }}</p>
+            <p class="popover-info"><span class="key">全名：</span> {{ currentUser.lastName }}{{ currentUser.firstName }}</p>
             <p class="popover-info"><span class="key">电话号码：</span> {{ currentUser.phone }}</p>
             <p class="popover-info"><span class="key">电子邮箱：</span> {{ currentUser.email }}</p>
             <div class="popover-button">
