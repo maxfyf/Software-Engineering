@@ -42,7 +42,7 @@ project_root/                                    # 项目根目录
 │   ├── security.py                              # 密码加密与 JWT 令牌逻辑等安全认证相关逻辑
 │   ├── requirements.txt                         # 后端依赖列表 / Python项目核心配置文件
 │   └── task_manager.db                          # SQLite 数据库文件（运行后生成）
-├── frontend/                                    # 前端根目录
+├── frontend/                                    # 前端目录
 │   ├── .vscode/                                 # 以VS Code为默认编辑器
 │   │   └── extensions.json                      # 为项目推荐特定的VS Code插件
 │   ├── public/                                  # 静态资源
@@ -88,8 +88,8 @@ project_root/                                    # 项目根目录
 
 ##### 3.1 环境准备
 
-- 后端依赖安装：确保电脑上已安装 Python 3.9+，打开命令行切换到后端根目录 `backend/`，执行 `pip install -r requirements.txt`。
-- 前端依赖安装：确保电脑上已安装Node.js，打开命令行切换到前端根目录`frontend/`，执行`npm install`。
+- 后端依赖安装：确保电脑上已安装 Python 3.9+，打开命令行切换到后端目录 `backend/`，执行 `pip install -r requirements.txt`。
+- 前端依赖安装：确保电脑上已安装Node.js，打开命令行切换到前端目录`frontend/`，执行`npm install`。
 
 ##### 3.2 启动后端服务器
 
@@ -99,7 +99,7 @@ project_root/                                    # 项目根目录
 uvicorn api:app --reload --host 0.0.0.0 --port 8000
 ```
 
-方式二（使用项目启动脚本）：切换到 `backend/` 目录后执行：
+方式二（使用项目启动脚本）：打开命令行，切换到 `backend/` 目录后执行：
 
 ```bash
 python main.py
@@ -113,5 +113,28 @@ python main.py
 
 ##### 3.3 启动前端网页
 
-- 开发模式：打开命令行，切换到前端根目录`frontend/`，执行`npm run dev`后按住Ctrl键点击链接，可以快捷地打开含调试信息的前端网页。
-- 构建模式：打开命令行，切换到前端根目录`frontend/`，执行`npm run build`可以在前端目录下生成静态文件目录`dist`。随后执行`npm run preview`，按住Ctrl键点击链接，可以预览项目上线后前端网页的实际效果，并对相关功能进行测试。
+方式一（开发模式，推荐开发调试）：打开命令行，切换到`frontend/`目录后执行：
+
+```bash
+npm run dev
+```
+
+随后按住Ctrl键点击链接，可以快捷地打开含调试信息的前端网页。
+
+方式二（构建模式，在项目部署前构建）：打开命令行，切换到`frontend/`目录后执行
+
+```bash
+npm run build
+```
+
+前端目录下将自动生成静态文件目录`dist`。接着，在命令行中执行
+
+```bash
+npm run preview
+```
+
+随后按住Ctrl键点击链接，可以预览项目上线后前端网页的实际效果，并对相关功能进行测试。
+
+- 开发模式前端服务地址：http://localhost:5173/
+- 构建模式前端服务地址：http://localhost:4173/
+
