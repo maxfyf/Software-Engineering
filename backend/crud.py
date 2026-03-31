@@ -1,11 +1,17 @@
 from sqlalchemy.orm import Session
 import models, schemas, security
+from fastapi import HTTPException
 
 # 注册相关
 
 def get_user_by_username(db: Session, username: str) -> models.User | None:
     """根据用户名查询用户（API层用来判断用户是否已存在）"""
     return db.query(models.User).filter(models.User.username == username).first()
+
+def get_user_by_email(db: Session, email: str) -> models.User | None:
+    """根据邮箱查询用户"""
+    return db.query(models.User).filter(models.User.email == email).first()
+
 
 def create_user(db: Session, user: schemas.UserCreate) -> models.User:
     """创建新用户并写入数据库（密码在此处加密）"""
