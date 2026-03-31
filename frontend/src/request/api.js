@@ -36,12 +36,24 @@ service.interceptors.response.use(
         const status = error.response?.status
         const detail = error.response?.data?.detail
         const msg = error.response?.data?.msg
+        const isLoginRequest = error.config.url.includes('/user/login')
         
         if (status === 401) {
-            if (!error.config.url.includes('/user/login')) {
+            if (isLoginRequest) {
+                // 登录接口的401错误，直接显示错误信息
+                ElMessage.error(detail || '密码错误')
+            } else {
+                // 其他接口的401错误，跳转登录页
                 ElMessage.error('登录状态已过期，请重新登录')
                 sessionStorage.clear()
                 window.location.href = '/login'
+            }
+        } else if (status === 404) {
+            if (isLoginRequest) {
+                // 登录接口的404错误，显示用户不存在
+                ElMessage.error(detail || '用户不存在')
+            } else {
+                ElMessage.error(detail || msg || '资源不存在')
             }
         } else if (status === 400 || status === 422) {
             // 显示后端返回的错误信息
