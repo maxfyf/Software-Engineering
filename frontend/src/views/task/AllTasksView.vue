@@ -207,13 +207,34 @@ const formatDate = (dateStr) => {
         <span class="dialog-title">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;任务详情</span>
       </template>
       <div class="dialog-content-wrapper">
-        <p class="dialog-content"><span class="key">任务标题：</span>{{ currentTask.title }}</p>
-        <p class="dialog-content"><span class="key">描述：</span>{{ currentTask.description }}</p>
-        <p class="dialog-content"><span class="key">状态：</span>{{ currentTask.status }}</p>
-        <p class="dialog-content"><span class="key">优先级：</span>{{ currentTask.priority }}</p>
-        <p class="dialog-content"><span class="key">截止时间：</span>{{ currentTask.deadline }}</p>
-        <p class="dialog-content"><span class="key">创建时间：</span>{{ formatDate(currentTask.createdAt) }}</p>
-        <p class="dialog-content"><span class="key">更新时间：</span>{{ formatDate(currentTask.updatedAt) }}</p>
+        <p class="dialog-content">
+          <span class="key">任务标题：</span>
+          {{ currentTask.title }}
+        </p>
+        <p class="dialog-content" v-if="currentTask.description !== ''">
+          <span class="key">描述：</span>
+          {{ currentTask.description }}
+        </p>
+        <p class="dialog-content">
+          <span class="key">状态：</span>
+          {{ currentTask.status }}
+        </p>
+        <p class="dialog-content">
+          <span class="key">优先级：</span>
+          {{ currentTask.priority }}
+        </p>
+        <p class="dialog-content" v-if="currentTask.deadline !== null">
+          <span class="key">截止时间：</span>
+          {{ currentTask.deadline }}
+        </p>
+        <p class="dialog-content">
+          <span class="key">创建时间：</span>
+          {{ formatDate(currentTask.createdAt) }}
+        </p>
+        <p class="dialog-content">
+          <span class="key">更新时间：</span>
+          {{ formatDate(currentTask.updatedAt) }}
+        </p>
       </div>
     </el-dialog>
   </HeaderWrapper>
