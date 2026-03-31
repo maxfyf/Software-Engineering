@@ -25,3 +25,40 @@ class UserResponse(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+# 用于接收创建任务的数据
+class TaskCreate(BaseModel):
+    title: str = Field(..., max_length=100)
+    description: Optional[str] = None
+    status: Optional[str] = "todo"
+    priority: Optional[str] = "medium"
+    due_date: Optional[datetime] = None
+
+# 用于接收更新任务的数据
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+    priority: Optional[str] = None
+    due_date: Optional[datetime] = None
+
+# 用于返回任务详情给前端
+class TaskResponse(BaseModel):
+    id: int
+    title: str
+    description: Optional[str]
+    status: str
+    priority: str
+    due_date: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
+    owner_username: str
+
+    class Config:
+        from_attributes = True
+
+# 统一接口返回格式
+class BaseResponse(BaseModel):
+    code: int
+    msg: str
+    data: Optional[dict | list | None] = None    
