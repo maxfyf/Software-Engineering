@@ -62,7 +62,6 @@ frontend/                                    # 前端根目录
 ├── README.md                                # 此文件
 ├── index.html                               # HTML入口，作为应用程序的容器
 ├── jsconfig.json                            # Javascript项目的根目录标识和配置核心
-├── package-lock.json                        # npm包管理器锁定文件
 ├── package.json                             # Node.js项目核心配置文件
 └── vite.config.js                           # Vite构建工具配置文件
 ```
