@@ -33,12 +33,23 @@ service.interceptors.response.use(
         return res
     },
     (error) => {
-        if (error.response?.status === 401) {
-            ElMessage.error('登录状态已过期，请重新登录')
-            sessionStorage.clear()
-            window.location.href = '/login'
-        } else if (error.response){
-            ElMessage.error(error.response?.data?.msg || '请求失败')
+        const status = error.response?.status
+        const detail = error.response?.data?.detail
+        const msg = error.response?.data?.msg
+        
+        if (status === 401) {
+            if (!error.config.url.includes('/user/login')) {
+                ElMessage.error('登录状态已过期，请重新登录')
+                sessionStorage.clear()
+                window.location.href = '/login'
+            }
+        } else if (status === 400 || status === 422) {
+            // 显示后端返回的错误信息
+            ElMessage.error(detail || msg || '请求参数错误')
+        } else if (detail || msg) {
+            ElMessage.error(detail || msg)
+        } else {
+            ElMessage.error('网络错误，请稍后重试')
         }
         return Promise.reject(error)
     }
