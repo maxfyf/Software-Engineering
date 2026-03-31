@@ -238,8 +238,6 @@ export const handleRegister = async ({
             }
         }
     } catch (error) {
-        const msg = error.response?.data?.detail || error.response?.data?.msg || '注册失败'
-        ElMessage.error(msg)
         return { success: false }
     }
 }
@@ -287,6 +285,8 @@ export const handleLogin = async ({ username, password }) => {
             sessionStorage.setItem('token', token)
         }
 
+        resetTaskList()
+
         // 加载用户信息
         currentUser.username = info.username
         currentUser.firstName = info.firstName  
@@ -301,6 +301,8 @@ export const handleLogin = async ({ username, password }) => {
         // 将 isLoggedIn 置为 true
         isLoggedIn.value = true
         highlightTaskId.value = null
+
+        await initTaskList()
         
         ElMessage.success('登录成功')
         
@@ -330,6 +332,7 @@ export const handleLogout = () => {
                 console.error('登出失败:', error)
             }
             resetUserInfo()
+            resetTaskList()
             sessionStorage.removeItem('isLoggedIn')
             sessionStorage.removeItem('username')
             sessionStorage.removeItem('token')
