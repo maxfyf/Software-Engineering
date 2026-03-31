@@ -168,7 +168,7 @@ export const validatePhone = (phoneNum) => {
 /**
  * 验证邮箱格式
  * @param {string} emailAddr - 待验证的邮箱地址
- * @returns {boolean} - 是否符合"(字符)@(字符).com"格式
+ * @returns {boolean} - 是否符合"(字符)@(字符).(字符)"格式
  */
 export const validateEmail = (emailAddr) => {
     if (!emailAddr) {
@@ -186,32 +186,26 @@ export const handleRegister = async ({
     phone,
     email
 }) => {
-    
-    // 1. 验证用户名格式
     if (!validateUsername(username)) {
         ElMessage.error('用户名只允许包含字母、数字、下划线，长度为4～20')
         return false
     }
-    
-    // 2. 验证密码格式
+
     if (!validatePassword(firstTimePassword)) {
         ElMessage.error('密码长度不少于6位，且必须同时包含字母和数字')
         return false
     }
-    
-    // 3. 验证两次输入的密码是否一致
+
     if (firstTimePassword !== repeatedPassword) {
         ElMessage.error('两次输入的密码不一致')
         return false
     }
-    
-    // 4. 验证电话号码格式
+
     if (!validatePhone(phone)) {
         ElMessage.error('电话号码必须为8位或11位数字')
         return false
     }
-    
-    // 5. 验证邮箱格式
+
     if (!validateEmail(email)) {
         ElMessage.error('邮箱格式不正确，应为"xxx@xxx.xxx"')
         return false
@@ -243,9 +237,7 @@ export const handleRegister = async ({
                 email: ''
             }
         }
-        
     } catch (error) {
-        // 后端不可用时，模拟注册成功
         const msg = error.response?.data?.detail || error.response?.data?.msg || '注册失败'
         ElMessage.error(msg)
         return { success: false }
@@ -285,7 +277,6 @@ export const handleCancelAccount = () => {
 }
 
 export const handleLogin = async ({ username, password }) => {
-
     try {
         // 调用后端登录 API
         const res = await api.login({ username, password })
@@ -309,6 +300,7 @@ export const handleLogin = async ({ username, password }) => {
         
         // 将 isLoggedIn 置为 true
         isLoggedIn.value = true
+        highlightTaskId.value = null
         
         ElMessage.success('登录成功')
         
@@ -323,7 +315,6 @@ export const handleLogin = async ({ username, password }) => {
 }
 
 export const handleLogout = () => {
-
     return new Promise((resolve) => {
         ElMessageBox.confirm(
             '确认退出登录？',
