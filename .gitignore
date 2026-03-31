@@ -81,7 +81,7 @@ coverage
 .eslintcache
 
 # npm
-package_lock.json
+package-lock.json
 
 # Cypress
 /cypress/videos/
