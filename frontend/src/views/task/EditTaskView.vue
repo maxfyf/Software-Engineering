@@ -121,6 +121,11 @@ const saveChanges = async () => {
     ElMessage.error('任务标题不能为空')
     return
   }
+
+  if (newTitle.value.length > 20) {
+    ElMessage.error('请将任务标题限制在20字以内')
+    return
+  }
   
   const taskData = {
     title: newTitle.value,
