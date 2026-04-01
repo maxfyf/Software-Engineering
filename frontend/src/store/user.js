@@ -306,7 +306,7 @@ export const handleLogin = async ({ username, password }) => {
         ElMessage.success('登录成功')
         
         // 切换页面到/task 页面
-        return { success: true, redirect: '/task' }
+        return { success: true, redirect: '/task', replace: true }
         
     } catch (error) {
         return { success: false }
