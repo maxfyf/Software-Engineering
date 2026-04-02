@@ -160,7 +160,7 @@ export const validateUsername = (username) => {
  */
 export const validatePhone = (phoneNum) => {
     if (!phoneNum) {
-        return false
+        return true
     }
     return /^\d{8}$|^\d{11}$/.test(phoneNum)
 }
@@ -172,7 +172,7 @@ export const validatePhone = (phoneNum) => {
  */
 export const validateEmail = (emailAddr) => {
     if (!emailAddr) {
-        return false
+        return true
     }
     return /^[^@]+@[^@]+\.[^@]+$/.test(emailAddr)
 }
