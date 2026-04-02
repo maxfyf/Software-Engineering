@@ -21,7 +21,7 @@ const onHandleLogin = async () => {
     password: password.value
   })
   if (result && result.success && result.redirect) {
-    router.push(result.redirect)
+    router.replace(result.redirect)
   }
 }
 
