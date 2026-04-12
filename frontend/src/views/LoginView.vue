@@ -42,6 +42,7 @@ const onHandleRegister = async () => {
     if (result.redirect) router.push(result.redirect)
     if (result.resetFields) {
       username.value = result.resetFields.username
+      password.value = result.resetFields.password
       first_time_password.value = result.resetFields.firstTimePassword
       repeated_password.value = result.resetFields.repeatedPassword
       first_name.value = result.resetFields.firstName
