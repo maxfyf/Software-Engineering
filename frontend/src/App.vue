@@ -89,15 +89,15 @@ const onHandleLogout = async () => {
             <h2 class="popover-title">
               {{ currentUser.username }}
             </h2>
-            <p class="popover-info">
+            <p class="popover-info" v-if="currentUser.lastName !== '' && currentUser.firstName !== ''">
               <span class="key">全名：</span>
               {{ currentUser.lastName }}{{ currentUser.firstName }}
             </p>
-            <p class="popover-info">
+            <p class="popover-info" v-if="currentUser.phone !== ''">
               <span class="key">电话号码：</span>
               {{ currentUser.phone }}
             </p>
-            <p class="popover-info">
+            <p class="popover-info" v-if="currentUser.email !== ''">
               <span class="key">电子邮箱：</span>
               {{ currentUser.email }}
             </p>
