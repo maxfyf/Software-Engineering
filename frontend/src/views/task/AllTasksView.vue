@@ -2,10 +2,10 @@
 import { ref, computed, onMounted } from 'vue';
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import Search from "@/components/Search.vue";
-import { Plus, View, Edit, Delete } from "@element-plus/icons-vue";
+import { Plus, View, Edit, Check, Delete } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useRouter } from 'vue-router';
-import { taskList, highlightTaskId,removeTask, initTaskList } from '@/store/user.js';
+import { taskList, highlightTaskId, finishTask, removeTask, initTaskList } from '@/store/user.js';
 
 const router = useRouter();
 // 实际用户所有任务名称字符串数组
@@ -78,6 +78,13 @@ const editTask = (row) => {
       taskId: row.id 
     }
   })
+}
+
+// 完成任务
+const checkTask = (row) => {
+  highlightTaskId.value = row.id
+  finishTask(row.id)
+  ElMessage.success('任务已完成')
 }
 
 // 删除任务
@@ -158,7 +165,7 @@ const formatDate = (dateStr) => {
 
       <el-row>
         <el-col>
-          <el-table :data="pageData" stripe class="task-table" :row-class-name="tableRowClassName">
+          <el-table :data="pageData" stripe class="task-table" :row-class-name="tableRowClassName" :key="highlightTaskId">
             <el-table-column prop="title" label="任务名称" min-width="50%" align="left" />
             <el-table-column prop="status" label="状态" min-width="20%" align="center" />
             <el-table-column prop="priority" label="优先级" min-width="15%" align="center" />
@@ -173,6 +180,17 @@ const formatDate = (dateStr) => {
                 <el-button link type="text" @click="editTask(scope.row)">
                   <el-icon>
                     <Edit/>
+                  </el-icon>
+                </el-button>
+
+                <el-button v-if="scope.row.status !== '已完成'" link type="text" @click="checkTask(scope.row)">
+                  <el-icon>
+                    <Check/>
+                  </el-icon>
+                </el-button>
+                <el-button v-else link type="text" disabled>
+                  <el-icon>
+                    <Check/>
                   </el-icon>
                 </el-button>
 

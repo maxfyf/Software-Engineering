@@ -60,6 +60,38 @@ export const addTask = async (task) => {
     return newTask
 }
 
+// 完成任务
+export const finishTask = async (taskId) => {
+    const task = taskList.value.find(t => t.id === taskId)
+    if (!task) {
+        console.error('任务不存在')
+        return false
+    }
+    
+    // 检查任务是否已完成
+    if (task.status === '已完成') {
+        console.warn('任务已经是完成状态')
+        return true
+    }
+    
+    // 调用后端API更新任务状态
+    await api.updateTask(taskId, {
+        status: '已完成'
+    })
+    
+    // 更新本地任务列表
+    const index = taskList.value.findIndex(t => t.id === taskId)
+    if (index !== -1) {
+        taskList.value[index] = {
+            ...taskList.value[index],
+            status: '已完成',
+            updatedAt: new Date().toISOString()
+        }
+    }
+    
+    return true
+}
+
 // 删除任务
 export const removeTask = async (taskId) => {
     await api.deleteTask(taskId)
@@ -160,7 +192,7 @@ export const validateUsername = (username) => {
  */
 export const validatePhone = (phoneNum) => {
     if (!phoneNum) {
-        return false
+        return true
     }
     return /^\d{8}$|^\d{11}$/.test(phoneNum)
 }
@@ -172,7 +204,7 @@ export const validatePhone = (phoneNum) => {
  */
 export const validateEmail = (emailAddr) => {
     if (!emailAddr) {
-        return false
+        return true
     }
     return /^[^@]+@[^@]+\.[^@]+$/.test(emailAddr)
 }
@@ -306,7 +338,7 @@ export const handleLogin = async ({ username, password }) => {
         ElMessage.success('登录成功')
         
         // 切换页面到/task 页面
-        return { success: true, redirect: '/task' }
+        return { success: true, redirect: '/task', replace: true }
         
     } catch (error) {
         return { success: false }

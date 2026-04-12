@@ -21,7 +21,7 @@ const onHandleLogin = async () => {
     password: password.value
   })
   if (result && result.success && result.redirect) {
-    router.push(result.redirect)
+    router.replace(result.redirect)
   }
 }
 
@@ -42,6 +42,7 @@ const onHandleRegister = async () => {
     if (result.redirect) router.push(result.redirect)
     if (result.resetFields) {
       username.value = result.resetFields.username
+      password.value = result.resetFields.password
       first_time_password.value = result.resetFields.firstTimePassword
       repeated_password.value = result.resetFields.repeatedPassword
       first_name.value = result.resetFields.firstName
@@ -136,50 +137,67 @@ export default {
             </div>
 
             <div v-else class="inner-box">
-              <el-input
-                  class="input"
-                  v-model="username"
-                  type="text"
-                  placeholder="用户名"
-              />
-              <el-input
-                  class="input"
-                  v-model="first_time_password"
-                  type="password"
-                  placeholder="密码"
-                  show-password
-              />
-              <el-input
-                  class="input"
-                  v-model="repeated_password"
-                  type="password"
-                  placeholder="确认密码"
-                  show-password
-              />
-              <el-input
-                  class="input"
-                  v-model="first_name"
-                  type="text"
-                  placeholder="名"
-              />
-              <el-input
-                  class="input"
-                  v-model="last_name"
-                  type="text"
-                  placeholder="姓"
-              />
-              <el-input
-                  class="input"
-                  v-model="phone"
-                  type="tel"
-                  placeholder="电话号码"
-              />
-              <el-input
-                  class="input"
-                  v-model="email"
-                  type="email"
-                  placeholder="电子邮箱"
-              />
+              <div class="item">
+                <span class="star">*&nbsp;</span>
+                <el-input
+                    class="input"
+                    v-model="username"
+                    type="text"
+                    placeholder="用户名"
+                />
+              </div>
+              <div class="item">
+                <span class="star">*&nbsp;</span>
+                <el-input
+                    class="input"
+                    v-model="first_time_password"
+                    type="password"
+                    placeholder="密码"
+                    show-password
+                />
+              </div>
+              <div class="item">
+                <span class="star">*&nbsp;</span>
+                <el-input
+                    class="input"
+                    v-model="repeated_password"
+                    type="password"
+                    placeholder="确认密码"
+                    show-password
+                />
+              </div>
+              <div class="item">
+                <el-input
+                    class="input-with-margin"
+                    v-model="first_name"
+                    type="text"
+                    placeholder="名"
+                />
+              </div>
+              <div class="item">
+                <el-input
+                    class="input-with-margin"
+                    v-model="last_name"
+                    type="text"
+                    placeholder="姓"
+                />
+              </div>
+              <div class="item">
+                <el-input
+                    class="input-with-margin"
+                    v-model="phone"
+                    type="tel"
+                    placeholder="电话号码"
+                />
+              </div>
+              <div class="item">
+                <el-input
+                    class="input-with-margin"
+                    v-model="email"
+                    type="email"
+                    placeholder="电子邮箱"
+                />
+              </div>
               <div class="spacer"/>
               <el-button
                   type="primary"
@@ -303,6 +321,16 @@ export default {
   gap: 20px;
 }
 
+.item {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+}
+
+.star {
+  color: red;
+}
+
 .input :deep(.el-input__inner) {
   width: 100%;
   height: 35px;
@@ -310,6 +338,21 @@ export default {
 }
 
 .input :deep(.el-icon) {
+  color: #222222;
+  cursor: pointer;
+}
+
+.input-with-margin {
+  margin-left: 11px;
+}
+
+.input-with-margin :deep(.el-input__inner) {
+  width: 100%;
+  height: 35px;
+  font-size: medium;
+}
+
+.input-with-margin :deep(.el-icon) {
   color: #222222;
   cursor: pointer;
 }
