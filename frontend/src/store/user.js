@@ -60,6 +60,11 @@ export const addTask = async (task) => {
     return newTask
 }
 
+// 完成任务
+export const finishTask = async (taskId) => {
+
+}
+
 // 删除任务
 export const removeTask = async (taskId) => {
     await api.deleteTask(taskId)
