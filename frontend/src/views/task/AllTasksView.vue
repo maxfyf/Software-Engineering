@@ -165,7 +165,7 @@ const formatDate = (dateStr) => {
 
       <el-row>
         <el-col>
-          <el-table :data="pageData" stripe class="task-table" :row-class-name="tableRowClassName">
+          <el-table :data="pageData" stripe class="task-table" :row-class-name="tableRowClassName" :key="highlightTaskId">
             <el-table-column prop="title" label="任务名称" min-width="50%" align="left" />
             <el-table-column prop="status" label="状态" min-width="20%" align="center" />
             <el-table-column prop="priority" label="优先级" min-width="15%" align="center" />
@@ -183,7 +183,12 @@ const formatDate = (dateStr) => {
                   </el-icon>
                 </el-button>
 
-                <el-button link type="text" @click="checkTask(scope.row)">
+                <el-button v-if="scope.row.status !== '已完成'" link type="text" @click="checkTask(scope.row)">
+                  <el-icon>
+                    <Check/>
+                  </el-icon>
+                </el-button>
+                <el-button v-else link type="text" disabled>
                   <el-icon>
                     <Check/>
                   </el-icon>
