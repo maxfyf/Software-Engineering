@@ -10,12 +10,9 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 
 // 实际用户所有任务名称字符串数组
-// TODO: 改为用户可见的所有任务，通过taskList实现，且任务结构体添加权限等级（ReadOnly/Participate/Administrate）
-const tasks = computed(
+const tasks = computed(() => taskList.value)
 
-)
-
-// TODO: 改成tasks中每一项的title
+// tasks中每一项的title
 const dataset = computed(() => taskList.value.map(task => task.title))
 
 // 页面加载时获取任务列表
@@ -44,6 +41,17 @@ const handleSelect = (taskName) => {
     viewDialogVisible.value = true
   }
 }
+
+// 分页变化
+const handlePageChange = (page) => {
+  currentPage.value = page
+}
+
+// 查看详情
+const handleViewDetail = (task) => {
+  currentTask.value = task
+  viewDialogVisible.value = true
+}
 </script>
 
 <template>
@@ -63,15 +71,15 @@ const handleSelect = (taskName) => {
     <TaskList
         :tasks="tasks"
         :router="router"
-        :current-page="currentPage.value"
-        :pageSize="pageSize.value"
-        :currentTask="currentTask.value"
-        :viewDialogVisible="viewDialogVisible.value"
+        :current-page="currentPage"
+        :page-size="pageSize"
+        @page-change="handlePageChange"
+        @view-detail="handleViewDetail"
     />
 
     <TaskDetail
-        :currentTask="currentTask.value"
-        :viewDialogVisible="viewDialogVisible.value"
+        :current-task="currentTask"
+        v-model:visible="viewDialogVisible"
     />
 
   </HeaderWrapper>
