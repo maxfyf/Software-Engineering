@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { finishTask, highlightTaskId, removeTask } from "@/store/user.js";
-import { Check, Delete, Edit, View } from "@element-plus/icons-vue";
+import { View, CaretRight, Check, Edit, Delete } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
 const props = defineProps({
@@ -55,7 +55,14 @@ const viewDetail = (row) => {
   emit('viewDetail', row)
 }
 
-// 更改状态
+// 开始任务
+const startTask = (row) => {
+  highlightTaskId.value = row.id
+  //TODO
+  ElMessage.success('任务已开始')
+}
+
+// 完成任务
 const checkTask = (row) => {
   highlightTaskId.value = row.id
   finishTask(row.id)
@@ -111,12 +118,12 @@ const deleteTask = (row) => {
               </el-icon>
             </el-button>
 
-            <el-button v-if="scope.row.status !== '已完成'" link type="text" @click="checkTask(scope.row)">
+            <el-button v-if="scope.row.status === '待办'" link type="text" @click="startTask(scope.row)">
               <el-icon>
-                <Check/>
+                <CaretRight/>
               </el-icon>
             </el-button>
-            <el-button v-else link type="text" disabled>
+            <el-button v-else-if="scope.row.status === '进行中'" link type="text" @click="checkTask(scope.row)">
               <el-icon>
                 <Check/>
               </el-icon>
@@ -160,15 +167,7 @@ const deleteTask = (row) => {
   justify-content: flex-end;
 }
 
-:deep(.el-pagination .el-pager li) {
-  background-color: transparent !important;
-}
 
-:deep(.el-pagination .btn-prev),
-:deep(.el-pagination .btn-next) {
-  background-color: transparent !important;
-  color: black !important;
-}
 
 :deep(.el-table__row.highlight-row) {
   background-color: #ecf5ff !important;

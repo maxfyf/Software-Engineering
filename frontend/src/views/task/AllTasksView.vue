@@ -6,6 +6,7 @@ import TaskList from "@/components/TaskList.vue";
 import TaskDetail from "@/components/TaskDetail.vue";
 import { taskList, highlightTaskId, initTaskList } from '@/store/user.js';
 import { useRouter } from 'vue-router';
+import { Plus } from "@element-plus/icons-vue";
 
 const router = useRouter();
 
@@ -42,6 +43,16 @@ const handleSelect = (taskName) => {
   }
 }
 
+// 新建任务
+const handleNew = () => {
+  console.log('新建任务')
+  // 跳转到编辑页面，并传递 isNew 参数
+  router.push({
+    path: '/task/edit',
+    query: { isNew: 'true' }
+  })
+}
+
 // 分页变化
 const handlePageChange = (page) => {
   currentPage.value = page
@@ -68,14 +79,28 @@ const handleViewDetail = (task) => {
       </div>
     </template>
 
-    <TaskList
-        :tasks="tasks"
-        :router="router"
-        :current-page="currentPage"
-        :page-size="pageSize"
-        @page-change="handlePageChange"
-        @view-detail="handleViewDetail"
-    />
+    <div class="main-content-wrapper">
+      <div class="header">
+        <el-button
+            type="primary"
+            class="new-button"
+            @click="handleNew"
+        >
+          <el-icon>
+            <Plus/>
+          </el-icon>
+          &nbsp;新建
+        </el-button>
+      </div>
+      <TaskList
+          :tasks="tasks"
+          :router="router"
+          :current-page="currentPage"
+          :page-size="pageSize"
+          @page-change="handlePageChange"
+          @view-detail="handleViewDetail"
+      />
+    </div>
 
     <TaskDetail
         :current-task="currentTask"
@@ -111,5 +136,35 @@ const handleViewDetail = (task) => {
   right: 20px;
   width: 250px;
   align-items: center;
+}
+
+.main-content-wrapper {
+  margin-top: 20px;
+  margin-left: 20px;
+  margin-right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.header {
+  width: 100%;
+  display: flex;
+}
+
+.new-button {
+  width: 70px;
+  margin-left: auto;
+  margin-right: 15px;
+}
+
+:deep(.el-pagination .el-pager li) {
+  background-color: transparent !important;
+}
+
+:deep(.el-pagination .btn-prev),
+:deep(.el-pagination .btn-next) {
+  background-color: transparent !important;
+  color: black !important;
 }
 </style>
