@@ -4,16 +4,13 @@ const props = defineProps({
   currentTask: {
     type: Object,
     default: null
-  },
-
-  viewDialogVisible: {
-    type: Boolean,
-    default: false
   }
 })
 
+const visible = defineModel('visible')
+
 const closeViewDialog = () => {
-  props.viewDialogVisible = false
+  visible.value = false
 }
 
 const formatDate = (dateStr) => {
@@ -29,7 +26,7 @@ const formatDate = (dateStr) => {
 
 <template>
   <el-dialog
-      v-model="props.viewDialogVisible"
+      v-model="visible"
       width="500px"
       center
       :before-close="closeViewDialog"
@@ -37,34 +34,34 @@ const formatDate = (dateStr) => {
     <template #header>
       <span class="dialog-title">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;任务详情</span>
     </template>
-    <div class="dialog-content-wrapper">
+    <div class="dialog-content-wrapper" v-if="currentTask">
       <p class="dialog-content">
         <span class="key">任务标题：</span>
-        {{ props.currentTask.title }}
+        {{ currentTask.title }}
       </p>
-      <p class="dialog-content" v-if="props.currentTask.description !== ''">
+      <p class="dialog-content" v-if="currentTask.description !== ''">
         <span class="key">描述：</span>
-        {{ props.currentTask.description }}
+        {{ currentTask.description }}
       </p>
       <p class="dialog-content">
         <span class="key">状态：</span>
-        {{ props.currentTask.status }}
+        {{ currentTask.status }}
       </p>
       <p class="dialog-content">
         <span class="key">优先级：</span>
-        {{ props.currentTask.priority }}
+        {{ currentTask.priority }}
       </p>
-      <p class="dialog-content" v-if="props.currentTask.deadline !== null">
+      <p class="dialog-content" v-if="currentTask.deadline !== null">
         <span class="key">截止时间：</span>
-        {{ props.currentTask.deadline }}
+        {{ currentTask.deadline }}
       </p>
       <p class="dialog-content">
         <span class="key">创建时间：</span>
-        {{ formatDate(props.currentTask.createdAt) }}
+        {{ formatDate(currentTask.createdAt) }}
       </p>
       <p class="dialog-content">
         <span class="key">更新时间：</span>
-        {{ formatDate(props.currentTask.updatedAt) }}
+        {{ formatDate(currentTask.updatedAt) }}
       </p>
     </div>
   </el-dialog>

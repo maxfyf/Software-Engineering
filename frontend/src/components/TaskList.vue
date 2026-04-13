@@ -3,13 +3,12 @@ import { computed } from 'vue';
 import { finishTask, highlightTaskId, removeTask } from "@/store/user.js";
 import { Check, Delete, Edit, View } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { useRouter } from 'vue-router';
 
 const props = defineProps({
   tasks: {
     type: Array,
     required: true,
-    default: []
+    default: () => []
   },
 
   router: {
@@ -25,21 +24,13 @@ const props = defineProps({
   pageSize: {
     type: Number,
     default: 10
-  },
-
-  currentTask: {
-    type: Object,
-    default: null
-  },
-
-  viewDialogVisible: {
-    type: Boolean,
-    default: false
   }
 })
 
-const total = computed(() => props.tasks.length)    // 总数据条数
-const pageData = computed(() => {    // 当前页面数据
+const emit = defineEmits(['pageChange', 'viewDetail'])
+
+const total = computed(() => props.tasks.length)
+const pageData = computed(() => {
   const start = (props.currentPage - 1) * props.pageSize
   const end = start + props.pageSize
   return props.tasks.slice(start, end)
@@ -47,7 +38,7 @@ const pageData = computed(() => {    // 当前页面数据
 
 // 切换页面
 const handleCurrentChange = (page) => {
-  props.currentPage = page
+  emit('pageChange', page)
 }
 
 // 表格行样式回调
@@ -60,9 +51,8 @@ const tableRowClassName = ({ row }) => {
 
 // 查看详情
 const viewDetail = (row) => {
-  props.currentTask = row
   highlightTaskId.value = row.id
-  props.viewDialogVisible = true
+  emit('viewDetail', row)
 }
 
 // 更改状态
@@ -76,8 +66,7 @@ const checkTask = (row) => {
 const editTask = (row) => {
   console.log('编辑任务:', row)
   highlightTaskId.value = row.id
-  // 跳转到编辑页面，传递任务ID
-  router.push({
+  props.router.push({
     path: '/task/edit',
     query: {
       isNew: 'false',
