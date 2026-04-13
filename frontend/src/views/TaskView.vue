@@ -9,6 +9,7 @@ const activeMenu = computed(() => {
     return '/task/all'
   }
   else if (route.path.startsWith('/task/edit')) {
+    // TODO: 需要记录先前路由的路径，并返回之
     return '/task/all'
   }
   else
@@ -32,6 +33,14 @@ watch(() => route.path, (newPath) => {
       >
         <el-menu-item index="/task/all" class="secondary-route">
           全部任务
+        </el-menu-item>
+
+        <el-menu-item index="/task/personal" class="secondary-route">
+          个人任务
+        </el-menu-item>
+
+        <el-menu-item index="/task/team" class="secondary-route">
+          团队任务
         </el-menu-item>
       </el-menu>
     </template>

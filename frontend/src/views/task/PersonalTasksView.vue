@@ -10,7 +10,7 @@ import { Plus } from "@element-plus/icons-vue";
 
 const router = useRouter();
 
-// 用户的所有个人任务与分配给该用户的所有团队任务
+// TODO：筛选出用户的所有个人任务
 const tasks = computed(() => taskList.value)
 
 // tasks中每一项的title
@@ -35,7 +35,7 @@ const handleSelect = (taskName) => {
     const index = taskList.value.findIndex(t => t.id === task.id)
     // 切换到该任务所在的页面
     currentPage.value = Math.floor(index / pageSize.value) + 1
-    
+
     highlightTaskId.value = task.id
 
     currentTask.value = task
@@ -69,7 +69,7 @@ const handleViewDetail = (task) => {
   <HeaderWrapper>
     <template #header>
       <div class="inner-header">
-        <span class="route">全部任务</span>
+        <span class="route">个人任务</span>
         <div class="search-wrapper">
           <Search
               :data="dataset"
@@ -89,7 +89,7 @@ const handleViewDetail = (task) => {
           <el-icon>
             <Plus/>
           </el-icon>
-          &nbsp;新建个人任务
+          &nbsp;新建
         </el-button>
       </div>
       <TaskList
@@ -153,7 +153,7 @@ const handleViewDetail = (task) => {
 }
 
 .new-button {
-  width: 125px;
+  width: 70px;
   margin-left: auto;
   margin-right: 15px;
 }

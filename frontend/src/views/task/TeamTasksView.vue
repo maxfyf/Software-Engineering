@@ -10,7 +10,7 @@ import { Plus } from "@element-plus/icons-vue";
 
 const router = useRouter();
 
-// 用户的所有个人任务与分配给该用户的所有团队任务
+// TODO：筛选出分配给该用户的所有团队任务
 const tasks = computed(() => taskList.value)
 
 // tasks中每一项的title
@@ -35,22 +35,12 @@ const handleSelect = (taskName) => {
     const index = taskList.value.findIndex(t => t.id === task.id)
     // 切换到该任务所在的页面
     currentPage.value = Math.floor(index / pageSize.value) + 1
-    
+
     highlightTaskId.value = task.id
 
     currentTask.value = task
     viewDialogVisible.value = true
   }
-}
-
-// 新建任务
-const handleNew = () => {
-  console.log('新建任务')
-  // 跳转到编辑页面，并传递 isNew 参数
-  router.push({
-    path: '/task/edit',
-    query: { isNew: 'true' }
-  })
 }
 
 // 分页变化
@@ -69,7 +59,7 @@ const handleViewDetail = (task) => {
   <HeaderWrapper>
     <template #header>
       <div class="inner-header">
-        <span class="route">全部任务</span>
+        <span class="route">团队任务</span>
         <div class="search-wrapper">
           <Search
               :data="dataset"
@@ -79,19 +69,9 @@ const handleViewDetail = (task) => {
       </div>
     </template>
 
+    <div class="header"/>
+
     <div class="main-content-wrapper">
-      <div class="header">
-        <el-button
-            type="primary"
-            class="new-button"
-            @click="handleNew"
-        >
-          <el-icon>
-            <Plus/>
-          </el-icon>
-          &nbsp;新建个人任务
-        </el-button>
-      </div>
       <TaskList
           :tasks="tasks"
           :router="router"
@@ -149,13 +129,7 @@ const handleViewDetail = (task) => {
 
 .header {
   width: 100%;
-  display: flex;
-}
-
-.new-button {
-  width: 125px;
-  margin-left: auto;
-  margin-right: 15px;
+  height: 15px;
 }
 
 :deep(.el-pagination .el-pager li) {

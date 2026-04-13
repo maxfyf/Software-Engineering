@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="js">
 import { computed } from 'vue';
 import { taskAuthority, finishTask, highlightTaskId, removeTask} from "@/store/user.js";
 import { View, CaretRight, Check, Edit, Delete } from "@element-plus/icons-vue";
