@@ -11,9 +11,17 @@ export const userInfo = {
     email: ''          // 电子邮箱
 }
 
+// 用户对任务的权限类型
+export const taskAuthority = {
+    READ_ONLY: 0,
+    UPDATE_STATUS_ONLY: 1,
+    WRITEABLE: 2
+}
+
 // 任务数据结构
 export const taskInfo = {
     id: null,
+    authority: taskAuthority.READ_ONLY,
     title: '',
     description: '',
     status: '',

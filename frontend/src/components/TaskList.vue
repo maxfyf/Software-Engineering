@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue';
-import { finishTask, highlightTaskId, removeTask } from "@/store/user.js";
+import { taskAuthority, finishTask, highlightTaskId, removeTask} from "@/store/user.js";
 import { View, CaretRight, Check, Edit, Delete } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
@@ -112,30 +112,57 @@ const deleteTask = (row) => {
         <el-table-column prop="priority" label="优先级" min-width="15%" align="center" />
         <el-table-column fixed="right" label="操作" min-width="15%" align="center">
           <template v-slot:default="scope">
-            <el-button link type="text" @click="viewDetail(scope.row)">
+            <el-button
+                link
+                type="text"
+                @click="viewDetail(scope.row)"
+            >
               <el-icon>
                 <View/>
               </el-icon>
             </el-button>
 
-            <el-button v-if="scope.row.status === '待办'" link type="text" @click="startTask(scope.row)">
+            <el-button
+                link
+                type="text"
+                v-if="scope.row.authority >= taskAuthority.UPDATE_STATUS_ONLY &&
+                  scope.row.status === '待办'"
+                @click="startTask(scope.row)"
+            >
               <el-icon>
                 <CaretRight/>
               </el-icon>
             </el-button>
-            <el-button v-else-if="scope.row.status === '进行中'" link type="text" @click="checkTask(scope.row)">
+            <el-button
+                link
+                type="text"
+                v-else-if="scope.row.authority >= taskAuthority.UPDATE_STATUS_ONLY &&
+                  scope.row.status === '进行中'"
+                @click="checkTask(scope.row)"
+            >
               <el-icon>
                 <Check/>
               </el-icon>
             </el-button>
 
-            <el-button link type="text" @click="editTask(scope.row)">
+            <el-button
+                link
+                type="text"
+                v-if="scope.row.authority === taskAuthority.WRITEABLE"
+                @click="editTask(scope.row)"
+            >
               <el-icon>
                 <Edit/>
               </el-icon>
             </el-button>
 
-            <el-button link type="text" class="delete-button" @click="deleteTask(scope.row)">
+            <el-button
+                link
+                type="text"
+                class="delete-button"
+                v-if="scope.row.authority === taskAuthority.WRITEABLE"
+                @click="deleteTask(scope.row)"
+            >
               <el-icon>
                 <Delete/>
               </el-icon>
