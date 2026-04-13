@@ -33,6 +33,35 @@ const router = createRouter({
             ]
         },
         {
+            path: '/team',
+            name: 'team',
+            component: () => import('@/views/TeamView.vue'),
+            meta: { requiresAuth: true },
+            redirect: '/team/all',
+            children: [
+                {
+                    path: 'all',
+                    name: 'allTeams',
+                    component: () => import('@/views/team/AllTeamsView.vue')
+                },
+                {
+                    path: 'owner',
+                    name: 'ownerTeams',
+                    component: () => import('@/views/team/OwnerTeamsView.vue')
+                },
+                {
+                    path: 'admin',
+                    name: 'adminTeams',
+                    component: () => import('@/views/team/AdminTeamsView.vue')
+                },
+                {
+                    path: 'member',
+                    name: 'memberTeams',
+                    component: () => import('@/views/team/MemberTeamsView.vue')
+                }
+            ]
+        },
+        {
             path: '/settings',
             name: 'settings',
             component: () => import('@/views/SettingsView.vue'),
