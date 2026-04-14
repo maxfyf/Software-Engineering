@@ -51,7 +51,7 @@ const {
       <div v-if="showNewButton" class="header">
         <el-button type="primary" class="new-button" @click="handleNew">
           <el-icon><Plus/></el-icon>
-          &nbsp;新建
+          &nbsp;新建个人任务
         </el-button>
       </div>
       <div v-else class="header-spacer" />
@@ -121,7 +121,7 @@ const {
 }
 
 .new-button {
-  width: 70px;
+  width: 120px;
   margin-left: auto;
   margin-right: 15px;
 }
