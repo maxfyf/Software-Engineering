@@ -3,7 +3,7 @@ import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import Search from "@/components/Search.vue";
 import TaskList from "@/components/TaskList.vue";
 import TaskDetail from "@/components/TaskDetail.vue";
-import { useTaskView } from '@/composables/useTaskView.js';
+import { useTaskView } from '@/utils/useTaskView.js';
 import { Plus } from "@element-plus/icons-vue";
 
 const props = defineProps({
