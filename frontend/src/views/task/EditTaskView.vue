@@ -114,7 +114,7 @@ const handleBack = () => {
   }
 }
 
-// 保存所有更改并回退到'/task/all'页面
+// 保存所有更改并回退到来源页面
 const saveChanges = async () => {
   // 表单验证
   if (!newTitle.value) {
@@ -156,10 +156,10 @@ const saveChanges = async () => {
     ElMessage.success('任务更新成功')
   }
   
-  // 返回任务列表
+  // 返回来源页面
   resetForm()
   isLeaving.value = true  // 标记正在离开，跳过守卫
-  router.push('/task/all')
+  router.push(previousTaskPage.value.path) 
 }
 
 // 路由守卫：离开页面前检查
