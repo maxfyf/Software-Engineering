@@ -4,7 +4,7 @@ import { Back } from "@element-plus/icons-vue";
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { taskList, addTask, getTaskById, updateTask } from '@/store/user.js';
+import { taskList, addTask, getTaskById, updateTask, previousTaskPage } from '@/store/user.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -88,7 +88,7 @@ const resetForm = () => {
   newDate.value = ''
 }
 
-// 回退到AllTaskView，若为新建任务，取消该任务；若为编辑任务，取消编辑记录
+// 回退到对应TasksView，若为新建任务，取消该任务；若为编辑任务，取消编辑记录
 const handleBack = () => {
   const info = isNew.value ? '您新建的任务尚未保存，确定要离开吗？' : '您有未保存的更改，确定要离开吗？'
   
@@ -104,13 +104,13 @@ const handleBack = () => {
       }
     ).then(() => {
       isLeaving.value = true
-      router.push('/task/all')
+      router.push(previousTaskPage.value.path)
     }).catch(() => {
       // 取消，留在当前页面
     })
   } else {
     isLeaving.value = true
-    router.push('/task/all')
+    router.push(previousTaskPage.value.path)
   }
 }
 
@@ -206,7 +206,7 @@ onBeforeRouteLeave((to, from, next) => {
           </el-icon>
         </el-button>
         <span class="route">
-          <span>全部任务</span>
+          <span>{{ previousTaskPage.title }}</span>
           <span>&nbsp;>&nbsp;</span>
           <span v-if="isNew" class="present-directory">
             新建任务

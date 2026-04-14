@@ -1,13 +1,23 @@
-import { ref, computed, onMounted } from 'vue'
-import { taskList, highlightTaskId, initTaskList } from '@/store/user.js'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch, onMounted } from 'vue'
+import { taskList, highlightTaskId, initTaskList, previousTaskPage } from '@/store/user.js'
+import { useRouter, useRoute } from 'vue-router'
 
 /**
  * 任务视图的通用逻辑
  * @param {Function|null} filterFn - 任务筛选函数
+ * @param {string} pageTitle - 页面标题
  */
-export function useTaskView(filterFn = null) {
+export function useTaskView(filterFn = null, pageTitle = '全部任务') {
   const router = useRouter()
+  const route = useRoute()
+
+  // 记录当前页面为来源页面
+  watch(() => route.path, (newPath) => {
+    previousTaskPage.value = {
+      path: newPath,
+      title: pageTitle
+    }
+  }, { immediate: true })
 
   // 根据 filterFn 筛选任务
   const tasks = computed(() => {

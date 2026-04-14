@@ -33,7 +33,7 @@ const {
   handleNew,
   handlePageChange,
   handleViewDetail
-} = useTaskView(props.filterFn)
+} = useTaskView(props.filterFn, props.title)
 </script>
 
 <template>

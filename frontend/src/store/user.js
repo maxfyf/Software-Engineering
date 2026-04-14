@@ -57,6 +57,12 @@ export const resetTaskList = () => {
 // 高亮任务的ID
 export const highlightTaskId = ref(null)
 
+// 来源页面
+export const previousTaskPage = ref({
+  path: '/task/all',
+  title: '全部任务'
+})
+
 // 添加任务
 export const addTask = async (task) => {
     const res = await api.createTask({
@@ -167,7 +173,6 @@ export const updateTask = async (taskId, taskData) => {
     return true
 }
 
-// 初始化任务列表
 // 初始化任务列表
 export const initTaskList = async () => {
     try {
