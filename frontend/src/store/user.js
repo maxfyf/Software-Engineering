@@ -28,7 +28,9 @@ export const taskInfo = {
     priority: '',
     deadline: '',
     createdAt: '',
-    updatedAt: ''
+    updatedAt: '',
+    teamId: null,
+    assignee: null
 }
 
 // 当前登录用户信息
@@ -100,6 +102,38 @@ export const finishTask = async (taskId) => {
     return true
 }
 
+// 开始任务
+export const startTask = async (taskId) => {
+    const task = taskList.value.find(t => t.id === taskId)
+    if (!task) {
+        console.error('任务不存在')
+        return false
+    }
+    
+    // 检查任务状态
+    if (task.status !== '待办') {
+        console.warn('只有待办状态的任务可以开始')
+        return false
+    }
+    
+    // 调用后端API更新任务状态
+    await api.updateTask(taskId, {
+        status: '进行中'
+    })
+    
+    // 更新本地任务列表
+    const index = taskList.value.findIndex(t => t.id === taskId)
+    if (index !== -1) {
+        taskList.value[index] = {
+            ...taskList.value[index],
+            status: '进行中',
+            updatedAt: new Date().toISOString()
+        }
+    }
+    
+    return true
+}
+
 // 删除任务
 export const removeTask = async (taskId) => {
     await api.deleteTask(taskId)
@@ -134,10 +168,27 @@ export const updateTask = async (taskId, taskData) => {
 }
 
 // 初始化任务列表
+// 初始化任务列表
 export const initTaskList = async () => {
     try {
         const res = await api.getTaskList()
-        taskList.value = res.data
+        // TODO：处理任务数据
+        // 为每个任务计算权限
+        taskList.value = res.data.map(task => {
+            if (task.authority !== undefined) {
+                return task
+            }
+            // 前端计算
+            const authority = task.owner === currentUser.username 
+                ? taskAuthority.WRITEABLE 
+                : taskAuthority.READ_ONLY
+            return {
+                ...task,
+                authority,
+                teamId: task.teamId || null,
+                assignees: task.assignees || []
+            }
+        })
     } catch (error) {
         console.error('获取任务列表失败:', error)
     }
