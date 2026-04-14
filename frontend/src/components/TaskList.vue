@@ -1,6 +1,6 @@
 <script setup lang="js">
 import { computed } from 'vue';
-import { taskAuthority, finishTask, highlightTaskId, removeTask} from "@/store/user.js";
+import { taskAuthority, finishTask, startTask as startTaskAction, highlightTaskId, removeTask} from "@/store/user.js";
 import { View, CaretRight, Check, Edit, Delete } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
@@ -58,7 +58,7 @@ const viewDetail = (row) => {
 // 开始任务
 const startTask = (row) => {
   highlightTaskId.value = row.id
-  //TODO
+  startTaskAction(row.id)
   ElMessage.success('任务已开始')
 }
 
