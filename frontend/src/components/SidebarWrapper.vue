@@ -1,9 +1,17 @@
 <script setup lang="js">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { minWidth, maxWidthPercent, getContainerWidth, sidebarWidth } from '@/store/layout.js'
 
-const isResizing = ref(false)
+import { ref, onMounted, onBeforeUnmount } from 'vue'
+const minWidth = 200    //最小宽度：200px
+const maxWidthPercent = 0.5    //最大宽度占比：50%
+
+const getContainerWidth = () => {
+  const layoutEl = document.querySelector('.sidebar-layout')
+  return layoutEl ? layoutEl.clientWidth : window.innerWidth
+}
+
 let maxWidth = getContainerWidth() * maxWidthPercent
+const sidebarWidth = ref((3 * minWidth + maxWidth) / 4)
+const isResizing = ref(false)
 
 const updateMaxWidth = () => {
   const containerWidth = getContainerWidth()
@@ -137,8 +145,7 @@ onBeforeUnmount(() => {
 }
 
 .content {
-  flex: 1;
-  overflow-x: hidden;
-  position: relative;
+  flex-grow: 1;
+  width: 100%;
 }
 </style>

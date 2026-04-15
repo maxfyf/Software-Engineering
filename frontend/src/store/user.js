@@ -1,4 +1,4 @@
-import { ElMessage, ElMessageBox } from 'element-plus'
+import {ElMessage, ElMessageBox} from 'element-plus'
 import { reactive, ref } from 'vue'
 import api from '@/request/api.js'
 
@@ -11,26 +11,16 @@ export const userInfo = {
     email: ''          // 电子邮箱
 }
 
-// 用户对任务的权限类型
-export const taskAuthority = {
-    READ_ONLY: 0,
-    UPDATE_STATUS_ONLY: 1,
-    WRITEABLE: 2
-}
-
 // 任务数据结构
 export const taskInfo = {
     id: null,
-    authority: taskAuthority.READ_ONLY,
     title: '',
     description: '',
     status: '',
     priority: '',
     deadline: '',
     createdAt: '',
-    updatedAt: '',
-    teamId: null,
-    assignee: null
+    updatedAt: ''
 }
 
 // 当前登录用户信息
@@ -57,12 +47,6 @@ export const resetTaskList = () => {
 // 高亮任务的ID
 export const highlightTaskId = ref(null)
 
-// 来源页面
-export const previousTaskPage = ref({
-  path: '/task/all',
-  title: '全部任务'
-})
-
 // 添加任务
 export const addTask = async (task) => {
     const res = await api.createTask({
@@ -74,70 +58,6 @@ export const addTask = async (task) => {
     highlightTaskId.value = newTask.id
     taskList.value.push(newTask)
     return newTask
-}
-
-// 完成任务
-export const finishTask = async (taskId) => {
-    const task = taskList.value.find(t => t.id === taskId)
-    if (!task) {
-        console.error('任务不存在')
-        return false
-    }
-    
-    // 检查任务是否已完成
-    if (task.status === '已完成') {
-        console.warn('任务已经是完成状态')
-        return true
-    }
-    
-    // 调用后端API更新任务状态
-    await api.updateTask(taskId, {
-        status: '已完成'
-    })
-    
-    // 更新本地任务列表
-    const index = taskList.value.findIndex(t => t.id === taskId)
-    if (index !== -1) {
-        taskList.value[index] = {
-            ...taskList.value[index],
-            status: '已完成',
-            updatedAt: new Date().toISOString()
-        }
-    }
-    
-    return true
-}
-
-// 开始任务
-export const startTask = async (taskId) => {
-    const task = taskList.value.find(t => t.id === taskId)
-    if (!task) {
-        console.error('任务不存在')
-        return false
-    }
-    
-    // 检查任务状态
-    if (task.status !== '待办') {
-        console.warn('只有待办状态的任务可以开始')
-        return false
-    }
-    
-    // 调用后端API更新任务状态
-    await api.updateTask(taskId, {
-        status: '进行中'
-    })
-    
-    // 更新本地任务列表
-    const index = taskList.value.findIndex(t => t.id === taskId)
-    if (index !== -1) {
-        taskList.value[index] = {
-            ...taskList.value[index],
-            status: '进行中',
-            updatedAt: new Date().toISOString()
-        }
-    }
-    
-    return true
 }
 
 // 删除任务
@@ -177,23 +97,7 @@ export const updateTask = async (taskId, taskData) => {
 export const initTaskList = async () => {
     try {
         const res = await api.getTaskList()
-        // TODO：处理任务数据
-        // 为每个任务计算权限
-        taskList.value = res.data.map(task => {
-            if (task.authority !== undefined) {
-                return task
-            }
-            // 前端计算
-            const authority = task.owner === currentUser.username 
-                ? taskAuthority.WRITEABLE 
-                : taskAuthority.READ_ONLY
-            return {
-                ...task,
-                authority,
-                teamId: task.teamId || null,
-                assignees: task.assignees || []
-            }
-        })
+        taskList.value = res.data
     } catch (error) {
         console.error('获取任务列表失败:', error)
     }
