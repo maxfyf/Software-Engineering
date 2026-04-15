@@ -1,4 +1,4 @@
-import {ElMessage, ElMessageBox} from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { reactive, ref } from 'vue'
 import api from '@/request/api.js'
 
