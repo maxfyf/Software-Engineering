@@ -8,3 +8,7 @@ import TaskViewWrapper from "@/components/TaskViewWrapper.vue";
       :show-new-button="true"
   />
 </template>
+
+<style scoped>
+
+</style>

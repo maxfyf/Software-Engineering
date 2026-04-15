@@ -145,7 +145,8 @@ onBeforeUnmount(() => {
 }
 
 .content {
-  flex-grow: 1;
-  width: 100%;
+  flex: 1;
+  overflow-x: hidden;
+  position: relative;
 }
 </style>

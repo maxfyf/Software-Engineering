@@ -10,3 +10,7 @@ const isTeamTask = (task) => task.teamId
       :filter-fn="isTeamTask"
   />
 </template>
+
+<style scoped>
+
+</style>

@@ -11,3 +11,7 @@ const isPersonalTask = (task) => !task.teamId
       :show-new-button="true"
   />
 </template>
+
+<style scoped>
+
+</style>
