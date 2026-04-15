@@ -66,7 +66,10 @@ project_root/                                    # 项目根目录
 │   │   │   ├── SidebarWrapper.vue               # 侧边栏
 │   │   │   ├── TaskDetail.vue                   # 任务详情窗口
 │   │   │   ├── TaskList.vue                     # 任务列表
-│   │   │   └── TaskViewWrapper.vue              # 任务列表容器
+│   │   │   ├── TaskViewWrapper.vue              # 任务列表容器
+│   │   │   ├── TeamList.vue                     # 团队列表
+│   │   │   ├── TeamListWrapper.vue              # 团队列表容器
+│   │   │   └── TwoColumnWrapper.vue             # 两栏表
 │   │   ├── request/                             # API前端接口
 │   │   │   └── api.js                           # 基于Axios实现的前后端通信API
 │   │   ├── router/                              # 界面路由
@@ -75,7 +78,8 @@ project_root/                                    # 项目根目录
 │   │   │   ├── layout.js                        # 界面样式数据
 │   │   │   └── user.js                          # 登录用户数据
 │   │   ├── utils/                               # 可复用的工具函数
-│   │   │   └── useTaskView.js                   # 任务列表界面的通用函数
+│   │   │   ├── useTaskView.js                   # 任务列表界面的通用函数
+│   │   │   └── useTeamView.js                   # 团队列表界面的通用函数
 │   │   ├── views/                               # 界面
 │   │   │   ├── settings/                        # 设置路由下的界面
 │   │   │   │   └── UserInfoView.vue             # 个人资料界面
@@ -84,6 +88,12 @@ project_root/                                    # 项目根目录
 │   │   │   │   ├── EditTaskView.vue             # 新建/编辑任务界面
 │   │   │   │   ├── PersonalTasksView.vue        # 个人任务界面
 │   │   │   │   └── TeamTasksView.vue            # 团队任务界面
+│   │   │   ├── team/                            # 团队路由下的界面
+│   │   │   │   ├── AdminTeamsView.vue           # 用户管理的团队界面
+│   │   │   │   ├── AllTeamsView.vue             # 全部团队界面
+│   │   │   │   ├── MemberTeamsView.vue          # 用户参与的团队界面
+│   │   │   │   ├── OwnerTeamsView.vue           # 用户拥有的团队界面
+│   │   │   │   └── TeamSpaceView.vue            # 团队空间界面
 │   │   │   ├── LoginView.vue                    # 登录界面
 │   │   │   ├── SettingsView.vue                 # 设置界面
 │   │   │   └── TaskView.vue                     # 任务界面
