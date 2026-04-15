@@ -57,6 +57,9 @@ export const resetTaskList = () => {
 // 高亮任务的ID
 export const highlightTaskId = ref(null)
 
+// 高亮团队的ID
+export const highlightTeamId = ref(null)
+
 // 来源页面
 export const previousTaskPage = ref({
   path: '/task/all',
@@ -74,38 +77,6 @@ export const addTask = async (task) => {
     highlightTaskId.value = newTask.id
     taskList.value.push(newTask)
     return newTask
-}
-
-// 完成任务
-export const finishTask = async (taskId) => {
-    const task = taskList.value.find(t => t.id === taskId)
-    if (!task) {
-        console.error('任务不存在')
-        return false
-    }
-    
-    // 检查任务是否已完成
-    if (task.status === '已完成') {
-        console.warn('任务已经是完成状态')
-        return true
-    }
-    
-    // 调用后端API更新任务状态
-    await api.updateTask(taskId, {
-        status: '已完成'
-    })
-    
-    // 更新本地任务列表
-    const index = taskList.value.findIndex(t => t.id === taskId)
-    if (index !== -1) {
-        taskList.value[index] = {
-            ...taskList.value[index],
-            status: '已完成',
-            updatedAt: new Date().toISOString()
-        }
-    }
-    
-    return true
 }
 
 // 开始任务
@@ -140,6 +111,38 @@ export const startTask = async (taskId) => {
     return true
 }
 
+// 完成任务
+export const finishTask = async (taskId) => {
+    const task = taskList.value.find(t => t.id === taskId)
+    if (!task) {
+        console.error('任务不存在')
+        return false
+    }
+
+    // 检查任务是否已完成
+    if (task.status === '已完成') {
+        console.warn('任务已经是完成状态')
+        return true
+    }
+
+    // 调用后端API更新任务状态
+    await api.updateTask(taskId, {
+        status: '已完成'
+    })
+
+    // 更新本地任务列表
+    const index = taskList.value.findIndex(t => t.id === taskId)
+    if (index !== -1) {
+        taskList.value[index] = {
+            ...taskList.value[index],
+            status: '已完成',
+            updatedAt: new Date().toISOString()
+        }
+    }
+
+    return true
+}
+
 // 删除任务
 export const removeTask = async (taskId) => {
     await api.deleteTask(taskId)
@@ -171,6 +174,11 @@ export const updateTask = async (taskId, taskData) => {
         }
     }
     return true
+}
+
+// 解散团队
+export const removeTeam = async (teamId) => {
+    // TODO
 }
 
 // 初始化任务列表

@@ -68,6 +68,11 @@ const router = createRouter({
                     path: 'member',
                     name: 'memberTeams',
                     component: () => import('@/views/team/MemberTeamsView.vue')
+                },
+                {
+                    path: 'space',
+                    name: 'teamSpace',
+                    component: () => import('@/views/team/TeamSpaceView.vue')
                 }
             ]
         },

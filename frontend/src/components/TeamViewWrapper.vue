@@ -1,9 +1,8 @@
 <script setup lang="js">
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import Search from "@/components/Search.vue";
-import TaskList from "@/components/TaskList.vue";
-import TaskDetail from "@/components/TaskDetail.vue";
-import { useTaskView } from '@/utils/useTaskView.js';
+import TeamList from "@/components/TeamList.vue";
+import { useTeamView } from "@/utils/useTeamView.js";
 import { Plus } from "@element-plus/icons-vue";
 
 const props = defineProps({
@@ -22,18 +21,13 @@ const props = defineProps({
 })
 
 const {
-  tasks,
+  teams,
   dataset,
-  currentPage,
-  pageSize,
-  viewDialogVisible,
-  currentTask,
   router,
   handleSelect,
   handleNew,
-  handlePageChange,
-  handleViewDetail
-} = useTaskView(props.filterFn, props.title)
+  handleEnterTeamSpace
+} = useTeamView(props.filterFn, props.title)
 </script>
 
 <template>
@@ -51,25 +45,16 @@ const {
       <div v-if="showNewButton" class="header">
         <el-button type="primary" class="new-button" @click="handleNew">
           <el-icon><Plus/></el-icon>
-          &nbsp;新建个人任务
+          &nbsp;新建团队
         </el-button>
       </div>
-      <div v-else class="header-spacer" />
 
-      <TaskList
-          :tasks="tasks"
+      <TeamList
+          :teams="teams"
           :router="router"
-          :current-page="currentPage"
-          :page-size="pageSize"
-          @page-change="handlePageChange"
-          @view-detail="handleViewDetail"
+          @handle-enter-team-space="handleEnterTeamSpace"
       />
     </div>
-
-    <TaskDetail
-        :current-task="currentTask"
-        v-model:visible="viewDialogVisible"
-    />
   </HeaderWrapper>
 </template>
 
@@ -112,24 +97,9 @@ const {
   display: flex;
 }
 
-.header-spacer {
-  width: 100%;
-  height: 15px;
-}
-
 .new-button {
-  width: 128px;
+  width: 100px;
   margin-left: auto;
   margin-right: 15px;
-}
-
-:deep(.el-pagination .el-pager li) {
-  background-color: transparent !important;
-}
-
-:deep(.el-pagination .btn-prev),
-:deep(.el-pagination .btn-next) {
-  background-color: transparent !important;
-  color: black !important;
 }
 </style>
