@@ -1,8 +1,19 @@
 <script setup lang="js">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { handleLogin, handleRegister } from '@/store/user.js'
 
+const activeTab = ref(0)
+const tabs = ref([
+  {
+    label: 'login',
+    name: '登录'
+  },
+  {
+    label: 'register',
+    name: '注册'
+  }
+])
 
 const router = useRouter()
 const username = ref('')    //用户名
@@ -42,6 +53,7 @@ const onHandleRegister = async () => {
     if (result.redirect) router.push(result.redirect)
     if (result.resetFields) {
       username.value = result.resetFields.username
+      password.value = result.resetFields.password
       first_time_password.value = result.resetFields.firstTimePassword
       repeated_password.value = result.resetFields.repeatedPassword
       first_name.value = result.resetFields.firstName
@@ -51,27 +63,29 @@ const onHandleRegister = async () => {
     }
   }
 }
-</script>
 
-<script lang="js">
-export default {
-  data() {
-    return {
-      activeTab: 0,
-
-      tabs: [
-        {
-          label: 'login',
-          name: '登录'
-        },
-        {
-          label: 'register',
-          name: '注册'
-        }
-      ]
-    };
+// 全局监听回车键用于触发登录或注册按钮
+const handleKeyDown = (event) => {
+  // 判断是否按下回车键
+  if (event.key === 'Enter') {
+    // 【关键修正】获取 ref 的值需要使用 .value
+    if (activeTab.value === 0) {
+      console.log('登录');
+      onHandleLogin();
+    } else {
+      console.log('注册');
+      onHandleRegister();
+    }
   }
 };
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeyDown);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeyDown);
+});
 </script>
 
 <template>

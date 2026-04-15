@@ -5,12 +5,13 @@
 ##### 1.1 后端依赖
 
 ```text
+python >= 3.9                        # 后端编程语言
 fastapi                              # 高性能 Web API 框架
 uvicorn                              # ASGI 服务器，用于运行 FastAPI
 pydantic                             # 数据校验与请求模型定义
 sqlalchemy                           # ORM 框架，负责数据库访问
-passlib==1.7.4                       # 密码哈希与校验
-bcrypt==4.0.1                        # passlib 的 bcrypt 算法依赖
+passlib == 1.7.4                     # 密码哈希与校验
+bcrypt == 4.0.1                      # passlib 的 bcrypt 算法依赖
 python-jose                          # JWT 令牌生成与解析
 
 # 说明：项目使用 SQLite，数据库文件为 backend/task_manager.db（Python 内置 sqlite3 驱动，无需单独安装）
@@ -19,6 +20,7 @@ python-jose                          # JWT 令牌生成与解析
 ##### 1.2 前端依赖
 
 ``` text
+Node.js >= 20.19/22.12               # 让JavaScript脱离浏览器运行的前端环境
 element-plus/icons-vue >= 2.3.2      # Vue3版本的Element Plus图标库
 axios >= 1.14.0                      # HTTP客户端库，用于发送AJAX请求与调用后端API
 element-plus >= 2.13.5               # Element Plus组件库
@@ -58,22 +60,30 @@ project_root/                                    # 项目根目录
 │   │   │   └── styles/                          # 样式
 │   │   │       ├── base.css                     # 基础样式
 │   │   │       └── main.css                     # 网页样式与其他全局样式
-│   │   ├── components/                          # 可复用组件
+│   │   ├── components/                          # 可复用的组件
 │   │   │   ├── HeaderWrapper.vue                # 顶栏
 │   │   │   ├── Search.vue                       # 搜索框
-│   │   │   └── SidebarWrapper.vue               # 侧边栏
+│   │   │   ├── SidebarWrapper.vue               # 侧边栏
+│   │   │   ├── TaskDetail.vue                   # 任务详情窗口
+│   │   │   ├── TaskList.vue                     # 任务列表
+│   │   │   └── TaskViewWrapper.vue              # 任务列表容器
 │   │   ├── request/                             # API前端接口
 │   │   │   └── api.js                           # 基于Axios实现的前后端通信API
 │   │   ├── router/                              # 界面路由
-│   │   │   └── index.js                         # 界面路由表与历史记录
-│   │   ├── store/                               # 前端暂存数据
+│   │   │   └── index.js                         # 界面路由索引与历史记录
+│   │   ├── store/                               # 前端暂存的数据
+│   │   │   ├── layout.js                        # 界面样式数据
 │   │   │   └── user.js                          # 登录用户数据
+│   │   ├── utils/                               # 可复用的工具函数
+│   │   │   └── useTaskView.js                   # 任务列表界面的通用函数
 │   │   ├── views/                               # 界面
 │   │   │   ├── settings/                        # 设置路由下的界面
 │   │   │   │   └── UserInfoView.vue             # 个人资料界面
 │   │   │   ├── task/                            # 任务路由下的界面
-│   │   │   │   ├── AllTaskView.vue              # 全部任务界面
-│   │   │   │   └── EditTaskView.vue             # 新建/编辑任务界面
+│   │   │   │   ├── AllTasksView.vue             # 全部任务界面
+│   │   │   │   ├── EditTaskView.vue             # 新建/编辑任务界面
+│   │   │   │   ├── PersonalTasksView.vue        # 个人任务界面
+│   │   │   │   └── TeamTasksView.vue            # 团队任务界面
 │   │   │   ├── LoginView.vue                    # 登录界面
 │   │   │   ├── SettingsView.vue                 # 设置界面
 │   │   │   └── TaskView.vue                     # 任务界面
@@ -98,7 +108,7 @@ project_root/                                    # 项目根目录
   pip install -r requirements.txt
   ```
 
-- 前端依赖安装：确保电脑上已安装Node.js，打开命令行并切换到`frontend/`目录后执行
+- 前端依赖安装：确保电脑上已安装Node.js 20.19+或22.12+，打开命令行并切换到`frontend/`目录后执行
 
   ```bash
   npm install
