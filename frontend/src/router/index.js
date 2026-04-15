@@ -26,16 +26,6 @@ const router = createRouter({
                     component: () => import('@/views/task/AllTasksView.vue')
                 },
                 {
-                    path: 'personal',
-                    name: 'personalTasks',
-                    component: () => import('@/views/task/PersonalTasksView.vue')
-                },
-                {
-                    path: 'team',
-                    name: 'teamTasks',
-                    component: () => import('@/views/task/TeamTasksView.vue')
-                },
-                {
                     path: 'edit',
                     name: 'editTask',
                     component: () => import('@/views/task/EditTaskView.vue')
