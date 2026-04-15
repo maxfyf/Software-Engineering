@@ -72,6 +72,7 @@ project_root/                                    # 项目根目录
 │   │   ├── router/                              # 界面路由
 │   │   │   └── index.js                         # 界面路由索引与历史记录
 │   │   ├── store/                               # 前端暂存的数据
+│   │   │   ├── layout.js                        # 界面样式数据
 │   │   │   └── user.js                          # 登录用户数据
 │   │   ├── utils/                               # 可复用的工具函数
 │   │   │   └── useTaskView.js                   # 任务列表界面的通用函数
