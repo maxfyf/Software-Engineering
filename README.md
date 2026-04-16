@@ -93,6 +93,7 @@ project_root/                                    # 项目根目录
 │   │   │   │   ├── AllTeamsView.vue             # 全部团队界面
 │   │   │   │   ├── MemberTeamsView.vue          # 用户参与的团队界面
 │   │   │   │   ├── OwnerTeamsView.vue           # 用户拥有的团队界面
+│   │   │   │   ├── PersonnelView.vue            # 团队人员界面
 │   │   │   │   └── TeamSpaceView.vue            # 团队空间界面
 │   │   │   ├── LoginView.vue                    # 登录界面
 │   │   │   ├── SettingsView.vue                 # 设置界面
