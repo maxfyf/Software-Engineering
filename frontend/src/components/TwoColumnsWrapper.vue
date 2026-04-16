@@ -44,6 +44,7 @@ const rightList = computed(() => props.items.filter((_, index) => index % 2 !== 
 <style scoped>
 .empty-text-container {
   width: 100%;
+  margin-top: 3%;
   display: flex;
   justify-content: center;
 }
