@@ -54,7 +54,6 @@
   overflow-y: auto;
 }
 
-// 滚轮采用与Element Plus相同风格
 :deep(.content) {
   &::-webkit-scrollbar {
     width: 6px;
