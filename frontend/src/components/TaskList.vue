@@ -124,6 +124,7 @@ const deleteTask = (row) => {
     <el-col>
       <el-table
           :data="pageData"
+          empty-text="暂无任务"
           stripe
           class="task-table"
           :row-class-name="tableRowClassName"

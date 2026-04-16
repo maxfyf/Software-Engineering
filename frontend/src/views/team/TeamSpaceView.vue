@@ -35,6 +35,8 @@ const viewMembers = () => {
         class="member"
         @click="viewMembers"
     >
+      <!--TODO: 用户为owner-->
+      <span v-if="true">编辑</span>
       成员信息
     </el-button>
   </div>

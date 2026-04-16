@@ -4,16 +4,6 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import TwoColumnsWrapper from "@/components/TwoColumnsWrapper.vue";
 import { Delete, Right } from "@element-plus/icons-vue";
 
-const teams = [
-  {
-    title: '团队1',
-    tasks: [],
-    owner: '张三',
-    admin: ['maxfeng', '李四'],
-    member: ['王五']
-  }
-]
-
 const props = defineProps({
   teams: {
     type: Array,
@@ -77,7 +67,7 @@ const enterTeamSpace = (index) => {
 </script>
 
 <template>
-  <TwoColumnsWrapper :items="teams">
+  <TwoColumnsWrapper :items="props.teams" empty-text="暂无团队">
     <template #item="{ item, index }">
       <el-card :class="index === highlightTeamId ? 'highlight-card' : 'card' ">
         <div class="line">
