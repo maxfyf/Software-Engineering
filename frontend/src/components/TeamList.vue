@@ -75,7 +75,7 @@ const enterTeamSpace = (index) => {
         <div class="line">
           <span class="info">
             创建者：{{item.owner}}&nbsp;&nbsp;&nbsp;
-            人数：{{item.members.length}}
+            成员：{{item.members.length}}人
           </span>
           <el-button
               link
