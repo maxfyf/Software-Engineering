@@ -398,7 +398,7 @@ onBeforeRouteLeave((to, from, next) => {
 }
 
 .cancel {
-  margin-left: 200px;
+  margin-left: 20%;
   margin-right: auto;
   width: 100px;
   height: 100%;
@@ -407,7 +407,7 @@ onBeforeRouteLeave((to, from, next) => {
 
 .save {
   margin-left: auto;
-  margin-right: 200px;
+  margin-right: 20%;
   width: 100px;
   height: 100%;
   font-size: 20px;

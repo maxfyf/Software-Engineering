@@ -44,12 +44,13 @@ const viewMembers = () => {
 .footer {
   width: 100%;
   height: 35px;
+  margin-bottom: 20px;
   display: flex;
   flex-direction: row;
 }
 
 .back {
-  margin-left: 200px;
+  margin-left: 15%;
   margin-right: auto;
   width: 200px;
   height: 100%;
@@ -58,7 +59,7 @@ const viewMembers = () => {
 
 .member {
   margin-left: auto;
-  margin-right: 200px;
+  margin-right: 15%;
   width: 200px;
   height: 100%;
   font-size: 20px;
