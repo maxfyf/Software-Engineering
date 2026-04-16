@@ -17,6 +17,21 @@ const props = defineProps({
   }
 })
 
+// 判定用户角色
+const role = (item) => {
+  const username = currentUser.username;
+  if (username === item.owner)
+    return '拥有者'
+  else if (item.admin.includes(username))
+    return '管理者'
+  else if (item.member.includes(username))
+    return '参与者'
+  else {
+    ElMessage.error('非法访问团队')
+    return null
+  }
+}
+
 // 解散团队
 const deleteTeam = (item, index) => {
   highlightTeamId.value = null
@@ -75,7 +90,8 @@ const enterTeamSpace = (index) => {
         <div class="line">
           <span class="info">
             创建者：{{item.owner}}&nbsp;&nbsp;&nbsp;
-            成员：{{item.members.length}}人
+            成员：{{1 + item.admin.length + item.member.length}}人&nbsp;&nbsp;&nbsp;
+            我的角色：{{role(item)}}
           </span>
           <el-button
               link

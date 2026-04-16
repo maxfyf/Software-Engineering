@@ -25,6 +25,16 @@ export const taskInfo = {
     assignee: null
 }
 
+// 团队数据结构
+export const teamInfo = {
+    id: null,
+    title: '',
+    tasks: [],
+    owner: '',
+    admin: [],
+    member: []
+}
+
 // 当前登录用户信息
 export const currentUser = reactive({ ...userInfo })
 
