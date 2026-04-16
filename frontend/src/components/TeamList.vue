@@ -45,7 +45,7 @@ const enterTeamSpace = (index) => {
     path: '/team/space',
     query: {
       isNew: 'false',
-      teamId: index
+      team: index
     }
   })
 }

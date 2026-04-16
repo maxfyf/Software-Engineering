@@ -1,6 +1,12 @@
 <script setup lang="js">
 import { computed } from 'vue';
-import { taskAuthority, finishTask, startTask as startTaskAction, highlightTaskId, removeTask} from "@/store/user.js";
+import {
+  finishTask,
+  startTask as startTaskAction,
+  highlightTaskId,
+  removeTask,
+  currentUser
+} from "@/store/user.js";
 import { View, CaretRight, Check, Edit, Delete } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
@@ -14,6 +20,16 @@ const props = defineProps({
   router: {
     type: Object,
     required: true
+  },
+
+  showAssignee: {
+    type: Boolean,
+    default: false
+  },
+
+  isAdmin: {
+    type: Boolean,
+    default: false
   },
 
   currentPage: {
@@ -106,11 +122,44 @@ const deleteTask = (row) => {
 <template>
   <el-row>
     <el-col>
-      <el-table :data="pageData" stripe class="task-table" :row-class-name="tableRowClassName" :key="highlightTaskId">
-        <el-table-column prop="title" label="任务名称" min-width="50%" align="left" />
-        <el-table-column prop="status" label="状态" min-width="20%" align="center" />
-        <el-table-column prop="priority" label="优先级" min-width="15%" align="center" />
-        <el-table-column fixed="right" label="操作" min-width="15%" align="center">
+      <el-table
+          :data="pageData"
+          stripe
+          class="task-table"
+          :row-class-name="tableRowClassName"
+          :key="highlightTaskId"
+      >
+        <el-table-column
+            prop="title"
+            label="任务名称"
+            :min-width="showAssignee ? '40%' : '50%'"
+            align="left"
+        />
+        <el-table-column
+            v-if="showAssignee"
+            prop="assignee"
+            label="负责人"
+            min-width="20%"
+            align="center"
+        />
+        <el-table-column
+            prop="status"
+            label="状态"
+            :min-width="showAssignee ? '15%' : '20%'"
+            align="center"
+        />
+        <el-table-column
+            prop="priority"
+            label="优先级"
+            :min-width="showAssignee ? '10%' : '15%'"
+            align="center"
+        />
+        <el-table-column
+            fixed="right"
+            label="操作"
+            min-width="15%"
+            align="center"
+        >
           <template v-slot:default="scope">
             <el-button
                 link
@@ -122,10 +171,11 @@ const deleteTask = (row) => {
               </el-icon>
             </el-button>
 
+            <!-- 个人任务与用户作为负责人时可见 -->
             <el-button
                 link
                 type="text"
-                v-if="scope.row.authority >= taskAuthority.UPDATE_STATUS_ONLY &&
+                v-if="(scope.row.team === null || scope.row.assignee === currentUser.username) &&
                   scope.row.status === '待办'"
                 @click="startTask(scope.row)"
             >
@@ -136,7 +186,7 @@ const deleteTask = (row) => {
             <el-button
                 link
                 type="text"
-                v-else-if="scope.row.authority >= taskAuthority.UPDATE_STATUS_ONLY &&
+                v-else-if="(scope.row.team === null || scope.row.assignee === currentUser.username) &&
                   scope.row.status === '进行中'"
                 @click="checkTask(scope.row)"
             >
@@ -145,10 +195,11 @@ const deleteTask = (row) => {
               </el-icon>
             </el-button>
 
+            <!-- 个人任务与用户作为任务所属团队的管理员时可见 -->
             <el-button
                 link
                 type="text"
-                v-if="scope.row.authority === taskAuthority.WRITEABLE"
+                v-if="scope.row.team === null || isAdmin"
                 @click="editTask(scope.row)"
             >
               <el-icon>
@@ -156,11 +207,12 @@ const deleteTask = (row) => {
               </el-icon>
             </el-button>
 
+            <!-- 个人任务与用户作为任务所属团队的管理员时可见 -->
             <el-button
                 link
                 type="text"
                 class="delete-button"
-                v-if="scope.row.authority === taskAuthority.WRITEABLE"
+                v-if="scope.row.team === null || isAdmin"
                 @click="deleteTask(scope.row)"
             >
               <el-icon>

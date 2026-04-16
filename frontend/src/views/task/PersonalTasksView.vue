@@ -1,7 +1,7 @@
 <script setup lang="js">
 import TaskViewWrapper from "@/components/TaskViewWrapper.vue";
 
-const isPersonalTask = (task) => !task.teamId
+const isPersonalTask = (task) => !task.team
 </script>
 
 <template>

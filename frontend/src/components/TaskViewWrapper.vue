@@ -18,6 +18,14 @@ const props = defineProps({
   showNewButton: {
     type: Boolean,
     default: false
+  },
+  showAssignee: {
+    type: Boolean,
+    default: false
+  },
+  isAdmin: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -51,7 +59,12 @@ const {
       <div v-if="showNewButton" class="header">
         <el-button type="primary" class="new-button" @click="handleNew">
           <el-icon><Plus/></el-icon>
-          &nbsp;新建个人任务
+          <span v-if="showAssignee === false">
+              &nbsp;新建个人任务
+            </span>
+          <span v-else>
+              &nbsp;新建团队任务
+            </span>
         </el-button>
       </div>
       <div v-else class="header-spacer" />
@@ -59,6 +72,8 @@ const {
       <TaskList
           :tasks="tasks"
           :router="router"
+          :show-assignee="showAssignee"
+          :is-admin="isAdmin"
           :current-page="currentPage"
           :page-size="pageSize"
           @page-change="handlePageChange"
@@ -68,6 +83,7 @@ const {
 
     <TaskDetail
         :current-task="currentTask"
+        :show-assignee="showAssignee"
         v-model:visible="viewDialogVisible"
     />
   </HeaderWrapper>
