@@ -69,7 +69,7 @@ project_root/                                    # 项目根目录
 │   │   │   ├── TaskViewWrapper.vue              # 任务列表容器
 │   │   │   ├── TeamList.vue                     # 团队列表
 │   │   │   ├── TeamListWrapper.vue              # 团队列表容器
-│   │   │   └── TwoColumnWrapper.vue             # 两栏表
+│   │   │   └── TwoColumnsWrapper.vue             # 两栏表
 │   │   ├── request/                             # API前端接口
 │   │   │   └── api.js                           # 基于Axios实现的前后端通信API
 │   │   ├── router/                              # 界面路由

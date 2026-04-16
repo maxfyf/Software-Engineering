@@ -1,7 +1,7 @@
 <script setup lang="js">
 import { currentUser, highlightTeamId, removeTeam} from "@/store/user.js";
 import { ElMessage, ElMessageBox } from "element-plus";
-import TwoColumnWrapper from "@/components/TwoColumnWrapper.vue";
+import TwoColumnsWrapper from "@/components/TwoColumnsWrapper.vue";
 import { Delete, Right } from "@element-plus/icons-vue";
 
 const props = defineProps({
@@ -52,7 +52,7 @@ const enterTeamSpace = (index) => {
 </script>
 
 <template>
-  <TwoColumnWrapper :items="props.teams">
+  <TwoColumnsWrapper :items="props.teams">
     <template #item="{ item, index }">
       <el-card :class="index === highlightTeamId ? 'highlight-card' : 'card' ">
         <div class="line">
@@ -90,7 +90,7 @@ const enterTeamSpace = (index) => {
         </div>
       </el-card>
     </template>
-  </TwoColumnWrapper>
+  </TwoColumnsWrapper>
 </template>
 
 <style scoped>
