@@ -53,4 +53,30 @@
   min-height: 0;
   overflow-y: auto;
 }
+
+// 滚轮采用与Element Plus相同风格
+:deep(.content) {
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--el-color-info-light-8);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--el-color-info);
+  }
+}
+
+:deep(.content) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--el-color-info-light-8) transparent;
+}
 </style>
