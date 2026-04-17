@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -28,6 +28,37 @@ class UserResponse(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+TeamRoleValue = Literal["Owner", "Admin", "Member"]
+
+class TeamCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+
+class TeamResponse(BaseModel):
+    id: int
+    name: str
+    owner_username: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class TeamMemberCreate(BaseModel):
+    username: str = Field(..., min_length=4, max_length=20)
+
+class TeamMemberRoleUpdate(BaseModel):
+    role: Literal["Admin", "Member"]
+
+class TeamMemberResponse(BaseModel):
+    id: int
+    team_id: int
+    username: str
+    role: TeamRoleValue
+    joined_at: datetime
+
+    class Config:
+        from_attributes = True
 
 # 用于接收创建任务的数据
 class TaskCreate(BaseModel):
