@@ -1,14 +1,24 @@
 <script setup lang="js">
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import { Back, InfoFilled, Plus, Minus } from "@element-plus/icons-vue";
+import { currentUser, teamList } from '@/store/user.js'
 
-// TODO: 建议提取函数到utils
+const route = useRoute()
+const router = useRouter()
+
+const teamId = computed(() => parseInt(route.query.teamId))
+const team = computed(() => teamList.value.find(t => t.id === teamId.value))
+
+const isOwner = computed(() => team.value?.owner === currentUser.username)
+
 const handleBack = () => {
-
+  router.push({
+    path: '/team/space',
+    query: { teamId: teamId.value }
+  })
 }
-
-// TODO: 用户是否团队的owner
-const isOwner = true;
 
 // TODO: 权限详情，弹出一个el-dialog窗口，窗口内容我来写
 const authorityDetail = () => {
@@ -78,7 +88,7 @@ const handleAddMember = () => {
             </el-button>
           </div>
           <div class="value">
-            TODO: 拥有者
+            {{ team ? team.owner : '' }}
           </div>
           <br>
 
@@ -114,7 +124,7 @@ const handleAddMember = () => {
             </el-button>
           </div>
           <div class="value">
-            TODO: 管理者
+            {{ team && team.admin.length > 0 ? team.admin.join('、') : '暂无' }}
           </div>
           <br>
 
@@ -150,7 +160,7 @@ const handleAddMember = () => {
             </el-button>
           </div>
           <div class="value">
-            TODO: 参与者
+            {{ team && team.member.length > 0 ? team.member.join('、') : '暂无' }}
           </div>
         </div>
 

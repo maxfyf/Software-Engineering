@@ -1,4 +1,6 @@
-import { useRouter, useRoute } from 'vue-router'
+import { ref, computed} from 'vue'
+import { teamList, highlightTeamId, addTeam } from '@/store/user.js'
+import { useRouter } from 'vue-router'
 
 /**
  * 团队视图的通用逻辑
@@ -7,35 +9,75 @@ import { useRouter, useRoute } from 'vue-router'
  */
 export function useTeamView(filterFn = null, pageTitle = '全部团队') {
     const router = useRouter()
-    const route = useRoute()
 
-    // TODO:团队结构体数组teams
-    let teams = []
+    // 根据 filterFn 筛选团队
+    const teams = computed(() => {
+        if (filterFn) {
+            return teamList.value.filter(filterFn)
+        }
+        return teamList.value
+    })
 
-    // TODO: 团队名字符串数组dataset（建议重构为taskNames和teamNames）
-    let dataset = []
+    // 团队名字符串数组dataset（建议重构为taskNames和teamNames）
+    const dataset = computed(() => teams.value.map(team => team.title))
 
-    // TODO: 下拉框中选择团队进入团队空间的回调函数handleSelect（建议重构为handleSelectTask和handleSelectTeam)
-    let handleSelect = () => {
+    // 新建团队弹窗状态
+    const createDialogVisible = ref(false)
+    const newTeamTitle = ref('')
 
+    // 下拉框中选择团队进入团队空间的回调函数handleSelect（建议重构为handleSelectTask和handleSelectTeam)
+    const handleSelect = (teamTitle) => {
+        const team = teams.value.find(t => t.title === teamTitle)
+        if (team) {
+            highlightTeamId.value = team.id
+        }
     }
 
-    // TODO: 创建新团队的函数handleNew（建议重构为handleNewTask和handleNewTeam)
-    let handleNew = () => {
-
+    // 创建新团队的函数handleNew（建议重构为handleNewTask和handleNewTeam)
+    const handleNew = () => {
+        createDialogVisible.value = true
+        newTeamTitle.value = ''
     }
 
-    // TODO: 进入团队空间页面的函数handleEnterTeamSpace
-    let handleEnterTeamSpace = () => {
+    // 确认创建团队
+    const handleCreateTeam = async () => {
+        if (!newTeamTitle.value || newTeamTitle.value.trim() === '') {
+            return
+        }
+        
+        await addTeam({
+            title: newTeamTitle.value.trim()
+        })
+        
+        createDialogVisible.value = false
+        newTeamTitle.value = ''
+    }
 
+    // 取消创建团队
+    const handleCancelCreate = () => {
+        createDialogVisible.value = false
+        newTeamTitle.value = ''
+    }
+
+    // 进入团队空间页面的函数handleEnterTeamSpace
+    const handleEnterTeamSpace = (teamId) => {
+        highlightTeamId.value = teamId
+        router.push({
+            path: '/team/space',
+            query: { teamId: teamId }
+        })
     }
 
     return {
         teams,
         dataset,
         router,
+        createDialogVisible,
+        newTeamTitle,
         handleSelect,
         handleNew,
+        handleCreateTeam,
+        handleCancelCreate,
         handleEnterTeamSpace
     }
 }

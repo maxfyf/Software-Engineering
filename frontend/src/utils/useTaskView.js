@@ -6,8 +6,9 @@ import { useRouter, useRoute } from 'vue-router'
  * 任务视图的通用逻辑
  * @param {Function|null} filterFn - 任务筛选函数
  * @param {string} pageTitle - 页面标题
+ * @param {Object} extraQuery - 新建任务路由参数
  */
-export function useTaskView(filterFn = null, pageTitle = '全部任务') {
+export function useTaskView(filterFn = null, pageTitle = '全部任务', extraQuery = {}) {
   const router = useRouter()
   const route = useRoute()
 
@@ -61,7 +62,7 @@ export function useTaskView(filterFn = null, pageTitle = '全部任务') {
   const handleNew = () => {
     router.push({
       path: '/task/edit',
-      query: { isNew: 'true' }
+      query: { isNew: 'true', ...extraQuery }
     })
   }
 

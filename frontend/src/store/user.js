@@ -22,7 +22,7 @@ export const taskInfo = {
     createdAt: '',
     updatedAt: '',
     team: null,
-    assignee: null
+    assignee: []
 }
 
 // 团队数据结构
@@ -51,9 +51,17 @@ export const resetUserInfo = () => {
 // 当前用户的任务列表
 export const taskList = ref([])
 
+// 当前用户的团队列表
+export const teamList = ref([])
+
 // 重置任务列表
 export const resetTaskList = () => {
     taskList.value = []
+}
+
+// 重置团队列表
+export const resetTeamList = () => {
+    teamList.value = []
 }
 
 // 高亮任务的ID
@@ -180,32 +188,87 @@ export const updateTask = async (taskId, taskData) => {
 
 // 解散团队
 export const removeTeam = async (teamId) => {
-    // TODO
+    await api.deleteTeam(teamId)
+    const index = teamList.value.findIndex(t => t.id === teamId)
+    if (index !== -1) {
+        teamList.value.splice(index, 1)
+    }
+    return true
+}
+
+// 创建团队
+export const addTeam = async (team) => {
+    try {
+        const res = await api.createTeam(team)
+        const newTeam = res.data
+        highlightTeamId.value = newTeam.id
+        teamList.value.push(newTeam)
+        return newTeam
+    } catch (error) {
+        console.error('创建团队失败，使用模拟数据:', error)
+        // TODO: 后端实现后删除模拟数据
+        const mockTeam = {
+            id: Date.now(),
+            title: team.title,
+            tasks: [],
+            owner: currentUser.username,
+            admin: [],
+            member: []
+        }
+        highlightTeamId.value = mockTeam.id
+        teamList.value.push(mockTeam)
+        return mockTeam
+    }
 }
 
 // 初始化任务列表
 export const initTaskList = async () => {
     try {
         const res = await api.getTaskList()
-        // TODO：处理任务数据
-        // 为每个任务计算权限
-        taskList.value = res.data.map(task => {
-            if (task.authority !== undefined) {
-                return task
-            }
-            // 前端计算
-            const authority = task.owner === currentUser.username 
-                ? taskAuthority.WRITEABLE 
-                : taskAuthority.READ_ONLY
-            return {
-                ...task,
-                authority,
-                team: task.team || null,
-                assignees: task.assignees || []
-            }
-        })
+        taskList.value = res.data.map(task => ({
+            ...task,
+            team: task.team || null,      // 团队名称
+            assignee: task.assignee || []  // 被分配用户数组
+        }))
     } catch (error) {
         console.error('获取任务列表失败:', error)
+    }
+}
+
+// 初始化团队列表
+export const initTeamList = async () => {
+    try {
+        const res = await api.getTeamList()
+        teamList.value = res.data
+    } catch (error) {
+        console.error('获取团队列表失败，使用模拟数据:', error)
+        // TODO: 后端实现后删除模拟数据
+        teamList.value = [
+            {
+                id: 1,
+                title: '前端开发组',
+                tasks: [],
+                owner: currentUser.username,
+                admin: ['admin_user'],
+                member: ['member1', 'member2']
+            },
+            {
+                id: 2,
+                title: '后端开发组',
+                tasks: [],
+                owner: 'other_user',
+                admin: [currentUser.username],
+                member: ['member3']
+            },
+            {
+                id: 3,
+                title: '测试组',
+                tasks: [],
+                owner: 'test_owner',
+                admin: [],
+                member: [currentUser.username, 'member4']
+            }
+        ]
     }
 }
 
@@ -365,9 +428,12 @@ export const handleCancelAccount = () => {
                 await api.cancelAccount()
             } catch (error) {
                 console.error('注销账号失败:', error)
+                resolve({ success: false })
+                return 
             }
             resetUserInfo()
             resetTaskList()
+            resetTeamList()
             sessionStorage.removeItem('isLoggedIn')
             sessionStorage.removeItem('username')
             sessionStorage.removeItem('token')
@@ -392,6 +458,7 @@ export const handleLogin = async ({ username, password }) => {
         }
 
         resetTaskList()
+        resetTeamList()
 
         // 加载用户信息
         currentUser.username = info.username
@@ -406,9 +473,11 @@ export const handleLogin = async ({ username, password }) => {
         
         isLoggedIn.value = true
         highlightTaskId.value = null
+        highlightTeamId.value = null
 
         await initTaskList()
-        
+        await initTeamList()
+
         ElMessage.success('登录成功')
         
         // 切换页面到/task 页面
@@ -438,6 +507,7 @@ export const handleLogout = () => {
             }
             resetUserInfo()
             resetTaskList()
+            resetTeamList()
             sessionStorage.removeItem('isLoggedIn')
             sessionStorage.removeItem('username')
             sessionStorage.removeItem('token')

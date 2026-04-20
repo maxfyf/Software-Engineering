@@ -4,7 +4,7 @@ import { Back } from "@element-plus/icons-vue";
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import {taskList, addTask, getTaskById, updateTask, previousTaskPage, teamInfo as team} from '@/store/user.js';
+import {taskList, addTask, getTaskById, updateTask, previousTaskPage, teamList} from '@/store/user.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -27,8 +27,27 @@ const pastDate = (time) => {
 
 const taskTitle = computed(() => isNew.value ? '' : newTitle.value)
 
-// TODO: team改为当前任务所属团队的结构体
-const teamMembers = [team.owner, ...team.admin, ...team.member]
+// 判断当前任务是否为团队任务
+const isTeamTask = computed(() => {
+  if (isNew.value) {
+    return route.query.teamId != null
+  }
+  return originalTask.value?.team != null
+})
+
+// 当前任务所属团队
+const currentTeam = computed(() => {
+  const teamId = isNew.value
+    ? parseInt(route.query.teamId)
+    : teamList.value.find(t => t.title === originalTask.value?.team)?.id
+  return teamList.value.find(t => t.id === teamId) || null
+})
+
+// 团队成员列表（响应式）
+const teamMembers = computed(() => {
+  if (!currentTeam.value) return []
+  return [currentTeam.value.owner, ...currentTeam.value.admin, ...currentTeam.value.member]
+})
 
 // 检查是否有修改
 const hasChanges = () => {
@@ -41,7 +60,7 @@ const hasChanges = () => {
   if (!originalTask.value) return false
   
   return newTitle.value !== originalTask.value.title ||
-         true/*TODO: 当前任务为团队任务*/ && newAssignee.value !== originalTask.value.assignee ||
+         (isTeamTask.value && newAssignee.value !== originalTask.value.assignee) ||
          newDescription.value !== (originalTask.value.description || '') ||
          newStatus.value !== originalTask.value.status ||
          newPriority.value !== originalTask.value.priority ||
@@ -69,14 +88,13 @@ onMounted(async () => {
 
 // 加载任务数据（编辑模式）
 const loadTaskData = async (id) => {
-  console.log('加载任务数据, ID:', id)
   const task = await getTaskById(id)
   if (task) {
     originalTask.value = task
     
     // 设置表单值
     newTitle.value = task.title
-    if(true /*当前任务为团队任务*/) newAssignee.value = task.assignee
+    if (isTeamTask.value) newAssignee.value = task.assignee || ''
     newDescription.value = task.description || ''
     newStatus.value = task.status
     newPriority.value = task.priority
@@ -88,7 +106,9 @@ const loadTaskData = async (id) => {
 const resetForm = () => {
   originalTask.value = null
   newTitle.value = ''
-  if(true /*TODO: 当前任务为团队任务*/) newAssignee.value = ''/*TODO: 初始化为owner*/
+  if (isTeamTask.value) {
+    newAssignee.value = currentTeam.value?.owner || ''
+  }
   newDescription.value = ''
   newStatus.value = '待办'
   newPriority.value = '中'
@@ -136,7 +156,7 @@ const saveChanges = async () => {
   
   const taskData = {
     title: newTitle.value,
-    /*TODO: assignee*/
+    ...(isTeamTask.value && { assignee: newAssignee.value }),
     description: newDescription.value,
     status: newStatus.value,
     priority: newPriority.value,
@@ -238,12 +258,12 @@ onBeforeRouteLeave((to, from, next) => {
           />
         </div>
 
-        <!--TODO: v-if改成当前任务是否为团队任务-->
-        <div v-if="true" class="item">
+        <!--团队任务显示负责人选择-->
+        <div v-if="isTeamTask" class="item">
           <span class="key">负责人：</span>
           <el-select class="assignee" v-model="newAssignee">
             <el-option
-                :v-for="item in teamMembers"
+                v-for="item in teamMembers"
                 :key="item"
                 :label="item"
                 :value="item"
@@ -253,12 +273,11 @@ onBeforeRouteLeave((to, from, next) => {
 
         <div class="item">
           <span class="key">描述：</span>
-          <!--TODO: rows中的true改为当前任务是团队任务-->
           <el-input
               class="description"
               v-model="newDescription"
               type="textarea"
-              :rows="true ? 8: 10"
+              :rows="isTeamTask ? 8 : 10"
           />
         </div>
 

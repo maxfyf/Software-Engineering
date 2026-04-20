@@ -4,6 +4,15 @@ import { computed, ref, watch } from 'vue';
 import { useRoute } from "vue-router";
 
 const route = useRoute()
+
+const previousRoute = ref('/team/all')
+
+watch(() => route.path, (newpath) => {
+  if (!newpath.startsWith('/team/space')){
+    previousRoute.value = newpath
+  }
+}, { immediate: true })
+
 const activeMenu = computed(() => {
   if (route.path.startsWith('/team/all')) {
     return '/team/all'
@@ -17,14 +26,12 @@ const activeMenu = computed(() => {
   else if (route.path.startsWith('/team/member')) {
     return '/team/member'
   }
+  else if (route.path.startsWith('/team/space')) {
+    return previousRoute.value
+  }
   else
     return route.path
 })
-const activeIndex = ref('/team/')    //当前网页路径
-
-watch(() => route.path, (newPath) => {
-  activeIndex.value = newPath
-}, { immediate: true })
 </script>
 
 <template>

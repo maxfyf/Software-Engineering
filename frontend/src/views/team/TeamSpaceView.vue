@@ -1,24 +1,45 @@
 <script setup lang="js">
-//TODO
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { currentUser, teamList } from '@/store/user.js'
 import TaskViewWrapper from "@/components/TaskViewWrapper.vue";
 
-const handleBack = () => {
+const route = useRoute()
+const router = useRouter()
 
+const teamId = computed(() => parseInt(route.query.teamId))
+const team = computed(() => teamList.value.find(t => t.id === teamId.value))
+
+const teamTitle = computed(() => team.value ? `${team.value.title}的团队空间` : '团队空间')
+
+const isOwner = computed(() => team.value?.owner === currentUser.username)
+const isAdmin = computed(() => team.value?.admin?.includes(currentUser.username))
+const isMember = computed(() => team.value?.member?.includes(currentUser.username))
+
+const canManage = computed(() => isOwner.value || isAdmin.value)
+
+const filterByTeam = (task) => task.team === team.value?.title
+
+const handleBack = () => {
+  router.push('/team/all')
 }
 
-//TODO
 const viewMembers = () => {
-
+  router.push({
+    path: '/team/space/personnel',
+    query: { teamId: teamId.value }
+  })
 }
 </script>
 
 <template>
-  <!--TODO: show-new-button=is-admin=用户不为member-->
   <TaskViewWrapper
-      title="TODO（团队名）的团队空间"
-      :show-new-button="true"
+      :title="teamTitle"
+      :filter-fn="filterByTeam"
+      :show-new-button="canManage"
       :show-assignee="true"
-      :is-admin="true"
+      :is-admin="canManage"
+      :extra-query="extraQuery"
   />
 
   <div class="footer">
@@ -35,8 +56,7 @@ const viewMembers = () => {
         class="member"
         @click="viewMembers"
     >
-      <!--TODO: 用户为owner-->
-      <span v-if="true">编辑</span>
+      <span v-if="isOwner">编辑</span>
       成员信息
     </el-button>
   </div>
