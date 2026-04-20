@@ -17,6 +17,8 @@ const props = defineProps({
   }
 })
 
+const emit = defineEmits(['enterTeamSpace'])
+
 // 判定用户角色
 const role = (item) => {
   const username = currentUser.username;
@@ -33,7 +35,7 @@ const role = (item) => {
 }
 
 // 解散团队
-const deleteTeam = (item, index) => {
+const deleteTeam = (item) => {
   highlightTeamId.value = null
   ElMessageBox.confirm(
       `确定要解散团队"${item.title}"吗？`,
@@ -45,7 +47,7 @@ const deleteTeam = (item, index) => {
         type: undefined
       }
   ).then(() => {
-    removeTeam(index)
+    removeTeam(item.id)
     ElMessage.success('团队已解散')
   }).catch(() => {
     console.log('取消删除')
@@ -53,23 +55,17 @@ const deleteTeam = (item, index) => {
 }
 
 // 进入团队空间
-const enterTeamSpace = (index) => {
-  console.log('进入团队空间:', index)
-  highlightTeamId.value = index
-  props.router.push({
-    path: '/team/space',
-    query: {
-      isNew: 'false',
-      team: index
-    }
-  })
+const enterTeamSpace = (item) => {
+  console.log('进入团队空间:', item.id)
+  highlightTeamId.value = item.id
+  emit('enterTeamSpace', item.id)
 }
 </script>
 
 <template>
   <TwoColumnsWrapper :items="props.teams" empty-text="暂无团队">
-    <template #item="{ item, index }">
-      <el-card :class="index === highlightTeamId ? 'highlight-card' : 'card' ">
+    <template #item="{ item }">
+      <el-card :class="item.id === highlightTeamId ? 'highlight-card' : 'card' ">
         <div class="line">
           <span class="title">{{item.title}}</span>
           <el-button
@@ -77,7 +73,7 @@ const enterTeamSpace = (index) => {
               type="text"
               class="delete-button"
               v-if="item.owner === currentUser.username"
-              @click="deleteTeam(item, index)"
+              @click="deleteTeam(item)"
           >
             <el-icon>
               <Delete/>
@@ -97,7 +93,7 @@ const enterTeamSpace = (index) => {
               link
               type="text"
               class="enter-button"
-              @click="enterTeamSpace(index)"
+              @click="enterTeamSpace(item)"
           >
             <el-icon>
               <Right/>

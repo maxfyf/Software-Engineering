@@ -24,8 +24,12 @@ const {
   teams,
   dataset,
   router,
+  createDialogVisible,
+  newTeamTitle,
   handleSelect,
   handleNew,
+  handleCreateTeam,
+  handleCancelCreate,
   handleEnterTeamSpace
 } = useTeamView(props.filterFn, props.title)
 </script>
@@ -52,9 +56,26 @@ const {
       <TeamList
           :teams="teams"
           :router="router"
-          @handle-enter-team-space="handleEnterTeamSpace"
+          @enter-team-space="handleEnterTeamSpace"
       />
     </div>
+
+    <!-- 新建团队弹窗 -->
+    <el-dialog
+        v-model="createDialogVisible"
+        title="新建团队"
+        width="400px"
+    >
+      <el-form label-width="80px">
+        <el-form-item label="团队名称">
+          <el-input v-model="newTeamTitle" placeholder="请输入团队名称" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="handleCancelCreate">取消</el-button>
+        <el-button type="primary" @click="handleCreateTeam">确定</el-button>
+      </template>
+    </el-dialog>
   </HeaderWrapper>
 </template>
 

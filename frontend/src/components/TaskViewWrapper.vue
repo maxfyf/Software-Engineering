@@ -26,6 +26,10 @@ const props = defineProps({
   isAdmin: {
     type: Boolean,
     default: false
+  },
+  extraQuery: {
+    type: Object,
+    default: () => ({})
   }
 })
 
@@ -41,7 +45,7 @@ const {
   handleNew,
   handlePageChange,
   handleViewDetail
-} = useTaskView(props.filterFn, props.title)
+} = useTaskView(props.filterFn, props.title, props.extraQuery)
 </script>
 
 <template>
