@@ -88,7 +88,19 @@ const api = {
     getTaskById: (taskId) => request.get(`/task/${taskId}`),
     createTask: (data) => request.post('/task/create', data),
     updateTask: (taskId, data) => request.put(`/task/${taskId}`, data),
-    deleteTask: (taskId) => request.delete(`/task/${taskId}`)
+    deleteTask: (taskId) => request.delete(`/task/${taskId}`),
+
+    // 团队模块
+    getTeamList: () => request.get('/team/list'),
+    createTeam: (data) => request.post('/team/create', data),
+    deleteTeam: (teamId) => request.delete(`/team/${teamId}`),
+    addMember: (teamId, username, role) => request.post(`/team/${teamId}/member`, { username, role }),
+    removeMember: (teamId, username) => request.delete(`/team/${teamId}/member`, { username }),
+    setMemberRole: (teamId, username, role) => request.put(`/team/${teamId}/member/role`, { username, role }),
+    // 团队模块补充
+    getTeamTasks: (teamId) => request.get(`/team/${teamId}/tasks`),
+    createTeamTask: (teamId, data) => request.post(`/team/${teamId}/task`, data),
+    assignTask: (taskId, username) => request.put(`/task/${taskId}/assign`, { username })
 }
 
 export default api
