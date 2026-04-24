@@ -11,7 +11,7 @@ const previousRoute = ref('/task/all')
 
 // 监听路由变化，记录非编辑页面的路径
 watch(() => route.path, (newPath) => {
-  if (!newPath.startsWith('/task/edit')) {
+  if (!newPath.includes('/edit')) {
     previousRoute.value = newPath
   }
 }, { immediate: true })
@@ -20,7 +20,7 @@ const activeMenu = computed(() => {
   if (route.path.startsWith('/task/all')) {
     return '/task/all'
   }
-  else if (route.path.startsWith('/task/edit')) {
+  else if (route.path.includes('/edit')) {
     // 返回先前记录的路由路径
     return previousRoute.value
   }

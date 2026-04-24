@@ -39,7 +39,8 @@ const viewMembers = () => {
 </script>
 
 <template>
-  <template v-if="!route.path.includes('/edit')">
+  <router-view v-if="route.path.includes('/edit') || route.path.includes('/personnel')" />
+  <template v-else>
     <TaskViewWrapper
         :title="teamTitle"
         :filter-fn="filterByTeam"
@@ -68,7 +69,6 @@ const viewMembers = () => {
       </el-button>
     </div>
   </template>
-  <router-view v-else />
 </template>
 
 <style scoped>
