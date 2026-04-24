@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import { Back, InfoFilled, Plus, Minus } from "@element-plus/icons-vue";
 import { currentUser, teamList } from '@/store/user.js'
-import { ElMessage } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
@@ -51,9 +50,36 @@ const goToTeamSpace = () => {
     })
 }
 
-// TODO: 权限详情，弹出一个el-dialog窗口，窗口内容我来写
+const viewAuthority = ref(0)
+const authorityVisible = computed(() => viewAuthority.value !== 0)
+const authorityDialogTitle = ref('')
 const authorityDetail = (role) => {
-    
+    switch (role) {
+      case 'owner':
+        viewAuthority.value = 3
+        authorityDialogTitle.value = '拥有者权限'
+        break
+      case 'admin':
+        viewAuthority.value = 2
+        authorityDialogTitle.value = '管理者权限'
+        break
+      case 'member':
+        viewAuthority.value = 1
+        authorityDialogTitle.value = '参与者权限'
+        break
+      default:
+        break
+    }
+}
+
+const closeAuthorityDialog = () => {
+  viewAuthority.value = 0
+  authorityDialogTitle.value = ''
+}
+
+// TODO: 更改成员权限，弹出一个el-dialog窗口，窗口内容我来写
+const handleChangeAuthority = (up) => {
+
 }
 
 // TODO: 移除成员，弹出一个el-dialog窗口，窗口内容我来写
@@ -140,7 +166,7 @@ const handleAddMember = () => {
             <el-button
                 v-if="isOwner"
                 class="authority-button"
-                @click="handleRemoveMember"
+                @click="handleChangeAuthority(false)"
             >
               <el-icon>
                 <Minus/>
@@ -149,7 +175,7 @@ const handleAddMember = () => {
             <el-button
                 v-if="isOwner"
                 class="authority-button"  
-                @click="handleAddMember"
+                @click="handleChangeAuthority(true)"
             >
               <el-icon>
                 <Plus/>
@@ -178,7 +204,7 @@ const handleAddMember = () => {
             <el-button
                 v-if="isOwner"
                 class="authority-button"
-                @click="handleRemoveMember"
+                @click="handleChangeAuthority(true)"
             >
               <el-icon>
                 <Minus/>
@@ -187,7 +213,7 @@ const handleAddMember = () => {
             <el-button
                 v-if="isOwner"
                 class="authority-button"
-                @click="handleAddMember"
+                @click="handleChangeAuthority(false)"
             >
               <el-icon>
                 <Plus/>
@@ -233,15 +259,23 @@ const handleAddMember = () => {
 
   <!-- 权限详情弹窗 -->
   <el-dialog
-      v-model="authorityDialogVisible"
-      :title="authorityDialogTitle"
-      width="400px"
+      v-model="authorityVisible"
+      width="500px"
       center
+      :beforeClose="closeAuthorityDialog"
   >
-    <p>{{ authorityDialogContent }}</p>
-    <template #footer>
-      <el-button type="primary" @click="closeAuthorityDialog">确定</el-button>
+    <template #header>
+      <span class="dialog-title">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ authorityDialogTitle }}</span>
     </template>
+    <ul class="dialog-item">
+      <li>浏览团队中的所有任务</li>
+      <li>操作分配给自己的任务，但只能修改任务状态</li>
+      <li v-if="viewAuthority >= 2">创建/修改/删除任务</li>
+      <li v-if="viewAuthority >= 2">将任务分配给团队成员</li>
+      <li v-if="viewAuthority >= 3">将其他用户添加到团队</li>
+      <li v-if="viewAuthority >= 3">将参与者设置为管理者</li>
+      <li v-if="viewAuthority >= 3">将管理者设置为参与者</li>
+    </ul>
   </el-dialog>
 
   <!-- 移除成员弹窗 -->
@@ -417,5 +451,15 @@ const handleAddMember = () => {
 
 .clickable:hover {
   text-decoration: underline;
+}
+
+.dialog-title {
+  color: black;
+  font-weight: bold;
+  font-size: 20px;
+}
+
+.dialog-item {
+  font-size: 18px;
 }
 </style>
