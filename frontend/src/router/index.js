@@ -23,22 +23,38 @@ const router = createRouter({
                 {
                     path: 'all',
                     name: 'allTasks',
-                    component: () => import('@/views/task/AllTasksView.vue')
+                    component: () => import('@/views/task/AllTasksView.vue'),
+                    children: [
+                        {
+                            path: 'edit',
+                            name: 'allTasksEdit',
+                            component: () => import('@/views/task/EditTaskView.vue')
+                        }
+                    ]
                 },
                 {
                     path: 'personal',
                     name: 'personalTasks',
-                    component: () => import('@/views/task/PersonalTasksView.vue')
+                    component: () => import('@/views/task/PersonalTasksView.vue'),
+                    children: [
+                        {
+                            path: 'edit',
+                            name: 'personalTasksEdit',
+                            component: () => import('@/views/task/EditTaskView.vue')
+                        }
+                    ]
                 },
                 {
                     path: 'team',
                     name: 'teamTasks',
-                    component: () => import('@/views/task/TeamTasksView.vue')
-                },
-                {
-                    path: 'edit',
-                    name: 'editTask',
-                    component: () => import('@/views/task/EditTaskView.vue')
+                    component: () => import('@/views/task/TeamTasksView.vue'),
+                    children: [
+                        {
+                            path: 'edit',
+                            name: 'teamTasksEdit',
+                            component: () => import('@/views/task/EditTaskView.vue')
+                        }
+                    ]
                 }
             ]
         },
@@ -52,32 +68,96 @@ const router = createRouter({
                 {
                     path: 'all',
                     name: 'allTeams',
-                    component: () => import('@/views/team/AllTeamsView.vue')
+                    component: () => import('@/views/team/AllTeamsView.vue'),
+                    children: [
+                        {
+                            path: 'space',
+                            name: 'allTeamsSpace',
+                            component: () => import('@/views/team/TeamSpaceView.vue'),
+                            children: [
+                                {
+                                    path: 'personnel',
+                                    name: 'allTeamsPersonnel',
+                                    component: () => import('@/views/team/PersonnelView.vue')
+                                },
+                                {
+                                    path: 'edit',
+                                    name: 'allTeamsEdit',
+                                    component: () => import('@/views/task/EditTaskView.vue')
+                                }
+                            ]
+                        }
+                    ]
                 },
                 {
                     path: 'owner',
                     name: 'ownerTeams',
-                    component: () => import('@/views/team/OwnerTeamsView.vue')
+                    component: () => import('@/views/team/OwnerTeamsView.vue'),
+                    children: [
+                        {
+                            path: 'space',
+                            name: 'ownerTeamsSpace',
+                            component: () => import('@/views/team/TeamSpaceView.vue'),
+                            children: [
+                                {
+                                    path: 'personnel',
+                                    name: 'ownerTeamsPersonnel',
+                                    component: () => import('@/views/team/PersonnelView.vue')
+                                },
+                                {
+                                    path: 'edit',
+                                    name: 'ownerTeamsEdit',
+                                    component: () => import('@/views/task/EditTaskView.vue')
+                                }
+                            ]
+                        }
+                    ]
                 },
                 {
                     path: 'admin',
                     name: 'adminTeams',
-                    component: () => import('@/views/team/AdminTeamsView.vue')
+                    component: () => import('@/views/team/AdminTeamsView.vue'),
+                    children: [
+                        {
+                            path: 'space',
+                            name: 'adminTeamsSpace',
+                            component: () => import('@/views/team/TeamSpaceView.vue'),
+                            children: [
+                                {
+                                    path: 'personnel',
+                                    name: 'adminTeamsPersonnel',
+                                    component: () => import('@/views/team/PersonnelView.vue')
+                                },
+                                {
+                                    path: 'edit',
+                                    name: 'adminTeamsEdit',
+                                    component: () => import('@/views/task/EditTaskView.vue')
+                                }
+                            ]
+                        }
+                    ]
                 },
                 {
                     path: 'member',
                     name: 'memberTeams',
-                    component: () => import('@/views/team/MemberTeamsView.vue')
-                },
-                {
-                    path: 'space',
-                    name: 'teamSpace',
-                    component: () => import('@/views/team/TeamSpaceView.vue'),
+                    component: () => import('@/views/team/MemberTeamsView.vue'),
                     children: [
                         {
-                            path: 'personnel',
-                            name: 'personnel',
-                            component: () => import('@/views/team/PersonnelView.vue')
+                            path: 'space',
+                            name: 'memberTeamsSpace',
+                            component: () => import('@/views/team/TeamSpaceView.vue'),
+                            children: [
+                                {
+                                    path: 'personnel',
+                                    name: 'memberTeamsPersonnel',
+                                    component: () => import('@/views/team/PersonnelView.vue')
+                                },
+                                {
+                                    path: 'edit',
+                                    name: 'memberTeamsEdit',
+                                    component: () => import('@/views/task/EditTaskView.vue')
+                                }
+                            ]
                         }
                     ]
                 }
