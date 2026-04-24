@@ -97,7 +97,6 @@ const api = {
     addMember: (teamId, username, role) => request.post(`/team/${teamId}/member`, { username, role }),
     removeMember: (teamId, username) => request.delete(`/team/${teamId}/member`, { username }),
     setMemberRole: (teamId, username, role) => request.put(`/team/${teamId}/member/role`, { username, role }),
-    // 团队模块补充
     getTeamTasks: (teamId) => request.get(`/team/${teamId}/tasks`),
     createTeamTask: (teamId, data) => request.post(`/team/${teamId}/task`, data),
     assignTask: (taskId, username) => request.put(`/task/${taskId}/assign`, { username })
