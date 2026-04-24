@@ -89,8 +89,24 @@ const checkTask = (row) => {
 const editTask = (row) => {
   console.log('编辑任务:', row)
   highlightTaskId.value = row.id
+  
+  // 根据当前路由确定编辑路径
+  const currentPath = props.router.currentRoute?.value?.path || ''
+  let editPath = '/task/all/edit'
+  
+  // 判断是否在团队空间
+  const teamMatch = currentPath.match(/\/team\/(all|owner|admin|member)\/space/)
+  if (teamMatch) {
+    // 在团队空间，跳转到团队路由下的 edit
+    editPath = `/team/${teamMatch[1]}/space/edit`
+  } else if (currentPath.includes('/task/personal')) {
+    editPath = '/task/personal/edit'
+  } else if (currentPath.includes('/task/team')) {
+    editPath = '/task/team/edit'
+  }
+  
   props.router.push({
-    path: '/task/edit',
+    path: editPath,
     query: {
       isNew: 'false',
       taskId: row.id
