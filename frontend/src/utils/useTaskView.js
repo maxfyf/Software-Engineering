@@ -41,9 +41,9 @@ export function useTaskView(filterFn = null, pageTitle = '全部任务', extraQu
   const viewDialogVisible = ref(false)
   const currentTask = ref(null)
 
-  // 初始化
+  // TODO:初始化
   onMounted(async () => {
-    await initTaskList()
+    await initTaskList(False)
   })
 
   // 搜索选中任务
@@ -60,8 +60,22 @@ export function useTaskView(filterFn = null, pageTitle = '全部任务', extraQu
 
   // 新建任务
   const handleNew = () => {
+    const path = route.path
+    let editPath = '/task/all/edit'
+    
+    // 判断是否在团队空间
+    const teamMatch = path.match(/\/team\/(all|owner|admin|member)\/space/)
+    if (teamMatch) {
+      // 在团队空间，跳转到团队路由下的 edit
+      editPath = `/team/${teamMatch[1]}/space/edit`
+    } else if (path.includes('/task/personal')) {
+      editPath = '/task/personal/edit'
+    } else if (path.includes('/task/team')) {
+      editPath = '/task/team/edit'
+    }
+    
     router.push({
-      path: '/task/edit',
+      path: editPath,
       query: { isNew: 'true', ...extraQuery }
     })
   }

@@ -1,5 +1,5 @@
 <script setup lang="js">
-import { ref, computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { currentUser, teamList } from '@/store/user.js'
 import TaskViewWrapper from "@/components/TaskViewWrapper.vue";
@@ -14,52 +14,61 @@ const teamTitle = computed(() => team.value ? `${team.value.title}的团队空�
 
 const isOwner = computed(() => team.value?.owner === currentUser.username)
 const isAdmin = computed(() => team.value?.admin?.includes(currentUser.username))
-const isMember = computed(() => team.value?.member?.includes(currentUser.username))
 
 const canManage = computed(() => isOwner.value || isAdmin.value)
 
 const filterByTeam = (task) => task.team === team.value?.title
 
+const extraQuery = computed(() => ({ teamId: teamId.value }))
+
+const parentPath = computed(() => {
+  const match = route.path.match(/\/team\/(all|owner|admin|member)/)
+  return match ? match[1] : 'all'
+})
+
 const handleBack = () => {
-  router.push('/team/all')
+  router.push(`/team/${parentPath.value}`)
 }
 
 const viewMembers = () => {
   router.push({
-    path: '/team/space/personnel',
-    query: { teamId: teamId.value }
+      path: `/team/${parentPath.value}/space/personnel`,
+      query: { teamId: teamId.value }
   })
 }
 </script>
 
 <template>
-  <TaskViewWrapper
-      :title="teamTitle"
-      :filter-fn="filterByTeam"
-      :show-new-button="canManage"
-      :show-assignee="true"
-      :is-admin="canManage"
-      :extra-query="extraQuery"
-  />
+  <template v-if="!route.path.includes('/edit')">
+    <TaskViewWrapper
+        :title="teamTitle"
+        :filter-fn="filterByTeam"
+        :show-new-button="canManage"
+        :show-assignee="true"
+        :is-admin="canManage"
+        :extra-query="extraQuery"
+    />
 
-  <div class="footer">
-    <el-button
-        type="primary"
-        class="back"
-        @click="handleBack"
-    >
-      返回团队列表
-    </el-button>
+    <div class="footer">
+      <el-button
+          type="primary"
+          class="back"
+          @click="handleBack"
+      >
+        返回团队列表
+      </el-button>
 
-    <el-button
-        type="primary"
-        class="member"
-        @click="viewMembers"
-    >
-      <span v-if="isOwner">编辑</span>
-      成员信息
-    </el-button>
-  </div>
+      <el-button
+          type="primary"
+          class="member"
+          @click="viewMembers"
+      >
+        <span v-if="isOwner">编辑</span>
+        成员信息
+      </el-button>
+    </div>
+  </template>
+  <router-view v-else />
 </template>
 
 <style scoped>

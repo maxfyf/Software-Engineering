@@ -61,12 +61,16 @@ export function useTeamView(filterFn = null, pageTitle = '全部团队') {
 
     // 进入团队空间页面的函数handleEnterTeamSpace
     const handleEnterTeamSpace = (teamId) => {
-        highlightTeamId.value = teamId
-        router.push({
-            path: '/team/space',
-            query: { teamId: teamId }
-        })
-    }
+    highlightTeamId.value = teamId
+    // 获取当前父路由路径 (all/owner/admin/member)
+    const path = router.currentRoute.value.path
+    const match = path.match(/\/team\/(all|owner|admin|member)/)
+    const parentPath = match ? match[1] : 'all'
+    router.push({
+        path: `/team/${parentPath}/space`,
+        query: { teamId: teamId }
+    })
+}
 
     return {
         teams,

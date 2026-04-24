@@ -221,8 +221,11 @@ export const addTeam = async (team) => {
     }
 }
 
-// 初始化任务列表
-export const initTaskList = async () => {
+// TODO:初始化任务列表
+export const initTaskList = async (force = false) => {
+    if (!force && taskList.value.length > 0) {
+        return
+    }
     try {
         const res = await api.getTaskList()
         taskList.value = res.data.map(task => ({

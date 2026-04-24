@@ -156,7 +156,9 @@ const saveChanges = async () => {
   
   const taskData = {
     title: newTitle.value,
-    ...(isTeamTask.value && { assignee: newAssignee.value }),
+    ...(isTeamTask.value && { 
+      assignee: newAssignee.value,
+      team: currentTeam.value?.title || null }),
     description: newDescription.value,
     status: newStatus.value,
     priority: newPriority.value,

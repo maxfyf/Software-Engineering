@@ -1,9 +1,10 @@
 <script setup lang="js">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import { Back, InfoFilled, Plus, Minus } from "@element-plus/icons-vue";
 import { currentUser, teamList } from '@/store/user.js'
+import { ElMessage } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,26 +14,56 @@ const team = computed(() => teamList.value.find(t => t.id === teamId.value))
 
 const isOwner = computed(() => team.value?.owner === currentUser.username)
 
+// 从路由路径获取父页面名称
+const parentPageName = computed(() => {
+    const path = route.path
+    if (path.includes('/owner/')) return '我拥有的团队'
+    if (path.includes('/admin/')) return '我管理的团队'
+    if (path.includes('/member/')) return '我参与的团队'
+    return '全部团队'
+})
+
+const teamSpaceTitle = computed(() => {
+    return team.value ? `${team.value.title}的团队空间` : '团队空间'
+})
+
+// 获取当前父路由路径
+const parentPath = computed(() => {
+  const match = route.path.match(/\/team\/(all|owner|admin|member)/)
+  return match ? match[1] : 'all'
+})
+
 const handleBack = () => {
-  router.push({
-    path: '/team/space',
-    query: { teamId: teamId.value }
-  })
+    router.push({
+        path: `/team/${parentPath.value}/space`,
+        query: { teamId: teamId.value }
+    })
+}
+
+const goToParentPage = () => {
+    router.push(`/team/${parentPath.value}`)
+}
+
+const goToTeamSpace = () => {
+    router.push({
+        path: `/team/${parentPath.value}/space`,
+        query: { teamId: teamId.value }
+    })
 }
 
 // TODO: 权限详情，弹出一个el-dialog窗口，窗口内容我来写
-const authorityDetail = () => {
-
+const authorityDetail = (role) => {
+    
 }
 
 // TODO: 移除成员，弹出一个el-dialog窗口，窗口内容我来写
 const handleRemoveMember = () => {
-
+  
 }
 
 // TODO: 添加成员，弹出一个el-dialog窗口，窗口内容我来写
 const handleAddMember = () => {
-
+    
 }
 </script>
 
@@ -51,9 +82,9 @@ const handleAddMember = () => {
           </el-icon>
         </el-button>
         <span class="route">
-          <!--TODO: 第二级目录-->
+          <span class="clickable" @click="goToParentPage">{{ parentPageName }}</span>
           <span>&nbsp;>&nbsp;</span>
-          <!--TODO: 第三级目录'xxx的团队空间'-->
+          <span class="clickable" @click="goToTeamSpace">{{ teamSpaceTitle }}</span>
           <span>&nbsp;>&nbsp;</span>
           <span class="present-directory">
             成员信息
@@ -80,7 +111,7 @@ const handleAddMember = () => {
                 link
                 type="text"
                 class="info"
-                @click="authorityDetail"
+                @click="authorityDetail('owner')"
             >
               <el-icon>
                 <InfoFilled/>
@@ -100,7 +131,7 @@ const handleAddMember = () => {
                 link
                 type="text"
                 class="info"
-                @click="authorityDetail"
+                @click="authorityDetail('admin')"
             >
               <el-icon>
                 <InfoFilled/>
@@ -109,6 +140,7 @@ const handleAddMember = () => {
             <el-button
                 v-if="isOwner"
                 class="authority-button"
+                @click="handleRemoveMember"
             >
               <el-icon>
                 <Minus/>
@@ -116,7 +148,8 @@ const handleAddMember = () => {
             </el-button>
             <el-button
                 v-if="isOwner"
-                class="authority-button"
+                class="authority-button"  
+                @click="handleAddMember"
             >
               <el-icon>
                 <Plus/>
@@ -136,7 +169,7 @@ const handleAddMember = () => {
                 link
                 type="text"
                 class="info"
-                @click="authorityDetail"
+                @click="authorityDetail('member')"
             >
               <el-icon>
                 <InfoFilled/>
@@ -145,6 +178,7 @@ const handleAddMember = () => {
             <el-button
                 v-if="isOwner"
                 class="authority-button"
+                @click="handleRemoveMember"
             >
               <el-icon>
                 <Minus/>
@@ -153,6 +187,7 @@ const handleAddMember = () => {
             <el-button
                 v-if="isOwner"
                 class="authority-button"
+                @click="handleAddMember"
             >
               <el-icon>
                 <Plus/>
@@ -195,6 +230,67 @@ const handleAddMember = () => {
       </el-card>
     </div>
   </HeaderWrapper>
+
+  <!-- 权限详情弹窗 -->
+  <el-dialog
+      v-model="authorityDialogVisible"
+      :title="authorityDialogTitle"
+      width="400px"
+      center
+  >
+    <p>{{ authorityDialogContent }}</p>
+    <template #footer>
+      <el-button type="primary" @click="closeAuthorityDialog">确定</el-button>
+    </template>
+  </el-dialog>
+
+  <!-- 移除成员弹窗 -->
+  <el-dialog
+      v-model="removeMemberDialogVisible"
+      title="移除成员"
+      width="400px"
+  >
+    <el-form label-width="100px">
+      <el-form-item label="选择成员">
+        <el-select v-model="memberToRemove" placeholder="请选择要移除的成员">
+          <el-option
+              v-for="member in [...(team?.admin || []), ...(team?.member || [])]"
+              :key="member"
+              :label="member"
+              :value="member"
+          />
+        </el-select>
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="closeRemoveDialog">取消</el-button>
+      <el-button type="danger" @click="confirmRemoveMember">移除</el-button>
+    </template>
+  </el-dialog>
+
+  <!-- 添加成员弹窗 -->
+  <el-dialog
+      v-model="addMemberDialogVisible"
+      title="添加成员"
+      width="400px"
+  >
+    <el-form label-width="100px">
+      <el-form-item label="用户名">
+        <el-input v-model="newMemberName" placeholder="请输入用户名" />
+      </el-form-item>
+      <el-form-item label="角色">
+        <el-radio-group v-model="newMemberRole">
+          <el-radio label="admin">管理者</el-radio>
+          <el-radio label="member">参与者</el-radio>
+        </el-radio-group>
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="closeAddDialog">取消</el-button>
+      <el-button type="primary" @click="confirmAddMember">添加</el-button>
+    </template>
+  </el-dialog>
+
 </template>
 
 <style scoped>
@@ -313,5 +409,13 @@ const handleAddMember = () => {
   width: 100px;
   height: 100%;
   font-size: 20px;
+}
+.clickable {
+  cursor: pointer;
+  color: #409eff;
+}
+
+.clickable:hover {
+  text-decoration: underline;
 }
 </style>
