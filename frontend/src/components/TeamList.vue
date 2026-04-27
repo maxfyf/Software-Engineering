@@ -113,8 +113,8 @@ const enterTeamSpace = (item) => {
 }
 
 .highlight-card {
-  background-color: #d9ecff;
-  border-color: #d9ecff;
+  background-color: #ecf5ff;
+  border-color: #ecf5ff;
   display: flex;
   flex-direction: column;
 }
