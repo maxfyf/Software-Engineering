@@ -116,7 +116,6 @@ const editTask = (row) => {
 
 // 删除任务
 const deleteTask = (row) => {
-  highlightTaskId.value = null
   ElMessageBox.confirm(
       `确定要删除任务"${row.title}"吗？`,
       '',
@@ -127,6 +126,7 @@ const deleteTask = (row) => {
         type: undefined
       }
   ).then(() => {
+    highlightTaskId.value = null
     removeTask(row.id)
     ElMessage.success('任务已删除')
   }).catch(() => {

@@ -36,7 +36,6 @@ const role = (item) => {
 
 // 解散团队
 const deleteTeam = (item) => {
-  highlightTeamId.value = null
   ElMessageBox.confirm(
       `确定要解散团队"${item.title}"吗？`,
       '',
@@ -47,6 +46,7 @@ const deleteTeam = (item) => {
         type: undefined
       }
   ).then(() => {
+    highlightTeamId.value = null
     removeTeam(item.id)
     ElMessage.success('团队已解散')
   }).catch(() => {
