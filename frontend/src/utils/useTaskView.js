@@ -14,7 +14,7 @@ export function useTaskView(filterFn = null, pageTitle = '全部任务', extraQu
 
   // 记录当前页面为来源页面
   watch(() => route.path, (newPath) => {
-    if (!newPath.startsWith('/task/edit')) {
+    if (!newPath.startsWith('/edit')) {
       previousTaskPage.value = {
         path: newPath,
         title: pageTitle
@@ -43,7 +43,7 @@ export function useTaskView(filterFn = null, pageTitle = '全部任务', extraQu
 
   // TODO:初始化
   onMounted(async () => {
-    await initTaskList(False)
+    await initTaskList(false)
   })
 
   // 搜索选中任务

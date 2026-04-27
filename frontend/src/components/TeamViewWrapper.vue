@@ -38,7 +38,11 @@ const {
   <HeaderWrapper>
     <template #header>
       <div class="inner-header">
-        <span class="route">{{ title }}</span>
+        <span class="route">
+          <span class="present-directory">
+            {{ title }}
+          </span>
+        </span>
         <div class="search-wrapper">
           <Search :data="dataset" :onSelect="handleSelect" />
         </div>
@@ -98,22 +102,6 @@ const {
 </template>
 
 <style scoped>
-.inner-header {
-  height: 100%;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-}
-
-.route {
-  display: inline-flex;
-  height: 100%;
-  align-items: center;
-  font-size: 20px;
-  font-weight: bold;
-  color: #333333;
-}
-
 .search-wrapper {
   display: flex;
   position: absolute;

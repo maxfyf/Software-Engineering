@@ -46,6 +46,7 @@ const viewMembers = () => {
         :filter-fn="filterByTeam"
         :show-new-button="canManage"
         :show-assignee="true"
+        :is-team-space="true"
         :is-admin="canManage"
         :extra-query="extraQuery"
     />

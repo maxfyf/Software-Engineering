@@ -8,7 +8,7 @@ const router = useRouter();
 const onHandleCancelAccount = async () => {
   const result = await handleCancelAccount()
   if (result && result.success && result.redirect) {
-    router.push(result.redirect)
+    await router.push(result.redirect)
   }
 }
 </script>
@@ -17,7 +17,11 @@ const onHandleCancelAccount = async () => {
   <HeaderWrapper>
     <template #header>
       <div class="inner-header">
-        <span class="route">个人资料</span>
+        <span class="route">
+          <span class="present-directory">
+            个人资料
+          </span>
+        </span>
       </div>
     </template>
 
@@ -61,25 +65,6 @@ const onHandleCancelAccount = async () => {
 </template>
 
 <style scoped>
-.inner-header {
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-}
-
-.route {
-  display: inline-flex;
-  height: 100%;
-  align-items: center;
-  font-size: 20px;
-  font-weight: bold;
-  color: #333333;
-}
-
 .main-content-wrapper {
   width: 100%;
   height: 100%;

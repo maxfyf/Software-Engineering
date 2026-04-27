@@ -352,29 +352,6 @@ const handleAddMember = () => {
 </template>
 
 <style scoped>
-.inner-header {
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: row;
-  gap: 15px;
-  align-items: center;
-}
-
-.route {
-  display: inline-flex;
-  height: 100%;
-  align-items: center;
-  font-size: 20px;
-  color: #333333;
-}
-
-.present-directory {
-  font-weight: bold;
-}
-
 .main-content-wrapper {
   width: 100%;
   height: 100%;
@@ -399,21 +376,6 @@ const handleAddMember = () => {
   border-bottom: none;
   display: flex;
   justify-content: center;
-}
-
-.back-button {
-  width: 100px;
-  height: 100%;
-  font-size: 20px;
-}
-
-.clickable {
-  cursor: pointer;
-  color: #409eff;
-}
-
-.clickable:hover {
-  text-decoration: underline;
 }
 
 .main-content {
@@ -553,5 +515,11 @@ const handleAddMember = () => {
   display: flex;
   flex-direction: row;
   justify-content: center;
+}
+
+.back-button {
+  width: 100px;
+  height: 100%;
+  font-size: 20px;
 }
 </style>

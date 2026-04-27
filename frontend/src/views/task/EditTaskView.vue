@@ -4,7 +4,7 @@ import { Back } from "@element-plus/icons-vue";
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import {taskList, addTask, getTaskById, updateTask, previousTaskPage, teamList} from '@/store/user.js';
+import { taskList, addTask, getTaskById, updateTask, previousTaskPage, teamList } from '@/store/user.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -115,6 +115,83 @@ const resetForm = () => {
   newDate.value = ''
 }
 
+// 从路由路径获取父页面名称
+const parentPageName = computed(() => {
+  const path = route.path
+  if (path.includes('/owner/')) return '我拥有的团队'
+  if (path.includes('/admin/')) return '我管理的团队'
+  if (path.includes('/member/')) return '我参与的团队'
+  return '全部团队'
+})
+
+const teamId = computed(() => parseInt(route.query.teamId))
+const team = computed(() => teamList.value.find(t => t.id === teamId.value) || {})
+const teamSpaceTitle = computed(() => {
+  return team.value ? `${team.value.title}的团队空间` : '团队空间'
+})
+
+// 获取当前父路由路径
+const parentPath = computed(() => {
+  const match = route.path.match(/\/team\/(all|owner|admin|member)/)
+  return match ? match[1] : 'all'
+})
+
+const goToParentPage = () => {
+  const info = isNew.value ? '您新建的任务尚未保存，确定要离开吗？' : '您有未保存的更改，确定要离开吗？'
+
+  if (hasChanges()) {
+    ElMessageBox.confirm(
+        info,
+        '',
+        {
+          confirmButtonText: '确定',
+          confirmButtonType: 'danger',
+          cancelButtonText: '取消',
+          type: undefined
+        }
+    ).then(() => {
+      isLeaving.value = true
+      router.push(`/team/${parentPath.value}`)
+    }).catch(() => {
+      // 取消，留在当前页面
+    })
+  } else {
+    isLeaving.value = true
+    router.push(`/team/${parentPath.value}`)
+  }
+}
+
+const goToTeamSpace = () => {
+  const info = isNew.value ? '您新建的任务尚未保存，确定要离开吗？' : '您有未保存的更改，确定要离开吗？'
+
+  if (hasChanges()) {
+    ElMessageBox.confirm(
+        info,
+        '',
+        {
+          confirmButtonText: '确定',
+          confirmButtonType: 'danger',
+          cancelButtonText: '取消',
+          type: undefined
+        }
+    ).then(() => {
+      isLeaving.value = true
+      router.push({
+        path: `/team/${parentPath.value}/space`,
+        query: { teamId: teamId.value }
+      })
+    }).catch(() => {
+      // 取消，留在当前页面
+    })
+  } else {
+    isLeaving.value = true
+    router.push({
+      path: `/team/${parentPath.value}/space`,
+      query: { teamId: teamId.value }
+    })
+  }
+}
+
 // 回退到对应TasksView，若为新建任务，取消该任务；若为编辑任务，取消编辑记录
 const handleBack = () => {
   const info = isNew.value ? '您新建的任务尚未保存，确定要离开吗？' : '您有未保存的更改，确定要离开吗？'
@@ -189,7 +266,7 @@ const saveChanges = async () => {
   // 返回来源页面
   resetForm()
   isLeaving.value = true  // 标记正在离开，跳过守卫
-  router.push(previousTaskPage.value.path) 
+  await router.push(previousTaskPage.value.path)
 }
 
 // 路由守卫：离开页面前检查
@@ -229,17 +306,30 @@ onBeforeRouteLeave((to, from, next) => {
             link
             type="text"
             size="large"
-            @click="handleBack"
+            @click="goToTeamSpace"
         >
           <el-icon :size="25">
             <Back/>
           </el-icon>
         </el-button>
         <span class="route">
-          <span>{{ previousTaskPage.title }}</span>
-          <span>&nbsp;>&nbsp;</span>
-          <span v-if="isNew" class="present-directory">
-            新建任务
+          <span v-if="isTeamTask">
+            <span class="clickable" @click="goToParentPage">{{ parentPageName }}</span>
+            <span>&nbsp;>&nbsp;</span>
+            <span class="clickable" @click="goToTeamSpace">{{ teamSpaceTitle }}</span>
+            <span>&nbsp;>&nbsp;</span>
+          </span>
+          <span v-else>
+            <span class="clickable" @click="handleBack">{{ previousTaskPage.title }}</span>
+            <span>&nbsp;>&nbsp;</span>
+          </span>
+          <span v-if="isNew">
+            <span v-if="isTeamTask" class="present-directory">
+              新建团队任务
+            </span>
+            <span v-else class="present-directory">
+              新建个人任务
+            </span>
           </span>
           <span v-else class="present-directory">
             编辑任务“{{ taskTitle }}”
@@ -348,29 +438,6 @@ onBeforeRouteLeave((to, from, next) => {
 </template>
 
 <style scoped>
-.inner-header {
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: row;
-  gap: 15px;
-  align-items: center;
-}
-
-.route {
-  display: inline-flex;
-  height: 100%;
-  align-items: center;
-  font-size: 20px;
-  color: #333333;
-}
-
-.present-directory {
-  font-weight: bold;
-}
-
 .main-content-wrapper {
   width: 100%;
   height: 100%;
