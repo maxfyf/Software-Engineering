@@ -63,17 +63,35 @@ const {
     <!-- 新建团队弹窗 -->
     <el-dialog
         v-model="createDialogVisible"
-        title="新建团队"
-        width="400px"
+        width="500px"
+        center
+        :beforeClose="handleCancelCreate"
     >
-      <el-form label-width="80px">
-        <el-form-item label="团队名称">
-          <el-input v-model="newTeamTitle" placeholder="请输入团队名称" />
-        </el-form-item>
-      </el-form>
+      <template #header>
+        <span class="dialog-title">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;新建团队</span>
+      </template>
+      <el-input
+          v-model="newTeamTitle"
+          type="text"
+          placeholder="团队名"
+      />
       <template #footer>
-        <el-button @click="handleCancelCreate">取消</el-button>
-        <el-button type="primary" @click="handleCreateTeam">确定</el-button>
+        <div class="dialog-footer">
+          <el-button
+              type="default"
+              class="cancel"
+              @click="handleCancelCreate"
+          >
+            取消
+          </el-button>
+          <el-button
+              type="primary"
+              class="check"
+              @click="handleCreateTeam"
+          >
+            确定
+          </el-button>
+        </div>
       </template>
     </el-dialog>
   </HeaderWrapper>
@@ -122,5 +140,34 @@ const {
   width: 100px;
   margin-left: auto;
   margin-right: 15px;
+}
+
+.dialog-title {
+  color: black;
+  font-weight: bold;
+  font-size: 20px;
+}
+
+.dialog-footer {
+  width: 100%;
+  height: 30px;
+  display: flex;
+  flex-direction: row;
+}
+
+.cancel {
+  margin-left: 20%;
+  margin-right: auto;
+  width: 70px;
+  height: 100%;
+  font-size: 18px;
+}
+
+.check {
+  margin-left: auto;
+  margin-right: 20%;
+  width: 70px;
+  height: 100%;
+  font-size: 18px;
 }
 </style>

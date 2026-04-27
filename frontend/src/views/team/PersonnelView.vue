@@ -169,7 +169,7 @@ const handleAddMember = () => {
           <el-button type="primary" class="new-button" @click="handleAdd">
             <el-icon><Plus/></el-icon>
             <span>
-              &nbsp;添加
+              &nbsp;添加成员
             </span>
           </el-button>
         </div>
@@ -441,7 +441,7 @@ const handleAddMember = () => {
 }
 
 .new-button {
-  width: 80px;
+  width: 100px;
   margin-left: auto;
   margin-right: 20px;
 }
