@@ -1,15 +1,36 @@
 <script setup lang="js">
 import { computed, ref } from 'vue'
+import Draggable from 'vuedraggable'
 import { useRoute, useRouter } from 'vue-router'
-import HeaderWrapper from "@/components/HeaderWrapper.vue";
-import { Back, InfoFilled, Plus, Minus } from "@element-plus/icons-vue";
+import HeaderWrapper from "@/components/HeaderWrapper.vue"
+import { Back, Delete, Plus, InfoFilled } from "@element-plus/icons-vue"
 import { currentUser, teamList } from '@/store/user.js'
 
 const route = useRoute()
 const router = useRouter()
 
 const teamId = computed(() => parseInt(route.query.teamId))
-const team = computed(() => teamList.value.find(t => t.id === teamId.value))
+const team = computed(() => teamList.value.find(t => t.id === teamId.value) || {})
+const objects = computed(() => {
+  if (!teamList.value) {
+    return { owner: '', admin: [], member: [] }
+  }
+
+  const currentTeam = teamList.value.find(t => t.id === teamId.value)
+  if (!currentTeam) {
+    return { owner: '', admin: [], member: [] }
+  }
+
+  const adminList = Array.isArray(currentTeam.admin) ? currentTeam.admin : []
+  const memberList = Array.isArray(currentTeam.member) ? currentTeam.member : []
+
+  return {
+    owner: currentTeam.owner || '',
+    admin: adminList.map(name => ({ id: name, name: name })),
+    member: memberList.map(name => ({ id: name, name: name }))
+  }
+})
+const isDragging = ref(false)
 
 const isOwner = computed(() => team.value?.owner === currentUser.username)
 
@@ -77,12 +98,12 @@ const closeAuthorityDialog = () => {
   authorityDialogTitle.value = ''
 }
 
-// TODO: 更改成员权限，弹出一个el-dialog窗口，窗口内容我来写
-const handleChangeAuthority = (up) => {
+// TODO: 更改成员权限
+const onDragChange = (event) => {
 
 }
 
-// TODO: 移除成员，弹出一个el-dialog窗口，窗口内容我来写
+// TODO: 移除成员，需弹出ElMessageBox二次确认
 const handleRemoveMember = () => {
   
 }
@@ -128,6 +149,19 @@ const handleAddMember = () => {
           </div>
         </template>
 
+        <div v-if="isOwner" class="button-header">
+          <div v-if="isDragging" class="delete-button" @dragover.prevent @drop="handleRemoveMember">
+            <el-icon><Delete /></el-icon>
+          </div>
+
+          <el-button type="primary" class="new-button" @click="handleAddMember">
+            <el-icon><Plus/></el-icon>
+            <span>
+              &nbsp;添加
+            </span>
+          </el-button>
+        </div>
+
         <div class="main-content">
           <div class="key-container">
             <div class="key">
@@ -163,26 +197,26 @@ const handleAddMember = () => {
                 <InfoFilled/>
               </el-icon>
             </el-button>
-            <el-button
-                v-if="isOwner"
-                class="authority-button"
-                @click="handleChangeAuthority(false)"
-            >
-              <el-icon>
-                <Minus/>
-              </el-icon>
-            </el-button>
-            <el-button
-                v-if="isOwner"
-                class="authority-button"  
-                @click="handleChangeAuthority(true)"
-            >
-              <el-icon>
-                <Plus/>
-              </el-icon>
-            </el-button>
           </div>
-          <div class="value">
+          <div v-if="isOwner">
+            <Draggable
+                v-model="objects.admin"
+                group="personnel"
+                item-key="id"
+                class="draggable-list"
+                @start="isDragging = true"
+                @end="isDragging = false"
+                @change="onDragChange"
+                :force-fallback="true"
+            >
+              <template #item="{ element }">
+                <div class="draggable-item">
+                  {{ element.name }}
+                </div>
+              </template>
+            </Draggable>
+          </div>
+          <div v-else class="value">
             {{ team && team.admin.length > 0 ? team.admin.join('、') : '暂无' }}
           </div>
           <br>
@@ -201,49 +235,32 @@ const handleAddMember = () => {
                 <InfoFilled/>
               </el-icon>
             </el-button>
-            <el-button
-                v-if="isOwner"
-                class="authority-button"
-                @click="handleChangeAuthority(true)"
-            >
-              <el-icon>
-                <Minus/>
-              </el-icon>
-            </el-button>
-            <el-button
-                v-if="isOwner"
-                class="authority-button"
-                @click="handleChangeAuthority(false)"
-            >
-              <el-icon>
-                <Plus/>
-              </el-icon>
-            </el-button>
           </div>
-          <div class="value">
+          <div v-if="isOwner">
+            <Draggable
+                v-model="objects.member"
+                group="personnel"
+                item-key="id"
+                class="draggable-list"
+                @start="isDragging = true"
+                @end="isDragging = false"
+                @change="onDragChange"
+                :force-fallback="true"
+            >
+              <template #item="{ element }">
+                <div class="draggable-item">
+                  {{ element.name }}
+                </div>
+              </template>
+            </Draggable>
+          </div>
+          <div v-else class="value">
             {{ team && team.member.length > 0 ? team.member.join('、') : '暂无' }}
           </div>
         </div>
 
         <template #footer>
-          <div v-if="isOwner" class="footer">
-            <el-button
-                type="danger"
-                class="remove-button"
-                @click="handleRemoveMember"
-            >
-              移除成员
-            </el-button>
-
-            <el-button
-                type="primary"
-                class="add-button"
-                @click="handleAddMember"
-            >
-              添加成员
-            </el-button>
-          </div>
-          <div v-else class="footer">
+          <div class="footer">
             <el-button
                 type="primary"
                 class="back-button"
@@ -277,54 +294,6 @@ const handleAddMember = () => {
       <li v-if="viewAuthority >= 3">将管理者设置为参与者</li>
     </ul>
   </el-dialog>
-
-  <!-- 移除成员弹窗 -->
-  <el-dialog
-      v-model="removeMemberDialogVisible"
-      title="移除成员"
-      width="400px"
-  >
-    <el-form label-width="100px">
-      <el-form-item label="选择成员">
-        <el-select v-model="memberToRemove" placeholder="请选择要移除的成员">
-          <el-option
-              v-for="member in [...(team?.admin || []), ...(team?.member || [])]"
-              :key="member"
-              :label="member"
-              :value="member"
-          />
-        </el-select>
-      </el-form-item>
-    </el-form>
-    <template #footer>
-      <el-button @click="closeRemoveDialog">取消</el-button>
-      <el-button type="danger" @click="confirmRemoveMember">移除</el-button>
-    </template>
-  </el-dialog>
-
-  <!-- 添加成员弹窗 -->
-  <el-dialog
-      v-model="addMemberDialogVisible"
-      title="添加成员"
-      width="400px"
-  >
-    <el-form label-width="100px">
-      <el-form-item label="用户名">
-        <el-input v-model="newMemberName" placeholder="请输入用户名" />
-      </el-form-item>
-      <el-form-item label="角色">
-        <el-radio-group v-model="newMemberRole">
-          <el-radio label="admin">管理者</el-radio>
-          <el-radio label="member">参与者</el-radio>
-        </el-radio-group>
-      </el-form-item>
-    </el-form>
-    <template #footer>
-      <el-button @click="closeAddDialog">取消</el-button>
-      <el-button type="primary" @click="confirmAddMember">添加</el-button>
-    </template>
-  </el-dialog>
-
 </template>
 
 <style scoped>
@@ -385,6 +354,28 @@ const handleAddMember = () => {
   justify-content: center;
 }
 
+.button-header {
+  width: 100%;
+  display: flex;
+  margin-bottom: 25px;
+}
+
+.delete-button {
+  font-size: 20px;
+  margin-left: 40px;
+  margin-right: auto;
+}
+
+.delete-button:hover {
+  color: #f56c6c !important;
+}
+
+.new-button {
+  width: 80px;
+  margin-left: auto;
+  margin-right: 20px;
+}
+
 .key-container {
   width: 100%;
   display: flex;
@@ -405,14 +396,45 @@ const handleAddMember = () => {
   padding: 0;
 }
 
-.authority-button {
-  padding: 5px;
-  width: 40px;
-  height: 40px;
+.draggable-list {
+  height: 80px;
+  overflow-y: auto;
+  background-color: #f8f9fa;
+  border: 1px solid #eef;
+  border-radius: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
 }
 
-.value {
-  font-size: 18px;
+.draggable-list:hover {
+  border: 1px solid #409eff;
+  box-shadow: 0 8px 24px rgba(64, 158, 255, 0.15);
+}
+
+.draggable-item {
+  display: inline-block;
+  width: auto;
+  height: 30px;
+  background-color: white;
+  color: black;
+  font-size: 15px;
+  border-radius: 5px;
+  text-align: center;
+  cursor: move;
+  box-sizing: border-box;
+  padding: 0 5px;
+  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1);
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.draggable-item:hover {
+  background-color: #ecf5ff;
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
 }
 
 .footer {
@@ -421,22 +443,6 @@ const handleAddMember = () => {
   display: flex;
   flex-direction: row;
   justify-content: center;
-}
-
-.remove-button {
-  margin-left: 20%;
-  margin-right: auto;
-  width: 120px;
-  height: 100%;
-  font-size: 20px;
-}
-
-.add-button {
-  margin-left: auto;
-  margin-right: 20%;
-  width: 120px;
-  height: 100%;
-  font-size: 20px;
 }
 
 .back-button {
