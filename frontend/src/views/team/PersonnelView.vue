@@ -11,6 +11,9 @@ const router = useRouter()
 
 const teamId = computed(() => parseInt(route.query.teamId))
 const team = computed(() => teamList.value.find(t => t.id === teamId.value) || {})
+
+const addVisible = ref(false)
+
 const objects = computed(() => {
   if (!teamList.value) {
     return { owner: '', admin: [], member: [] }
@@ -93,6 +96,10 @@ const authorityDetail = (role) => {
     }
 }
 
+const closeAddDialog = () => {
+  addVisible.value = false
+}
+
 const closeAuthorityDialog = () => {
   viewAuthority.value = 0
   authorityDialogTitle.value = ''
@@ -108,7 +115,12 @@ const handleRemoveMember = () => {
   
 }
 
-// TODO: 添加成员，弹出一个el-dialog窗口，窗口内容我来写
+const newUsername = ref('')
+const newAuthority = ref('member')
+const handleAdd = () => {
+  addVisible.value = true
+}
+// TODO: 添加成员，先确保用户名已填写，再向发送用户名newUsername与权限newAuthority，后端反馈用户不存在，添加失败，或者添加成功，前端界面重新渲染
 const handleAddMember = () => {
     
 }
@@ -154,7 +166,7 @@ const handleAddMember = () => {
             <el-icon><Delete /></el-icon>
           </div>
 
-          <el-button type="primary" class="new-button" @click="handleAddMember">
+          <el-button type="primary" class="new-button" @click="handleAdd">
             <el-icon><Plus/></el-icon>
             <span>
               &nbsp;添加
@@ -274,6 +286,49 @@ const handleAddMember = () => {
     </div>
   </HeaderWrapper>
 
+  <!-- 添加用户弹窗 -->
+  <el-dialog
+      v-model="addVisible"
+      width="500px"
+      center
+      :beforeClose="closeAddDialog"
+  >
+    <template #header>
+      <span class="dialog-title">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;添加用户</span>
+    </template>
+    <div class="dialog-body">
+      <el-input
+          v-model="newUsername"
+          type="text"
+          placeholder="用户名"
+      />
+
+      <el-select v-model="newAuthority">
+        <el-option label="管理者" value="admin"/>
+        <el-option label="参与者" value="member"/>
+      </el-select>
+    </div>
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button
+            type="default"
+            class="cancel"
+            @click="closeAddDialog"
+        >
+          取消
+        </el-button>
+
+        <el-button
+            type="primary"
+            class="check"
+            @click="handleAddMember"
+        >
+          确认
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
+
   <!-- 权限详情弹窗 -->
   <el-dialog
       v-model="authorityVisible"
@@ -344,6 +399,21 @@ const handleAddMember = () => {
   border-bottom: none;
   display: flex;
   justify-content: center;
+}
+
+.back-button {
+  width: 100px;
+  height: 100%;
+  font-size: 20px;
+}
+
+.clickable {
+  cursor: pointer;
+  color: #409eff;
+}
+
+.clickable:hover {
+  text-decoration: underline;
 }
 
 .main-content {
@@ -437,35 +507,51 @@ const handleAddMember = () => {
   box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
 }
 
-.footer {
-  width: 100%;
-  height: 35px;
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-}
-
-.back-button {
-  width: 100px;
-  height: 100%;
-  font-size: 20px;
-}
-.clickable {
-  cursor: pointer;
-  color: #409eff;
-}
-
-.clickable:hover {
-  text-decoration: underline;
-}
-
 .dialog-title {
   color: black;
   font-weight: bold;
   font-size: 20px;
 }
 
+.dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 15px;
+}
+
+.dialog-footer {
+  width: 100%;
+  height: 30px;
+  display: flex;
+  flex-direction: row;
+}
+
+.cancel {
+  margin-left: 20%;
+  margin-right: auto;
+  width: 70px;
+  height: 100%;
+  font-size: 18px;
+}
+
+.check {
+  margin-left: auto;
+  margin-right: 20%;
+  width: 70px;
+  height: 100%;
+  font-size: 18px;
+}
+
 .dialog-item {
   font-size: 18px;
+}
+
+.footer {
+  width: 100%;
+  height: 35px;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
 }
 </style>
