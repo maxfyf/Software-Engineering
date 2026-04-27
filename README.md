@@ -26,6 +26,7 @@ axios >= 1.14.0                      # HTTP客户端库，用于发送AJAX请求
 element-plus >= 2.13.5               # Element Plus组件库
 vue >= 3.5.29                        # Vue.js作为前端的基础框架
 vue-router >= 5.0.3                  # Vue路由管理器，实现单页应用路由
+vuedraggable >= 4.1.0                # Vue.js的拖拽排序组件库
 vitejs/plugin-vue >= 6.0.4           # Vite的Vue插件，提供Vue3单文件组件的热更新支持
 vite >= 7.3.1                        # Vite作为构建工具
 vite-plugin-vue-devtools >= 8.0.6    # Vue DevTools的Vite插件，在开发环境中提供Vue调试工具
