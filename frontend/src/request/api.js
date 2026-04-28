@@ -97,9 +97,7 @@ const api = {
     addMember: (teamId, username, role) => request.post(`/team/${teamId}/member`, { username, role }),
     removeMember: (teamId, username) => request.delete(`/team/${teamId}/member`, { params: { username } }),
     setMemberRole: (teamId, username, role) => request.put(`/team/${teamId}/member/role`, { username, role }),
-    getTeamTasks: (teamId) => request.get(`/team/${teamId}/tasks`),
-    createTeamTask: (teamId, data) => request.post(`/team/${teamId}/task`, data),
-    assignTask: (taskId, username) => request.put(`/task/${taskId}/assign`, { username })
+
 }
 
 export default api
