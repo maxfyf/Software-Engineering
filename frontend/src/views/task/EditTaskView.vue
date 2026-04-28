@@ -94,7 +94,10 @@ const loadTaskData = async (id) => {
     
     // 设置表单值
     newTitle.value = task.title
-    if (isTeamTask.value) newAssignee.value = task.assignee || ''
+    if (isTeamTask.value) {
+      const a = task.assignee
+      newAssignee.value = Array.isArray(a) ? (a[0] || '') : (a || '')
+    }
     newDescription.value = task.description || ''
     newStatus.value = task.status
     newPriority.value = task.priority

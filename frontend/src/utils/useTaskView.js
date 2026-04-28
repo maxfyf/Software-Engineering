@@ -14,7 +14,7 @@ export function useTaskView(filterFn = null, pageTitle = '全部任务', extraQu
 
   // 记录当前页面为来源页面
   watch(() => route.path, (newPath) => {
-    if (!newPath.startsWith('/edit')) {
+    if (!newPath.includes('/edit')) {
       previousTaskPage.value = {
         path: newPath,
         title: pageTitle

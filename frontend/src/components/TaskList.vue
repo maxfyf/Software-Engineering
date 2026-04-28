@@ -114,6 +114,15 @@ const editTask = (row) => {
   })
 }
 
+// 判断当前用户是否为任务负责人
+const isCurrentAssignee = (task) => {
+  const assignee = task.assignee
+  if (Array.isArray(assignee)) {
+    return assignee.includes(currentUser.username)
+  }
+  return assignee === currentUser.username
+}
+
 // 删除任务
 const deleteTask = (row) => {
   ElMessageBox.confirm(
@@ -192,7 +201,7 @@ const deleteTask = (row) => {
             <el-button
                 link
                 type="text"
-                v-if="(scope.row.team === null || scope.row.assignee === currentUser.username) &&
+                v-if="(scope.row.team === null || isCurrentAssignee(scope.row)) &&
                   scope.row.status === '待办'"
                 @click="startTask(scope.row)"
             >
@@ -203,7 +212,7 @@ const deleteTask = (row) => {
             <el-button
                 link
                 type="text"
-                v-else-if="(scope.row.team === null || scope.row.assignee === currentUser.username) &&
+                v-else-if="(scope.row.team === null || isCurrentAssignee(scope.row)) &&
                   scope.row.status === '进行中'"
                 @click="checkTask(scope.row)"
             >
