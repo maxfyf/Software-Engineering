@@ -4,7 +4,9 @@ import Draggable from 'vuedraggable'
 import { useRoute, useRouter } from 'vue-router'
 import HeaderWrapper from "@/components/HeaderWrapper.vue"
 import { Back, Delete, Plus, InfoFilled } from "@element-plus/icons-vue"
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { currentUser, teamList } from '@/store/user.js'
+import api from '@/request/api.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -34,6 +36,7 @@ const objects = computed(() => {
   }
 })
 const isDragging = ref(false)
+const draggedMemberName = ref(null)
 
 const isOwner = computed(() => team.value?.owner === currentUser.username)
 
@@ -105,14 +108,110 @@ const closeAuthorityDialog = () => {
   authorityDialogTitle.value = ''
 }
 
-// TODO: 更改成员权限
-const onDragChange = (event) => {
-
+const handleDragStart = (event) => {
+  isDragging.value = true
+  if (event && event.item) {
+    draggedMemberName.value = event.item.textContent.trim()
+  }
 }
 
-// TODO: 移除成员，需弹出ElMessageBox二次确认
-const handleRemoveMember = () => {
-  
+const handleDragEnd = () => {
+  isDragging.value = false
+  setTimeout(() => {
+    draggedMemberName.value = null
+  }, 100)
+}
+
+const onDragChange = async (event) => {
+  if (!event.added) return
+
+  const memberName = event.added.element.name
+
+  let newRole = null
+  if (objects.value.admin.some(a => a.name === memberName)) {
+    newRole = 'admin'
+  } else if (objects.value.member.some(m => m.name === memberName)) {
+    newRole = 'member'
+  }
+
+  if (!newRole) return
+
+  try {
+    await api.setMemberRole(teamId.value, memberName, newRole)
+    ElMessage.success('角色更改成功')
+
+    const currentTeam = teamList.value.find(t => t.id === teamId.value)
+    if (currentTeam) {
+      currentTeam.admin = currentTeam.admin.filter(a => a !== memberName)
+      currentTeam.member = currentTeam.member.filter(m => m !== memberName)
+      if (newRole === 'admin') {
+        currentTeam.admin.push(memberName)
+      } else {
+        currentTeam.member.push(memberName)
+      }
+    }
+  } catch (error) {
+    ElMessage.error('角色更改失败')
+    teamList.value = [...teamList.value]
+  }
+}
+
+const doRemoveMember = async (username) => {
+  try {
+    await api.removeMember(teamId.value, username)
+    const currentTeam = teamList.value.find(t => t.id === teamId.value)
+    if (currentTeam) {
+      currentTeam.admin = currentTeam.admin.filter(a => a !== username)
+      currentTeam.member = currentTeam.member.filter(m => m !== username)
+    }
+    ElMessage.success('成员已移除')
+  } catch (error) {
+    ElMessage.error('移除成员失败')
+  }
+}
+
+const handleRemoveMember = async () => {
+  const removableMembers = [
+    ...(team.value?.admin || []),
+    ...(team.value?.member || [])
+  ]
+
+  if (removableMembers.length === 0) {
+    ElMessage.warning('没有可移除的成员')
+    return
+  }
+
+  if (draggedMemberName.value && removableMembers.includes(draggedMemberName.value)) {
+    const name = draggedMemberName.value
+    try {
+      await ElMessageBox.confirm(
+        `确定要移除成员"${name}"吗？`,
+        '移除成员',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          confirmButtonType: 'danger'
+        }
+      )
+      await doRemoveMember(name)
+    } catch (error) {
+      // 取消移除
+    }
+    return
+  }
+
+  ElMessageBox.prompt('请输入要移除的成员用户名', '移除成员', {
+    confirmButtonText: '移除',
+    cancelButtonText: '取消',
+    confirmButtonType: 'danger',
+    inputValidator: (value) => {
+      if (!value) return '请输入用户名'
+      if (!removableMembers.includes(value)) return '该用户不在团队中或无法移除'
+      return true
+    }
+  }).then(async ({ value }) => {
+    await doRemoveMember(value)
+  }).catch(() => {})
 }
 
 const newUsername = ref('')
@@ -120,9 +219,35 @@ const newAuthority = ref('member')
 const handleAdd = () => {
   addVisible.value = true
 }
-// TODO: 添加成员，先确保用户名已填写，再向发送用户名newUsername与权限newAuthority，后端反馈用户不存在，添加失败，或者添加成功，前端界面重新渲染
-const handleAddMember = () => {
-    
+
+const handleAddMember = async () => {
+  if (!newUsername.value || !newUsername.value.trim()) {
+    ElMessage.error('请输入用户名')
+    return
+  }
+
+  const username = newUsername.value.trim()
+  const role = newAuthority.value
+
+  try {
+    await api.addMember(teamId.value, username, role)
+
+    const currentTeam = teamList.value.find(t => t.id === teamId.value)
+    if (currentTeam) {
+      if (role === 'admin' && !currentTeam.admin.includes(username)) {
+        currentTeam.admin.push(username)
+      } else if (role === 'member' && !currentTeam.member.includes(username)) {
+        currentTeam.member.push(username)
+      }
+    }
+
+    ElMessage.success('成员添加成功')
+    addVisible.value = false
+    newUsername.value = ''
+    newAuthority.value = 'member'
+  } catch (error) {
+    ElMessage.error('添加成员失败')
+  }
 }
 </script>
 
@@ -162,7 +287,7 @@ const handleAddMember = () => {
         </template>
 
         <div v-if="isOwner" class="button-header">
-          <div v-if="isDragging" class="delete-button" @dragover.prevent @drop="handleRemoveMember">
+          <div v-if="isDragging" class="delete-button" @dragover.prevent @drop="handleRemoveMember" @click="handleRemoveMember">
             <el-icon><Delete /></el-icon>
           </div>
 
@@ -216,8 +341,8 @@ const handleAddMember = () => {
                 group="personnel"
                 item-key="id"
                 class="draggable-list"
-                @start="isDragging = true"
-                @end="isDragging = false"
+                @start="handleDragStart"
+                @end="handleDragEnd"
                 @change="onDragChange"
                 :force-fallback="true"
             >
@@ -254,8 +379,8 @@ const handleAddMember = () => {
                 group="personnel"
                 item-key="id"
                 class="draggable-list"
-                @start="isDragging = true"
-                @end="isDragging = false"
+                @start="handleDragStart"
+                @end="handleDragEnd"
                 @change="onDragChange"
                 :force-fallback="true"
             >
