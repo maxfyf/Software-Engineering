@@ -32,7 +32,9 @@ const isTeamTask = computed(() => {
   if (isNew.value) {
     return route.query.teamId != null
   }
-  return originalTask.value?.team != null
+  else{
+    return originalTask.value?.team != null
+  }
 })
 
 // 当前任务所属团队
@@ -164,38 +166,7 @@ const goToParentPage = () => {
   }
 }
 
-const goToTeamSpace = () => {
-  const info = isNew.value ? '您新建的任务尚未保存，确定要离开吗？' : '您有未保存的更改，确定要离开吗？'
-
-  if (hasChanges()) {
-    ElMessageBox.confirm(
-        info,
-        '',
-        {
-          confirmButtonText: '确定',
-          confirmButtonType: 'danger',
-          cancelButtonText: '取消',
-          type: undefined
-        }
-    ).then(() => {
-      isLeaving.value = true
-      router.push({
-        path: `/team/${parentPath.value}/space`,
-        query: { teamId: teamId.value }
-      })
-    }).catch(() => {
-      // 取消，留在当前页面
-    })
-  } else {
-    isLeaving.value = true
-    router.push({
-      path: `/team/${parentPath.value}/space`,
-      query: { teamId: teamId.value }
-    })
-  }
-}
-
-// 回退到对应TasksView，若为新建任务，取消该任务；若为编辑任务，取消编辑记录
+// 回退到对应TasksView或TeamSpace，若为新建任务，取消该任务；若为编辑任务，取消编辑记录
 const handleBack = () => {
   const info = isNew.value ? '您新建的任务尚未保存，确定要离开吗？' : '您有未保存的更改，确定要离开吗？'
   
@@ -211,13 +182,31 @@ const handleBack = () => {
       }
     ).then(() => {
       isLeaving.value = true
-      router.push(previousTaskPage.value.path)
+      if(isTeamTask.value) {
+        router.push({
+          path: `/team/${parentPath.value}/space`,
+          query: { teamId: teamId.value }
+        })
+      }
+      else
+      {
+        router.push(previousTaskPage.value.path)
+      }
     }).catch(() => {
       // 取消，留在当前页面
     })
   } else {
     isLeaving.value = true
-    router.push(previousTaskPage.value.path)
+    if(isTeamTask.value) {
+      router.push({
+        path: `/team/${parentPath.value}/space`,
+        query: { teamId: teamId.value }
+      })
+    }
+    else
+    {
+      router.push(previousTaskPage.value.path)
+    }
   }
 }
 
@@ -309,7 +298,7 @@ onBeforeRouteLeave((to, from, next) => {
             link
             type="text"
             size="large"
-            @click="goToTeamSpace"
+            @click="handleBack"
         >
           <el-icon :size="25">
             <Back/>
@@ -319,7 +308,7 @@ onBeforeRouteLeave((to, from, next) => {
           <span v-if="isTeamTask">
             <span class="clickable" @click="goToParentPage">{{ parentPageName }}</span>
             <span>&nbsp;>&nbsp;</span>
-            <span class="clickable" @click="goToTeamSpace">{{ teamSpaceTitle }}</span>
+            <span class="clickable" @click="handleBack">{{ teamSpaceTitle }}</span>
             <span>&nbsp;>&nbsp;</span>
           </span>
           <span v-else>
