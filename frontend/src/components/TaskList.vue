@@ -1,5 +1,6 @@
 <script setup lang="js">
 import { computed } from 'vue';
+import { useRoute } from 'vue-router'
 import {
   finishTask,
   startTask as startTaskAction,
@@ -7,6 +8,7 @@ import {
   removeTask,
   currentUser
 } from "@/store/user.js";
+import { handleEnter } from "@/utils/routeManager.js"
 import { View, CaretRight, Check, Edit, Delete } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
@@ -42,6 +44,8 @@ const props = defineProps({
     default: 10
   }
 })
+
+const route = useRoute();
 
 const emit = defineEmits(['pageChange', 'viewDetail'])
 
@@ -89,29 +93,21 @@ const checkTask = (row) => {
 const editTask = (row) => {
   console.log('编辑任务:', row)
   highlightTaskId.value = row.id
-  
-  // 根据当前路由确定编辑路径
-  const currentPath = props.router.currentRoute?.value?.path || ''
-  let editPath = '/task/all/edit'
-  
-  // 判断是否在团队空间
-  const teamMatch = currentPath.match(/\/team\/(all|owner|admin|member)\/space/)
-  if (teamMatch) {
-    // 在团队空间，跳转到团队路由下的 edit
-    editPath = `/team/${teamMatch[1]}/space/edit`
-  } else if (currentPath.includes('/task/personal')) {
-    editPath = '/task/personal/edit'
-  } else if (currentPath.includes('/task/team')) {
-    editPath = '/task/team/edit'
+
+  const newPage = {
+    path: 'edit',
+    params: [
+      {
+        key: 'isNew',
+        value: false
+      },
+      {
+        key: 'taskId',
+        value: row.id
+      }
+    ]
   }
-  
-  props.router.push({
-    path: editPath,
-    query: {
-      isNew: 'false',
-      taskId: row.id
-    }
-  })
+  handleEnter(route.fullPath, props.router, newPage)
 }
 
 // 判断当前用户是否为任务负责人

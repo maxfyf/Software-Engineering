@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { currentUser, teamList } from '@/store/user.js'
+import { handleEnter, handleBack } from '@/utils/routeManager.js'
 import TaskViewWrapper from "@/components/TaskViewWrapper.vue";
 
 const route = useRoute()
@@ -25,17 +26,6 @@ const parentPath = computed(() => {
   const match = route.path.match(/\/team\/(all|owner|admin|member)/)
   return match ? match[1] : 'all'
 })
-
-const handleBack = () => {
-  router.push(`/team/${parentPath.value}`)
-}
-
-const viewMembers = () => {
-  router.push({
-      path: `/team/${parentPath.value}/space/personnel`,
-      query: { teamId: teamId.value }
-  })
-}
 </script>
 
 <template>
@@ -55,7 +45,7 @@ const viewMembers = () => {
       <el-button
           type="primary"
           class="back"
-          @click="handleBack"
+          @click="handleBack(route.fullPath, router, 1)"
       >
         返回团队列表
       </el-button>
@@ -63,7 +53,10 @@ const viewMembers = () => {
       <el-button
           type="primary"
           class="member"
-          @click="viewMembers"
+          @click="handleEnter(route.fullPath, router, {
+            path: 'personnel',
+            params: []
+          })"
       >
         <span v-if="isOwner">编辑</span>
         成员信息

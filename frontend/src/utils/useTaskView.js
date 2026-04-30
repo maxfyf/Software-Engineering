@@ -1,26 +1,15 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { taskList, highlightTaskId, initTaskList, previousTaskPage } from '@/store/user.js'
 import { useRouter, useRoute } from 'vue-router'
+import {handleEnter} from "@/utils/routeManager.js";
 
 /**
  * 任务视图的通用逻辑
  * @param {Function|null} filterFn - 任务筛选函数
- * @param {string} pageTitle - 页面标题
- * @param {Object} extraQuery - 新建任务路由参数
  */
-export function useTaskView(filterFn = null, pageTitle = '全部任务', extraQuery = {}) {
+export function useTaskView(filterFn = null) {
   const router = useRouter()
   const route = useRoute()
-
-  // 记录当前页面为来源页面
-  watch(() => route.path, (newPath) => {
-    if (!newPath.includes('/edit')) {
-      previousTaskPage.value = {
-        path: newPath,
-        title: pageTitle
-      }
-    }
-  }, { immediate: true })
 
   // 根据 filterFn 筛选任务
   const tasks = computed(() => {
@@ -62,22 +51,17 @@ export function useTaskView(filterFn = null, pageTitle = '全部任务', extraQu
   const handleNew = () => {
     const path = route.path
     let editPath = '/task/all/edit'
-    
-    // 判断是否在团队空间
-    const teamMatch = path.match(/\/team\/(all|owner|admin|member)\/space/)
-    if (teamMatch) {
-      // 在团队空间，跳转到团队路由下的 edit
-      editPath = `/team/${teamMatch[1]}/space/edit`
-    } else if (path.includes('/task/personal')) {
-      editPath = '/task/personal/edit'
-    } else if (path.includes('/task/team')) {
-      editPath = '/task/team/edit'
+
+    const newPage = {
+      path: 'edit',
+      params: [
+        {
+          key: 'isNew',
+          value: true
+        }
+      ]
     }
-    
-    router.push({
-      path: editPath,
-      query: { isNew: 'true', ...extraQuery }
-    })
+    handleEnter(route.fullPath, router, newPage)
   }
 
   // 分页变化

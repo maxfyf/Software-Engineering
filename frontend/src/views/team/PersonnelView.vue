@@ -3,9 +3,10 @@ import { computed, ref } from 'vue'
 import Draggable from 'vuedraggable'
 import { useRoute, useRouter } from 'vue-router'
 import HeaderWrapper from "@/components/HeaderWrapper.vue"
+import { currentUser, teamList } from '@/store/user.js'
+import { handleBack } from '@/utils/routeManager.js'
 import { Back, Delete, Plus, InfoFilled } from "@element-plus/icons-vue"
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { currentUser, teamList } from '@/store/user.js'
 import api from '@/request/api.js'
 
 const route = useRoute()
@@ -58,24 +59,6 @@ const parentPath = computed(() => {
   const match = route.path.match(/\/team\/(all|owner|admin|member)/)
   return match ? match[1] : 'all'
 })
-
-const handleBack = () => {
-    router.push({
-        path: `/team/${parentPath.value}/space`,
-        query: { teamId: teamId.value }
-    })
-}
-
-const goToParentPage = () => {
-    router.push(`/team/${parentPath.value}`)
-}
-
-const goToTeamSpace = () => {
-    router.push({
-        path: `/team/${parentPath.value}/space`,
-        query: { teamId: teamId.value }
-    })
-}
 
 const viewAuthority = ref(0)
 const authorityVisible = computed(() => viewAuthority.value !== 0)
@@ -259,16 +242,18 @@ const handleAddMember = async () => {
             link
             type="text"
             size="large"
-            @click="handleBack"
+            @click="handleBack(route.fullPath, router, 1)"
         >
           <el-icon :size="25">
             <Back/>
           </el-icon>
         </el-button>
         <span class="route">
-          <span class="clickable" @click="goToParentPage">{{ parentPageName }}</span>
+          <span class="clickable" @click="handleBack(route.fullPath, router, 2)">
+            {{ parentPageName }}
+          </span>
           <span>&nbsp;>&nbsp;</span>
-          <span class="clickable" @click="goToTeamSpace">{{ teamSpaceTitle }}</span>
+          <span class="clickable" @click="handleBack(route.fullPath, router, 1)">{{ teamSpaceTitle }}</span>
           <span>&nbsp;>&nbsp;</span>
           <span class="present-directory">
             成员信息
@@ -401,7 +386,7 @@ const handleAddMember = async () => {
             <el-button
                 type="primary"
                 class="back-button"
-                @click="handleBack"
+                @click="handleBack(route.fullPath, router, 1)"
             >
               返回
             </el-button>

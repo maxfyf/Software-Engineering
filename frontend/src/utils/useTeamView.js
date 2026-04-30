@@ -1,13 +1,14 @@
 import { ref, computed} from 'vue'
 import { teamList, highlightTeamId, addTeam } from '@/store/user.js'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { handleEnter } from "@/utils/routeManager.js";
 
 /**
  * 团队视图的通用逻辑
  * @param {Function|null} filterFn - 团队筛选函数
- * @param {string} pageTitle - 页面标题
  */
-export function useTeamView(filterFn = null, pageTitle = '全部团队') {
+export function useTeamView(filterFn = null) {
+    const route = useRoute()
     const router = useRouter()
 
     // 根据 filterFn 筛选团队
@@ -62,14 +63,16 @@ export function useTeamView(filterFn = null, pageTitle = '全部团队') {
     // 进入团队空间页面的函数handleEnterTeamSpace
     const handleEnterTeamSpace = (teamId) => {
         highlightTeamId.value = teamId
-        // 获取当前父路由路径 (all/owner/admin/member)
-        const path = router.currentRoute.value.path
-        const match = path.match(/\/team\/(all|owner|admin|member)/)
-        const parentPath = match ? match[1] : 'all'
-        router.push({
-            path: `/team/${parentPath}/space`,
-            query: { teamId: teamId }
-        })
+        const newPage = {
+            path: 'space',
+            params: [
+                {
+                    key: 'teamId',
+                    value: teamId
+                }
+            ]
+        }
+        handleEnter(route.fullPath, router, newPage)
     }
 
     return {

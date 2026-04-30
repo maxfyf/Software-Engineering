@@ -5,8 +5,9 @@ import Search from "@/components/Search.vue";
 import TaskList from "@/components/TaskList.vue";
 import TaskDetail from "@/components/TaskDetail.vue";
 import { useTaskView } from '@/utils/useTaskView.js';
+import { handleBack } from '@/utils/routeManager.js'
 import { Back, Plus } from "@element-plus/icons-vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 
 const props = defineProps({
   title: {
@@ -32,12 +33,10 @@ const props = defineProps({
   isAdmin: {
     type: Boolean,
     default: false
-  },
-  extraQuery: {
-    type: Object,
-    default: () => ({})
   }
 })
+
+const route = useRoute()
 
 const {
   tasks,
@@ -51,9 +50,7 @@ const {
   handleNew,
   handlePageChange,
   handleViewDetail
-} = useTaskView(props.filterFn, props.title, props.extraQuery)
-
-const route = useRoute()
+} = useTaskView(props.filterFn, props.title)
 
 // 从路由路径获取父页面名称
 const parentPageName = computed(() => {
@@ -73,12 +70,6 @@ const parentPageTitle = computed(() => {
   if (path.includes('/team/member/')) return '我参与的团队'
   return ''
 })
-
-const goToParentPage = () => {
-  router.push({
-    path: `/team/${parentPageName.value}`,
-  })
-}
 </script>
 
 <template>
@@ -90,7 +81,7 @@ const goToParentPage = () => {
             link
             type="text"
             size="large"
-            @click="goToParentPage"
+            @click="handleBack(route.fullPath, router, 1)"
         >
           <el-icon :size="25">
             <Back/>
@@ -100,7 +91,7 @@ const goToParentPage = () => {
           <span
               v-if="isTeamSpace"
               class="clickable"
-              @click="goToParentPage"
+              @click="handleBack(route.fullPath, router, 1)"
           >
             {{ parentPageTitle }}
           </span>
