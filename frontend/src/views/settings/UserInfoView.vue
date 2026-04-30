@@ -1,9 +1,11 @@
 <script setup lang="js">
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { currentUser, handleCancelAccount } from "@/store/user.js"
+import Route from "@/components/Route.vue";
 
-const router = useRouter();
+const route = useRoute()
+const router = useRouter()
 
 const onHandleCancelAccount = async () => {
   const result = await handleCancelAccount()
@@ -17,11 +19,9 @@ const onHandleCancelAccount = async () => {
   <HeaderWrapper>
     <template #header>
       <div class="inner-header">
-        <span class="route">
-          <span class="present-directory">
-            个人资料
-          </span>
-        </span>
+        <div class="route-wrapper">
+          <Route :route="route" :router="router" />
+        </div>
       </div>
     </template>
 
@@ -65,6 +65,12 @@ const onHandleCancelAccount = async () => {
 </template>
 
 <style scoped>
+.route-wrapper {
+  display: flex;
+  left: 20px;
+  align-items: center;
+}
+
 .main-content-wrapper {
   width: 100%;
   height: 100%;

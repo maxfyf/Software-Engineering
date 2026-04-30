@@ -2,9 +2,9 @@
 import { ref, computed, onMounted} from "vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
-import { Back } from "@element-plus/icons-vue";
+import Route from "@/components/Route.vue";
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { taskList, addTask, getTaskById, updateTask, previousTaskPage, teamList } from '@/store/user.js';
+import { taskList, addTask, getTaskById, updateTask, teamList } from '@/store/user.js';
 import { handleBack } from "@/utils/routeManager.js"
 
 const route = useRoute();
@@ -25,8 +25,6 @@ const newDate = ref('')
 const pastDate = (time) => {
   return time.getTime() < Date.now() - 8.64e7
 }
-
-const taskTitle = computed(() => isNew.value ? '' : newTitle.value)
 
 // 判断当前任务是否为团队任务
 const isTeamTask = computed(() => {
@@ -116,46 +114,6 @@ const resetForm = () => {
   newDate.value = ''
 }
 
-// 从路由路径获取父页面名称
-const parentPageName = computed(() => {
-  const path = route.path
-  if (path.includes('/owner/')) return '我拥有的团队'
-  if (path.includes('/admin/')) return '我管理的团队'
-  if (path.includes('/member/')) return '我参与的团队'
-  return '全部团队'
-})
-
-const teamId = computed(() => parseInt(route.query.teamId))
-const team = computed(() => teamList.value.find(t => t.id === teamId.value) || {})
-const teamSpaceTitle = computed(() => {
-  return team.value ? `${team.value.title}的团队空间` : '团队空间'
-})
-
-const handleBackWithModificationCheck = (num) => {
-  const info = isNew.value ? '您新建的任务尚未保存，确定要离开吗？' : '您有未保存的更改，确定要离开吗？'
-  
-  if (hasChanges()) {
-    ElMessageBox.confirm(
-      info,
-      '',
-      {
-        confirmButtonText: '确定',
-        confirmButtonType: 'danger',
-        cancelButtonText: '取消',
-        type: undefined
-      }
-    ).then(() => {
-      isLeaving.value = true
-      handleBack(route.fullPath, router, num)
-    }).catch(() => {
-      // 取消，留在当前页面
-    })
-  } else {
-    isLeaving.value = true
-    handleBack(route.fullPath, router, num)
-  }
-}
-
 // 保存所有更改并回退到来源页面
 const saveChanges = async () => {
   // 表单验证
@@ -204,7 +162,7 @@ const saveChanges = async () => {
   // 返回来源页面
   resetForm()
   isLeaving.value = true  // 标记正在离开，跳过守卫
-  handleBack(route.fullPath, router, 1)
+  handleBack(route, router, 1)
 }
 
 // 路由守卫：离开页面前检查
@@ -233,52 +191,13 @@ onBeforeRouteLeave((to, from, next) => {
     next()
   }
 })
-
 </script>
 
 <template>
   <HeaderWrapper>
     <template #header>
       <div class="inner-header">
-        <el-button
-            link
-            type="text"
-            size="large"
-            @click="handleBackWithModificationCheck(1)"
-        >
-          <el-icon :size="25">
-            <Back/>
-          </el-icon>
-        </el-button>
-        <span class="route">
-          <span v-if="isTeamTask">
-            <span class="clickable" @click="handleBackWithModificationCheck(2)">
-              {{ parentPageName }}
-            </span>
-            <span>&nbsp;>&nbsp;</span>
-            <span class="clickable" @click="handleBackWithModificationCheck(1)">
-              {{ teamSpaceTitle }}
-            </span>
-            <span>&nbsp;>&nbsp;</span>
-          </span>
-          <span v-else>
-            <span class="clickable" @click="handleBackWithModificationCheck(1)">
-              {{ previousTaskPage.title }}
-            </span>
-            <span>&nbsp;>&nbsp;</span>
-          </span>
-          <span v-if="isNew">
-            <span v-if="isTeamTask" class="present-directory">
-              新建团队任务
-            </span>
-            <span v-else class="present-directory">
-              新建个人任务
-            </span>
-          </span>
-          <span v-else class="present-directory">
-            编辑任务“{{ taskTitle }}”
-          </span>
-        </span>
+        <Route :route="route" :router="router"/>
       </div>
     </template>
 

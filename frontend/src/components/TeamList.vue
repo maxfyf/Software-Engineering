@@ -9,11 +9,6 @@ const props = defineProps({
     type: Array,
     required: true,
     default: () => []
-  },
-
-  router: {
-    type: Object,
-    required: true
   }
 })
 

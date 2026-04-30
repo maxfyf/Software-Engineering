@@ -8,7 +8,6 @@ const route = useRoute();
 <template>
   <TeamViewWrapper
       v-if="!route.path.includes('/space')"
-      title="全部团队"
       :show-new-button="true"
   />
   <router-view v-else />

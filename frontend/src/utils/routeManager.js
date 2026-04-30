@@ -1,7 +1,11 @@
+import { currentUser } from '@/store/user.js'
+import { taskList, teamList } from "@/store/user.js";
+
 // 路由解析器
-const routeManager = (route) => {
-    let path = route.split('/')
+const routeParser = (route) => {
+    let path = route.fullPath.split('/')
     if(path.length === 0) return undefined
+
     let lastIndex = path[path.length - 1].split('?')
     if(lastIndex.length === 1)
     {
@@ -34,7 +38,7 @@ const routeManager = (route) => {
 
 // 进入页面
 export const handleEnter = (route, router, newPage) => {
-    const res = routeManager(route)
+    const res = routeParser(route)
     if(!res) return false
 
     res.path.push(newPage.path)
@@ -58,7 +62,7 @@ export const handleEnter = (route, router, newPage) => {
 // 退出页面
 export const handleBack = (route, router, num) => {
     if(num <= 0) return false
-    const res = routeManager(route)
+    const res = routeParser(route)
     if(!res || res.path.length <= num) return false
 
     res.path.length -= num
@@ -79,4 +83,132 @@ export const handleBack = (route, router, num) => {
         query: queryObj
     })
     return true
+}
+
+const getParam = (params, key) => {
+    const param = params.find(param => param.key === key)
+    if(!param) return undefined
+    else return param.value
+}
+
+// 由route路径翻译为内部路由
+export const translate = (route) => {
+    const res = routeParser(route)
+    if(!res || res.path.length <= 1) return ''
+
+    let innerRoute = []
+    switch(res.path[1]) {
+        case 'login':
+            return ''
+        case 'task':
+            if(res.path.length <= 2) return ''
+            switch(res.path[2]) {
+                case 'all':
+                    innerRoute.push('全部任务')
+                    break
+                case 'personal':
+                    innerRoute.push('个人任务')
+                    break
+                case 'team':
+                    innerRoute.push('团队任务')
+                    break
+                default:
+                    return ''
+            }
+
+            if(res.path.length === 3) return innerRoute
+            switch(res.path[3]) {
+                case 'edit':
+                    if(innerRoute[0] === '团队任务') return ''
+                    const isNew = getParam(res.params, 'isNew')
+                    if(isNew === undefined) return ''
+
+                    if(isNew) innerRoute.push('新建个人任务')
+                    else {
+                        const taskId = getParam(res.params, 'taskId')
+                        if(taskId === undefined) return ''
+
+                        const task = taskList.value.find(task => Number(task.id) === Number(taskId))
+                        if(!task) return ''
+                        innerRoute.push('编辑个人任务\"' + task.title + '\"')
+                    }
+                    if(res.path.length > 4) return ''
+                    return innerRoute
+                default:
+                    return ''
+            }
+        case 'team':
+            if(res.path.length <= 2) return ''
+            switch(res.path[2]) {
+                case 'all':
+                    innerRoute.push('全部团队')
+                    break
+                case 'owner':
+                    innerRoute.push('我拥有的团队')
+                    break
+                case 'admin':
+                    innerRoute.push('我管理的团队')
+                    break
+                case 'member':
+                    innerRoute.push('我参与的团队')
+                    break
+                default:
+                    return ''
+            }
+
+            if(res.path.length === 3) return innerRoute
+            switch(res.path[3]) {
+                case 'space':
+                    const teamId = getParam(res.params, 'teamId')
+                    console.log(res)
+                    if(teamId === undefined) return ''
+                    console.log('teamId=', teamId)
+                    console.log(teamList.value)
+                    const team = teamList.value.find(team=> Number(team.id) === Number(teamId))
+                    console.log(team)
+                    if(!team) return ''
+                    innerRoute.push(team.title + '的团队空间')
+
+                    if(res.path.length === 4) return innerRoute
+                    switch(res.path[4]) {
+                        case 'edit':
+                            const isNew = getParam(res.params, 'isNew')
+                            if(isNew === undefined) return ''
+
+                            if(isNew) innerRoute.push('新建团队任务')
+                            else {
+                                const taskId = getParam(res.params, 'taskId')
+                                if(taskId === undefined) return ''
+
+                                const task = taskList.value.find(task => Number(task.id) === Number(taskId))
+                                if(!task) return ''
+                                innerRoute.push('编辑团队任务\"' + task.title + '\"')
+                            }
+                            if(res.path.length > 5) return ''
+                            return innerRoute
+                        case 'personnel':
+                            if(team.owner === currentUser.username) innerRoute.push('编辑成员信息')
+                            else innerRoute.push('成员信息')
+
+                            if(res.path.length > 5) return ''
+                            return innerRoute
+                        default:
+                            return ''
+                    }
+                default:
+                    return ''
+            }
+        case 'settings':
+            if(res.path.length <= 2) return ''
+            switch(res.path[2]) {
+                case 'info':
+                    innerRoute.push('个人资料')
+                    if(res.path.length > 3) return ''
+                    return innerRoute
+                default:
+                    return ''
+            }
+        default:
+            return ''
+    }
 }

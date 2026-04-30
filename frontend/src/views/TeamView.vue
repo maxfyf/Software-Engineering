@@ -4,12 +4,11 @@ import { computed, ref, watch } from 'vue';
 import { useRoute } from "vue-router";
 
 const route = useRoute()
-
 const previousRoute = ref('/team/all')
 
-watch(() => route.path, (newpath) => {
-  if (!newpath.includes('/space')){
-    previousRoute.value = newpath
+watch(() => route.path, (newPath) => {
+  if (!newPath.includes('/space')){
+    previousRoute.value = newPath
   }
 }, { immediate: true })
 

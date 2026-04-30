@@ -21,11 +21,6 @@ const canManage = computed(() => isOwner.value || isAdmin.value)
 const filterByTeam = (task) => task.team === team.value?.title
 
 const extraQuery = computed(() => ({ teamId: teamId.value }))
-
-const parentPath = computed(() => {
-  const match = route.path.match(/\/team\/(all|owner|admin|member)/)
-  return match ? match[1] : 'all'
-})
 </script>
 
 <template>
@@ -45,7 +40,7 @@ const parentPath = computed(() => {
       <el-button
           type="primary"
           class="back"
-          @click="handleBack(route.fullPath, router, 1)"
+          @click="handleBack(route, router, 1)"
       >
         返回团队列表
       </el-button>
@@ -53,7 +48,7 @@ const parentPath = computed(() => {
       <el-button
           type="primary"
           class="member"
-          @click="handleEnter(route.fullPath, router, {
+          @click="handleEnter(route, router, {
             path: 'personnel',
             params: []
           })"

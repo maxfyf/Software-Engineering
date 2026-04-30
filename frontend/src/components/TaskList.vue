@@ -1,6 +1,6 @@
 <script setup lang="js">
 import { computed } from 'vue';
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   finishTask,
   startTask as startTaskAction,
@@ -17,11 +17,6 @@ const props = defineProps({
     type: Array,
     required: true,
     default: () => []
-  },
-
-  router: {
-    type: Object,
-    required: true
   },
 
   showAssignee: {
@@ -46,6 +41,7 @@ const props = defineProps({
 })
 
 const route = useRoute();
+const router = useRouter();
 
 const emit = defineEmits(['pageChange', 'viewDetail'])
 
@@ -107,7 +103,7 @@ const editTask = (row) => {
       }
     ]
   }
-  handleEnter(route.fullPath, props.router, newPage)
+  handleEnter(route, router, newPage)
 }
 
 // 判断当前用户是否为任务负责人

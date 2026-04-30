@@ -10,7 +10,6 @@ const isAdmin = (team) => team.admin.includes(currentUser.username)
 <template>
   <TeamViewWrapper
       v-if="!route.path.includes('/space')"
-      title="我管理的团队"
       :filter-fn="isAdmin"
       :show-new-button="false"
   />

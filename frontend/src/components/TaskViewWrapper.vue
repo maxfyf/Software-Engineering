@@ -1,19 +1,14 @@
 <script setup lang="js">
-import { computed } from 'vue'
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
+import Route from "@/components/Route.vue";
 import Search from "@/components/Search.vue";
 import TaskList from "@/components/TaskList.vue";
 import TaskDetail from "@/components/TaskDetail.vue";
 import { useTaskView } from '@/utils/useTaskView.js';
-import { handleBack } from '@/utils/routeManager.js'
-import { Back, Plus } from "@element-plus/icons-vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
+import { Plus } from "@element-plus/icons-vue";
 
 const props = defineProps({
-  title: {
-    type: String,
-    required: true
-  },
   filterFn: {
     type: Function,
     default: null
@@ -37,6 +32,7 @@ const props = defineProps({
 })
 
 const route = useRoute()
+const router = useRouter()
 
 const {
   tasks,
@@ -45,61 +41,21 @@ const {
   pageSize,
   viewDialogVisible,
   currentTask,
-  router,
   handleSelect,
   handleNew,
   handlePageChange,
   handleViewDetail
-} = useTaskView(props.filterFn, props.title)
-
-// 从路由路径获取父页面名称
-const parentPageName = computed(() => {
-  const path = route.path
-  if (path.includes('/team/all/')) return 'all'
-  if (path.includes('/team/owner/')) return 'owner'
-  if (path.includes('/team/admin/')) return 'admin'
-  if (path.includes('/team/member/')) return 'member'
-  return ''
-})
-
-const parentPageTitle = computed(() => {
-  const path = route.path
-  if (path.includes('/team/all/')) return '全部团队'
-  if (path.includes('/team/owner/')) return '我拥有的团队'
-  if (path.includes('/team/admin/')) return '我管理的团队'
-  if (path.includes('/team/member/')) return '我参与的团队'
-  return ''
-})
+} = useTaskView(props.filterFn)
 </script>
 
 <template>
   <HeaderWrapper>
     <template #header>
       <div class="inner-header">
-        <el-button
-            v-if="isTeamSpace"
-            link
-            type="text"
-            size="large"
-            @click="handleBack(route.fullPath, router, 1)"
-        >
-          <el-icon :size="25">
-            <Back/>
-          </el-icon>
-        </el-button>
-        <span class="route">
-          <span
-              v-if="isTeamSpace"
-              class="clickable"
-              @click="handleBack(route.fullPath, router, 1)"
-          >
-            {{ parentPageTitle }}
-          </span>
-          <span v-if="isTeamSpace">&nbsp;>&nbsp;</span>
-          <span class="present-directory">
-            {{ title }}
-          </span>
-        </span>
+        <div class="route-wrapper">
+          <Route :route="route" :router="router" />
+        </div>
+
         <div class="search-wrapper">
           <Search :data="dataset" :onSelect="handleSelect" />
         </div>
@@ -122,7 +78,6 @@ const parentPageTitle = computed(() => {
 
       <TaskList
           :tasks="tasks"
-          :router="router"
           :show-assignee="showAssignee"
           :is-admin="isAdmin"
           :current-page="currentPage"
@@ -141,6 +96,12 @@ const parentPageTitle = computed(() => {
 </template>
 
 <style scoped>
+.route-wrapper {
+  display: flex;
+  left: 20px;
+  align-items: center;
+}
+
 .search-wrapper {
   display: flex;
   position: absolute;

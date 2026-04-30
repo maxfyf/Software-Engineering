@@ -95,25 +95,3 @@ a,
   gap: 15px;
   align-items: center;
 }
-
-.route {
-  display: inline-flex;
-  height: 100%;
-  align-items: center;
-  font-size: 20px;
-  color: #333333;
-}
-
-.present-directory {
-  font-weight: bold;
-}
-
-.clickable {
-  cursor: pointer;
-  color: black
-}
-
-.clickable:hover {
-  text-decoration: underline;
-  color: #409eff;
-}

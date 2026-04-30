@@ -8,7 +8,6 @@ const route = useRoute();
 <template>
   <TaskViewWrapper
       v-if="!route.path.includes('/edit')"
-      title="全部任务"
       :show-new-button="true"
   />
   <router-view v-else />

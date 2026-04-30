@@ -10,7 +10,6 @@ const isOwner = (team) => team.owner === currentUser.username
 <template>
   <TeamViewWrapper
       v-if="!route.path.includes('/space')"
-      title="我拥有的团队"
       :filter-fn="isOwner"
       :show-new-button="true"
   />

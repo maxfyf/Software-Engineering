@@ -3,9 +3,10 @@ import { computed, ref } from 'vue'
 import Draggable from 'vuedraggable'
 import { useRoute, useRouter } from 'vue-router'
 import HeaderWrapper from "@/components/HeaderWrapper.vue"
+import Route from "@/components/Route.vue"
 import { currentUser, teamList } from '@/store/user.js'
 import { handleBack } from '@/utils/routeManager.js'
-import { Back, Delete, Plus, InfoFilled } from "@element-plus/icons-vue"
+import { Delete, Plus, InfoFilled } from "@element-plus/icons-vue"
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '@/request/api.js'
 
@@ -40,25 +41,6 @@ const isDragging = ref(false)
 const draggedMemberName = ref(null)
 
 const isOwner = computed(() => team.value?.owner === currentUser.username)
-
-// 从路由路径获取父页面名称
-const parentPageName = computed(() => {
-    const path = route.path
-    if (path.includes('/owner/')) return '我拥有的团队'
-    if (path.includes('/admin/')) return '我管理的团队'
-    if (path.includes('/member/')) return '我参与的团队'
-    return '全部团队'
-})
-
-const teamSpaceTitle = computed(() => {
-    return team.value ? `${team.value.title}的团队空间` : '团队空间'
-})
-
-// 获取当前父路由路径
-const parentPath = computed(() => {
-  const match = route.path.match(/\/team\/(all|owner|admin|member)/)
-  return match ? match[1] : 'all'
-})
 
 const viewAuthority = ref(0)
 const authorityVisible = computed(() => viewAuthority.value !== 0)
@@ -238,27 +220,7 @@ const handleAddMember = async () => {
   <HeaderWrapper>
     <template #header>
       <div class="inner-header">
-        <el-button
-            link
-            type="text"
-            size="large"
-            @click="handleBack(route.fullPath, router, 1)"
-        >
-          <el-icon :size="25">
-            <Back/>
-          </el-icon>
-        </el-button>
-        <span class="route">
-          <span class="clickable" @click="handleBack(route.fullPath, router, 2)">
-            {{ parentPageName }}
-          </span>
-          <span>&nbsp;>&nbsp;</span>
-          <span class="clickable" @click="handleBack(route.fullPath, router, 1)">{{ teamSpaceTitle }}</span>
-          <span>&nbsp;>&nbsp;</span>
-          <span class="present-directory">
-            成员信息
-          </span>
-        </span>
+        <Route :route="route" :router="router"/>
       </div>
     </template>
 
@@ -386,7 +348,7 @@ const handleAddMember = async () => {
             <el-button
                 type="primary"
                 class="back-button"
-                @click="handleBack(route.fullPath, router, 1)"
+                @click="handleBack(route, router, 1)"
             >
               返回
             </el-button>

@@ -1,15 +1,13 @@
 <script setup lang="js">
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
+import Route from "@/components/Route.vue";
 import Search from "@/components/Search.vue";
 import TeamList from "@/components/TeamList.vue";
 import { useTeamView } from "@/utils/useTeamView.js";
 import { Plus } from "@element-plus/icons-vue";
+import { useRoute, useRouter } from "vue-router";
 
 const props = defineProps({
-  title: {
-    type: String,
-    required: true
-  },
   filterFn: {
     type: Function,
     default: null
@@ -20,10 +18,12 @@ const props = defineProps({
   }
 })
 
+const route = useRoute()
+const router = useRouter()
+
 const {
   teams,
   dataset,
-  router,
   createDialogVisible,
   newTeamTitle,
   handleSelect,
@@ -31,18 +31,16 @@ const {
   handleCreateTeam,
   handleCancelCreate,
   handleEnterTeamSpace
-} = useTeamView(props.filterFn, props.title)
+} = useTeamView(props.filterFn)
 </script>
 
 <template>
   <HeaderWrapper>
     <template #header>
       <div class="inner-header">
-        <span class="route">
-          <span class="present-directory">
-            {{ title }}
-          </span>
-        </span>
+        <div class="route-wrapper">
+          <Route :route="route" :router="router"/>
+        </div>
         <div class="search-wrapper">
           <Search :data="dataset" :onSelect="handleSelect" />
         </div>
@@ -102,6 +100,12 @@ const {
 </template>
 
 <style scoped>
+.route-wrapper {
+  display: flex;
+  left: 20px;
+  align-items: center;
+}
+
 .search-wrapper {
   display: flex;
   position: absolute;

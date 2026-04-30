@@ -1,12 +1,8 @@
 import { ref, computed, watch, onMounted } from 'vue'
-import { taskList, highlightTaskId, initTaskList, previousTaskPage } from '@/store/user.js'
+import { taskList, highlightTaskId, initTaskList } from '@/store/user.js'
 import { useRouter, useRoute } from 'vue-router'
 import {handleEnter} from "@/utils/routeManager.js";
 
-/**
- * 任务视图的通用逻辑
- * @param {Function|null} filterFn - 任务筛选函数
- */
 export function useTaskView(filterFn = null) {
   const router = useRouter()
   const route = useRoute()
@@ -49,9 +45,6 @@ export function useTaskView(filterFn = null) {
 
   // 新建任务
   const handleNew = () => {
-    const path = route.path
-    let editPath = '/task/all/edit'
-
     const newPage = {
       path: 'edit',
       params: [
@@ -61,7 +54,7 @@ export function useTaskView(filterFn = null) {
         }
       ]
     }
-    handleEnter(route.fullPath, router, newPage)
+    handleEnter(route, router, newPage)
   }
 
   // 分页变化
@@ -82,7 +75,6 @@ export function useTaskView(filterFn = null) {
     pageSize,
     viewDialogVisible,
     currentTask,
-    router,
     handleSelect,
     handleNew,
     handlePageChange,

@@ -17,7 +17,6 @@ const isPersonalTask = (task) => {
 <template>
   <TaskViewWrapper
       v-if="!route.path.includes('/edit')"
-      title="个人任务"
       :filter-fn="isPersonalTask"
       :show-new-button="true"
   />

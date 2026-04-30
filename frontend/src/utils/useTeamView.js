@@ -3,10 +3,6 @@ import { teamList, highlightTeamId, addTeam } from '@/store/user.js'
 import { useRoute, useRouter } from 'vue-router'
 import { handleEnter } from "@/utils/routeManager.js";
 
-/**
- * 团队视图的通用逻辑
- * @param {Function|null} filterFn - 团队筛选函数
- */
 export function useTeamView(filterFn = null) {
     const route = useRoute()
     const router = useRouter()
@@ -72,13 +68,12 @@ export function useTeamView(filterFn = null) {
                 }
             ]
         }
-        handleEnter(route.fullPath, router, newPage)
+        handleEnter(route, router, newPage)
     }
 
     return {
         teams,
         dataset,
-        router,
         createDialogVisible,
         newTeamTitle,
         handleSelect,

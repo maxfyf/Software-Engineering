@@ -9,7 +9,6 @@ const isTeamTask = (task) => task.team
 <template>
   <TaskViewWrapper
       v-if="!route.path.includes('/edit')"
-      title="团队任务"
       :filter-fn="isTeamTask"
   />
   <router-view v-else />
