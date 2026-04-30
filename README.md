@@ -63,6 +63,7 @@ project_root/                                    # 项目根目录
 │   │   │       └── main.css                     # 网页样式与其他全局样式
 │   │   ├── components/                          # 可复用的组件
 │   │   │   ├── HeaderWrapper.vue                # 顶栏
+│   │   │   ├── Route.vue                        # 二级以上的内部路由
 │   │   │   ├── Search.vue                       # 搜索框
 │   │   │   ├── SidebarWrapper.vue               # 侧边栏
 │   │   │   ├── TaskDetail.vue                   # 任务详情窗口
@@ -79,6 +80,7 @@ project_root/                                    # 项目根目录
 │   │   │   ├── layout.js                        # 界面样式数据
 │   │   │   └── user.js                          # 登录用户数据
 │   │   ├── utils/                               # 可复用的工具函数
+│   │   │   ├── routeManager.js                  # 二级以上内部路由管理器
 │   │   │   ├── useTaskView.js                   # 任务列表界面的通用函数
 │   │   │   └── useTeamView.js                   # 团队列表界面的通用函数
 │   │   ├── views/                               # 界面
