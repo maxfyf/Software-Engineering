@@ -70,12 +70,6 @@ export const highlightTaskId = ref(null)
 // 高亮团队的ID
 export const highlightTeamId = ref(null)
 
-// 来源页面
-export const previousTaskPage = ref({
-  path: '/task/all',
-  title: '全部任务'
-})
-
 // 添加任务
 export const addTask = async (task) => {
     const res = await api.createTask({

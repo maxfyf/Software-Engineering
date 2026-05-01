@@ -57,7 +57,6 @@ const {
 
       <TeamList
           :teams="teams"
-          :router="router"
           @enter-team-space="handleEnterTeamSpace"
       />
     </div>

@@ -11,8 +11,6 @@ const router = useRouter()
 const teamId = computed(() => parseInt(route.query.teamId))
 const team = computed(() => teamList.value.find(t => t.id === teamId.value))
 
-const teamTitle = computed(() => team.value ? `${team.value.title}的团队空间` : '团队空间')
-
 const isOwner = computed(() => team.value?.owner === currentUser.username)
 const isAdmin = computed(() => team.value?.admin?.includes(currentUser.username))
 
@@ -20,20 +18,17 @@ const canManage = computed(() => isOwner.value || isAdmin.value)
 
 const filterByTeam = (task) => task.team === team.value?.title
 
-const extraQuery = computed(() => ({ teamId: teamId.value }))
 </script>
 
 <template>
   <router-view v-if="route.path.includes('/edit') || route.path.includes('/personnel')" />
   <template v-else>
     <TaskViewWrapper
-        :title="teamTitle"
         :filter-fn="filterByTeam"
         :show-new-button="canManage"
         :show-assignee="true"
         :is-team-space="true"
         :is-admin="canManage"
-        :extra-query="extraQuery"
     />
 
     <div class="footer">
