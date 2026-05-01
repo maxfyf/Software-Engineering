@@ -301,7 +301,7 @@ const handleAddMember = async () => {
             </Draggable>
           </div>
           <div v-else class="value">
-            {{ team && team.admin.length > 0 ? team.admin.join('、') : '暂无' }}
+            {{ team?.admin?.length > 0 ? team.admin.join('、') : '暂无' }}
           </div>
           <br>
 
@@ -339,7 +339,7 @@ const handleAddMember = async () => {
             </Draggable>
           </div>
           <div v-else class="value">
-            {{ team && team.member.length > 0 ? team.member.join('、') : '暂无' }}
+            {{ team?.member?.length > 0 ? team.member.join('、') : '暂无' }}
           </div>
         </div>
 
