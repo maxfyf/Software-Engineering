@@ -272,7 +272,7 @@ onBeforeRouteLeave((to, from, next) => {
             <el-button
                 type="danger"
                 class="cancel"
-                @click="handleBack"
+                @click="handleBack(route, router, 1)"
             >
               取消
             </el-button>
