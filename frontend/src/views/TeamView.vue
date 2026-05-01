@@ -4,25 +4,28 @@ import { computed, ref, watch } from 'vue';
 import { useRoute } from "vue-router";
 
 const route = useRoute()
-const previousRoute = ref('/task/all')
+const previousRoute = ref('/team/all')
 
 watch(() => route.path, (newPath) => {
-  if (!newPath.includes('/edit')) {
+  if (!newPath.includes('/space')){
     previousRoute.value = newPath
   }
 }, { immediate: true })
 
 const activeMenu = computed(() => {
-  if (route.path.startsWith('/task/all')) {
-    return '/task/all'
+  if (route.path.startsWith('/team/all')) {
+    return '/team/all'
   }
-  else if (route.path.startsWith('/task/personal')) {
-    return '/task/personal'
+  else if (route.path.startsWith('/team/owner')) {
+    return '/team/owner'
   }
-  else if (route.path.startsWith('/task/team')) {
-    return '/task/team'
+  else if (route.path.startsWith('/team/admin')) {
+    return '/team/admin'
   }
-  else if (route.path.includes('/edit')) {
+  else if (route.path.startsWith('/team/member')) {
+    return '/team/member'
+  }
+  else if (route.path.includes('/space')) {
     return previousRoute.value
   }
   else
@@ -39,16 +42,20 @@ const activeMenu = computed(() => {
           class="sidebar-menu"
           :router="true"
       >
-        <el-menu-item index="/task/all" class="secondary-route">
-          全部任务
+        <el-menu-item index="/team/all" class="secondary-route">
+          全部团队
         </el-menu-item>
 
-        <el-menu-item index="/task/personal" class="secondary-route">
-          个人任务
+        <el-menu-item index="/team/owner" class="secondary-route">
+          我拥有的团队
         </el-menu-item>
 
-        <el-menu-item index="/task/team" class="secondary-route">
-          团队任务
+        <el-menu-item index="/team/admin" class="secondary-route">
+          我管理的团队
+        </el-menu-item>
+
+        <el-menu-item index="/team/member" class="secondary-route">
+          我参与的团队
         </el-menu-item>
       </el-menu>
     </template>

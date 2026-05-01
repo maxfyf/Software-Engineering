@@ -1,25 +1,11 @@
-import { ref, computed, watch, onMounted } from 'vue'
-import { taskList, highlightTaskId, initTaskList, previousTaskPage } from '@/store/user.js'
+import { ref, computed, onMounted } from 'vue'
+import { taskList, highlightTaskId, initTaskList } from '@/store/user.js'
 import { useRouter, useRoute } from 'vue-router'
+import {handleEnter} from "@/utils/routeManager.js";
 
-/**
- * 任务视图的通用逻辑
- * @param {Function|null} filterFn - 任务筛选函数
- * @param {string} pageTitle - 页面标题
- */
-export function useTaskView(filterFn = null, pageTitle = '全部任务') {
+export function useTaskView(filterFn = null) {
   const router = useRouter()
   const route = useRoute()
-
-  // 记录当前页面为来源页面
-  watch(() => route.path, (newPath) => {
-    if (!newPath.startsWith('/task/edit')) {
-      previousTaskPage.value = {
-        path: newPath,
-        title: pageTitle
-      }
-    }
-  }, { immediate: true })
 
   // 根据 filterFn 筛选任务
   const tasks = computed(() => {
@@ -40,9 +26,9 @@ export function useTaskView(filterFn = null, pageTitle = '全部任务') {
   const viewDialogVisible = ref(false)
   const currentTask = ref(null)
 
-  // 初始化
+  // TODO:初始化
   onMounted(async () => {
-    await initTaskList()
+    await initTaskList(false)
   })
 
   // 搜索选中任务
@@ -59,10 +45,16 @@ export function useTaskView(filterFn = null, pageTitle = '全部任务') {
 
   // 新建任务
   const handleNew = () => {
-    router.push({
-      path: '/task/edit',
-      query: { isNew: 'true' }
-    })
+    const newPage = {
+      path: 'edit',
+      params: [
+        {
+          key: 'isNew',
+          value: true
+        }
+      ]
+    }
+    handleEnter(route, router, newPage)
   }
 
   // 分页变化
@@ -83,7 +75,6 @@ export function useTaskView(filterFn = null, pageTitle = '全部任务') {
     pageSize,
     viewDialogVisible,
     currentTask,
-    router,
     handleSelect,
     handleNew,
     handlePageChange,

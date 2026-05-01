@@ -11,17 +11,9 @@ export const userInfo = {
     email: ''          // 电子邮箱
 }
 
-// 用户对任务的权限类型
-export const taskAuthority = {
-    READ_ONLY: 0,
-    UPDATE_STATUS_ONLY: 1,
-    WRITEABLE: 2
-}
-
 // 任务数据结构
 export const taskInfo = {
     id: null,
-    authority: taskAuthority.READ_ONLY,
     title: '',
     description: '',
     status: '',
@@ -29,8 +21,18 @@ export const taskInfo = {
     deadline: '',
     createdAt: '',
     updatedAt: '',
-    teamId: null,
-    assignee: null
+    team: null,
+    assignee: []
+}
+
+// 团队数据结构
+export const teamInfo = {
+    id: null,
+    title: '',
+    tasks: [],
+    owner: '',
+    admin: [],
+    member: []
 }
 
 // 当前登录用户信息
@@ -49,19 +51,24 @@ export const resetUserInfo = () => {
 // 当前用户的任务列表
 export const taskList = ref([])
 
+// 当前用户的团队列表
+export const teamList = ref([])
+
 // 重置任务列表
 export const resetTaskList = () => {
     taskList.value = []
 }
 
+// 重置团队列表
+export const resetTeamList = () => {
+    teamList.value = []
+}
+
 // 高亮任务的ID
 export const highlightTaskId = ref(null)
 
-// 来源页面
-export const previousTaskPage = ref({
-  path: '/task/all',
-  title: '全部任务'
-})
+// 高亮团队的ID
+export const highlightTeamId = ref(null)
 
 // 添加任务
 export const addTask = async (task) => {
@@ -74,38 +81,6 @@ export const addTask = async (task) => {
     highlightTaskId.value = newTask.id
     taskList.value.push(newTask)
     return newTask
-}
-
-// 完成任务
-export const finishTask = async (taskId) => {
-    const task = taskList.value.find(t => t.id === taskId)
-    if (!task) {
-        console.error('任务不存在')
-        return false
-    }
-    
-    // 检查任务是否已完成
-    if (task.status === '已完成') {
-        console.warn('任务已经是完成状态')
-        return true
-    }
-    
-    // 调用后端API更新任务状态
-    await api.updateTask(taskId, {
-        status: '已完成'
-    })
-    
-    // 更新本地任务列表
-    const index = taskList.value.findIndex(t => t.id === taskId)
-    if (index !== -1) {
-        taskList.value[index] = {
-            ...taskList.value[index],
-            status: '已完成',
-            updatedAt: new Date().toISOString()
-        }
-    }
-    
-    return true
 }
 
 // 开始任务
@@ -137,6 +112,38 @@ export const startTask = async (taskId) => {
         }
     }
     
+    return true
+}
+
+// 完成任务
+export const finishTask = async (taskId) => {
+    const task = taskList.value.find(t => t.id === taskId)
+    if (!task) {
+        console.error('任务不存在')
+        return false
+    }
+
+    // 检查任务是否已完成
+    if (task.status === '已完成') {
+        console.warn('任务已经是完成状态')
+        return true
+    }
+
+    // 调用后端API更新任务状态
+    await api.updateTask(taskId, {
+        status: '已完成'
+    })
+
+    // 更新本地任务列表
+    const index = taskList.value.findIndex(t => t.id === taskId)
+    if (index !== -1) {
+        taskList.value[index] = {
+            ...taskList.value[index],
+            status: '已完成',
+            updatedAt: new Date().toISOString()
+        }
+    }
+
     return true
 }
 
@@ -173,29 +180,92 @@ export const updateTask = async (taskId, taskData) => {
     return true
 }
 
-// 初始化任务列表
-export const initTaskList = async () => {
+// 解散团队
+export const removeTeam = async (teamId) => {
+    await api.deleteTeam(teamId)
+    const index = teamList.value.findIndex(t => t.id === teamId)
+    if (index !== -1) {
+        teamList.value.splice(index, 1)
+    }
+    return true
+}
+
+// 创建团队
+export const addTeam = async (team) => {
+    try {
+        const res = await api.createTeam(team)
+        const newTeam = res.data
+        highlightTeamId.value = newTeam.id
+        teamList.value.push(newTeam)
+        return newTeam
+    } catch (error) {
+        console.error('创建团队失败，使用模拟数据:', error)
+        // TODO: 后端实现后删除模拟数据
+        const mockTeam = {
+            id: Date.now(),
+            title: team.title,
+            tasks: [],
+            owner: currentUser.username,
+            admin: [],
+            member: []
+        }
+        highlightTeamId.value = mockTeam.id
+        teamList.value.push(mockTeam)
+        return mockTeam
+    }
+}
+
+// TODO:初始化任务列表
+export const initTaskList = async (force = false) => {
+    if (!force && taskList.value.length > 0) {
+        return
+    }
     try {
         const res = await api.getTaskList()
-        // TODO：处理任务数据
-        // 为每个任务计算权限
-        taskList.value = res.data.map(task => {
-            if (task.authority !== undefined) {
-                return task
-            }
-            // 前端计算
-            const authority = task.owner === currentUser.username 
-                ? taskAuthority.WRITEABLE 
-                : taskAuthority.READ_ONLY
-            return {
-                ...task,
-                authority,
-                teamId: task.teamId || null,
-                assignees: task.assignees || []
-            }
-        })
+        taskList.value = res.data.map(task => ({
+            ...task,
+            team: task.team || null,      // 团队名称
+            assignee: task.assignee || []  // 被分配用户数组
+        }))
     } catch (error) {
         console.error('获取任务列表失败:', error)
+    }
+}
+
+// 初始化团队列表
+export const initTeamList = async () => {
+    try {
+        const res = await api.getTeamList()
+        teamList.value = res.data
+    } catch (error) {
+        console.error('获取团队列表失败，使用模拟数据:', error)
+        // TODO: 后端实现后删除模拟数据
+        teamList.value = [
+            {
+                id: 1,
+                title: '前端开发组',
+                tasks: [],
+                owner: currentUser.username,
+                admin: ['admin_user'],
+                member: ['member1', 'member2']
+            },
+            {
+                id: 2,
+                title: '后端开发组',
+                tasks: [],
+                owner: 'other_user',
+                admin: [currentUser.username],
+                member: ['member3']
+            },
+            {
+                id: 3,
+                title: '测试组',
+                tasks: [],
+                owner: 'test_owner',
+                admin: [],
+                member: [currentUser.username, 'member4']
+            }
+        ]
     }
 }
 
@@ -355,9 +425,12 @@ export const handleCancelAccount = () => {
                 await api.cancelAccount()
             } catch (error) {
                 console.error('注销账号失败:', error)
+                resolve({ success: false })
+                return 
             }
             resetUserInfo()
             resetTaskList()
+            resetTeamList()
             sessionStorage.removeItem('isLoggedIn')
             sessionStorage.removeItem('username')
             sessionStorage.removeItem('token')
@@ -382,6 +455,7 @@ export const handleLogin = async ({ username, password }) => {
         }
 
         resetTaskList()
+        resetTeamList()
 
         // 加载用户信息
         currentUser.username = info.username
@@ -396,9 +470,11 @@ export const handleLogin = async ({ username, password }) => {
         
         isLoggedIn.value = true
         highlightTaskId.value = null
+        highlightTeamId.value = null
 
         await initTaskList()
-        
+        await initTeamList()
+
         ElMessage.success('登录成功')
         
         // 切换页面到/task 页面
@@ -428,6 +504,7 @@ export const handleLogout = () => {
             }
             resetUserInfo()
             resetTaskList()
+            resetTeamList()
             sessionStorage.removeItem('isLoggedIn')
             sessionStorage.removeItem('username')
             sessionStorage.removeItem('token')

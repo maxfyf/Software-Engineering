@@ -1,10 +1,11 @@
 <script setup lang="js">
 import { ref, computed, onMounted} from "vue";
-import { Back } from "@element-plus/icons-vue";
-import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
+import HeaderWrapper from "@/components/HeaderWrapper.vue";
+import Route from "@/components/Route.vue";
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { taskList, addTask, getTaskById, updateTask, previousTaskPage } from '@/store/user.js';
+import { taskList, addTask, getTaskById, updateTask, teamList } from '@/store/user.js';
+import { handleBack } from "@/utils/routeManager.js"
 
 const route = useRoute();
 const router = useRouter();
@@ -15,6 +16,7 @@ const originalTask = ref(null)
 const isLeaving = ref(false)
 
 const newTitle = ref('')
+const newAssignee = ref('')
 const newDescription = ref('')
 const newStatus = ref('待办')
 const newPriority = ref('中')
@@ -24,7 +26,24 @@ const pastDate = (time) => {
   return time.getTime() < Date.now() - 8.64e7
 }
 
-const taskTitle = computed(() => isNew.value ? '' : newTitle.value)
+// 判断当前任务是否为团队任务
+const isTeamTask = computed(() => {
+  return route.fullPath.indexOf('/space') !== -1
+})
+
+// 当前任务所属团队
+const currentTeam = computed(() => {
+  const teamId = isNew.value
+    ? parseInt(route.query.teamId)
+    : teamList.value.find(t => t.title === originalTask.value?.team)?.id
+  return teamList.value.find(t => t.id === teamId) || null
+})
+
+// 团队成员列表（响应式）
+const teamMembers = computed(() => {
+  if (!currentTeam.value) return []
+  return [currentTeam.value.owner, ...currentTeam.value.admin, ...currentTeam.value.member]
+})
 
 // 检查是否有修改
 const hasChanges = () => {
@@ -37,6 +56,7 @@ const hasChanges = () => {
   if (!originalTask.value) return false
   
   return newTitle.value !== originalTask.value.title ||
+         (isTeamTask.value && newAssignee.value !== originalTask.value.assignee) ||
          newDescription.value !== (originalTask.value.description || '') ||
          newStatus.value !== originalTask.value.status ||
          newPriority.value !== originalTask.value.priority ||
@@ -64,13 +84,16 @@ onMounted(async () => {
 
 // 加载任务数据（编辑模式）
 const loadTaskData = async (id) => {
-  console.log('加载任务数据, ID:', id)
   const task = await getTaskById(id)
   if (task) {
     originalTask.value = task
     
     // 设置表单值
     newTitle.value = task.title
+    if (isTeamTask.value) {
+      const a = task.assignee
+      newAssignee.value = Array.isArray(a) ? (a[0] || '') : (a || '')
+    }
     newDescription.value = task.description || ''
     newStatus.value = task.status
     newPriority.value = task.priority
@@ -82,36 +105,13 @@ const loadTaskData = async (id) => {
 const resetForm = () => {
   originalTask.value = null
   newTitle.value = ''
+  if (isTeamTask.value) {
+    newAssignee.value = currentTeam.value?.owner || ''
+  }
   newDescription.value = ''
   newStatus.value = '待办'
   newPriority.value = '中'
   newDate.value = ''
-}
-
-// 回退到对应TasksView，若为新建任务，取消该任务；若为编辑任务，取消编辑记录
-const handleBack = () => {
-  const info = isNew.value ? '您新建的任务尚未保存，确定要离开吗？' : '您有未保存的更改，确定要离开吗？'
-  
-  if (hasChanges()) {
-    ElMessageBox.confirm(
-      info,
-      '',
-      {
-        confirmButtonText: '确定',
-        confirmButtonType: 'danger',
-        cancelButtonText: '取消',
-        type: undefined
-      }
-    ).then(() => {
-      isLeaving.value = true
-      router.push(previousTaskPage.value.path)
-    }).catch(() => {
-      // 取消，留在当前页面
-    })
-  } else {
-    isLeaving.value = true
-    router.push(previousTaskPage.value.path)
-  }
 }
 
 // 保存所有更改并回退到来源页面
@@ -129,6 +129,9 @@ const saveChanges = async () => {
   
   const taskData = {
     title: newTitle.value,
+    ...(isTeamTask.value && { 
+      assignee: newAssignee.value,
+      team: currentTeam.value?.title || null }),
     description: newDescription.value,
     status: newStatus.value,
     priority: newPriority.value,
@@ -159,7 +162,7 @@ const saveChanges = async () => {
   // 返回来源页面
   resetForm()
   isLeaving.value = true  // 标记正在离开，跳过守卫
-  router.push(previousTaskPage.value.path) 
+  handleBack(route, router, 1)
 }
 
 // 路由守卫：离开页面前检查
@@ -188,33 +191,13 @@ onBeforeRouteLeave((to, from, next) => {
     next()
   }
 })
-
 </script>
 
 <template>
   <HeaderWrapper>
     <template #header>
       <div class="inner-header">
-        <el-button
-            link
-            type="text"
-            size="large"
-            @click="handleBack"
-        >
-          <el-icon :size="25">
-            <Back/>
-          </el-icon>
-        </el-button>
-        <span class="route">
-          <span>{{ previousTaskPage.title }}</span>
-          <span>&nbsp;>&nbsp;</span>
-          <span v-if="isNew" class="present-directory">
-            新建任务
-          </span>
-          <span v-else class="present-directory">
-            编辑任务“{{ taskTitle }}”
-          </span>
-        </span>
+        <Route :route="route" :router="router"/>
       </div>
     </template>
 
@@ -230,31 +213,44 @@ onBeforeRouteLeave((to, from, next) => {
           />
         </div>
 
+        <!--团队任务显示负责人选择-->
+        <div v-if="isTeamTask" class="item">
+          <span class="key">负责人：</span>
+          <el-select class="assignee" v-model="newAssignee">
+            <el-option
+                v-for="item in teamMembers"
+                :key="item"
+                :label="item"
+                :value="item"
+            />
+          </el-select>
+        </div>
+
         <div class="item">
           <span class="key">描述：</span>
           <el-input
               class="description"
               v-model="newDescription"
               type="textarea"
-              :rows="10"
+              :rows="isTeamTask ? 8 : 10"
           />
         </div>
 
         <div class="item">
           <span class="key">状态：</span>
           <el-select class="status" v-model="newStatus">
-            <el-option label="待办" value="待办"></el-option>
-            <el-option label="进行中" value="进行中"></el-option>
-            <el-option label="已完成" value="已完成"></el-option>
+            <el-option label="待办" value="待办"/>
+            <el-option label="进行中" value="进行中"/>
+            <el-option label="已完成" value="已完成"/>
           </el-select>
         </div>
 
         <div class="item">
           <span class="key">优先级：</span>
           <el-select class="priority" v-model="newPriority">
-            <el-option label="低" value="低"></el-option>
-            <el-option label="中" value="中"></el-option>
-            <el-option label="高" value="高"></el-option>
+            <el-option label="低" value="低"/>
+            <el-option label="中" value="中"/>
+            <el-option label="高" value="高"/>
           </el-select>
         </div>
 
@@ -276,7 +272,7 @@ onBeforeRouteLeave((to, from, next) => {
             <el-button
                 type="danger"
                 class="cancel"
-                @click="handleBack"
+                @click="handleBack(route, router, 1)"
             >
               取消
             </el-button>
@@ -289,7 +285,6 @@ onBeforeRouteLeave((to, from, next) => {
             >
               确认
             </el-button>
-
             <el-button
                 v-else
                 type="primary"
@@ -306,29 +301,6 @@ onBeforeRouteLeave((to, from, next) => {
 </template>
 
 <style scoped>
-.inner-header {
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: row;
-  gap: 15px;
-  align-items: center;
-}
-
-.route {
-  display: inline-flex;
-  height: 100%;
-  align-items: center;
-  font-size: 20px;
-  color: #333333;
-}
-
-.present-directory {
-  font-weight: bold;
-}
-
 .main-content-wrapper {
   width: 100%;
   height: 100%;
@@ -367,6 +339,11 @@ onBeforeRouteLeave((to, from, next) => {
   resize: none;
 }
 
+.assignee {
+  width: 350px;
+  font-size: 15px;
+}
+
 .description {
   flex-grow: 1;
   font-size: 15px;
@@ -399,7 +376,7 @@ onBeforeRouteLeave((to, from, next) => {
 }
 
 .cancel {
-  margin-left: 200px;
+  margin-left: 20%;
   margin-right: auto;
   width: 100px;
   height: 100%;
@@ -408,7 +385,7 @@ onBeforeRouteLeave((to, from, next) => {
 
 .save {
   margin-left: auto;
-  margin-right: 200px;
+  margin-right: 20%;
   width: 100px;
   height: 100%;
   font-size: 20px;

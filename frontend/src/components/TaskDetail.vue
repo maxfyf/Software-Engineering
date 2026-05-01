@@ -1,9 +1,12 @@
 <script setup lang="js">
-
 defineProps({
   currentTask: {
     type: Object,
     default: null
+  },
+  showAssignee: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -38,6 +41,14 @@ const formatDate = (dateStr) => {
       <p class="dialog-content">
         <span class="key">任务标题：</span>
         {{ currentTask.title }}
+      </p>
+      <p v-if="currentTask.team !== null" class="dialog-content">
+        <span class="key">所属团队：</span>
+        {{ currentTask.team }}
+      </p>
+      <p v-if="showAssignee" class="dialog-content">
+        <span class="key">负责人：</span>
+        {{ currentTask.assignee }}
       </p>
       <p class="dialog-content" v-if="currentTask.description !== ''">
         <span class="key">描述：</span>
