@@ -235,3 +235,39 @@ def delete_task(db: Session, task_id: int, username: str) -> None:
     db_task = get_task_by_id(db, task_id, username)
     db.delete(db_task)
     db.commit()
+
+
+def create_team_task(db: Session, task: schemas.TaskCreate, username: str) -> models.Task:
+    """创建团队任务，绑定创建者与归属团队"""
+    db_task = models.Task(
+        **task.dict(exclude={"team_id", "assignee_username"}),
+        owner_username=username,
+        team_id=task.team_id,
+        assignee_username=task.assignee_username
+    )
+    db.add(db_task)
+    db.commit()
+    db.refresh(db_task)
+    return db_task
+
+
+def get_team_tasks(db: Session, team_id: int) -> list[models.Task]:
+    """获取指定团队下的全部任务"""
+    return db.query(models.Task).filter(models.Task.team_id == team_id).all()
+
+
+def get_assigned_tasks(db: Session, username: str) -> list[models.Task]:
+    """获取分配给当前用户的团队任务"""
+    return db.query(models.Task).filter(models.Task.assignee_username == username).all()
+
+
+def update_task_status_only(db: Session, task_id: int, status: str):
+    """仅更新任务状态，用于普通成员修改自己的任务"""
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        return None
+
+    task.status = status
+    db.commit()
+    db.refresh(task)
+    return task
