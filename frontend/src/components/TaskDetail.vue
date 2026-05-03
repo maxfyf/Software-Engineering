@@ -48,7 +48,7 @@ const formatDate = (dateStr) => {
       </p>
       <p v-if="showAssignee" class="dialog-content">
         <span class="key">负责人：</span>
-        {{ currentTask.assignee }}
+        {{ Array.isArray(currentTask.assignee) ? currentTask.assignee.join(', ') : currentTask.assignee }}
       </p>
       <p class="dialog-content" v-if="currentTask.description !== ''">
         <span class="key">描述：</span>

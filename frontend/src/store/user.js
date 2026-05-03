@@ -165,17 +165,13 @@ export const getTaskById = async (taskId) => {
 
 // 更新任务
 export const updateTask = async (taskId, taskData) => {
-    await api.updateTask(taskId, {
+    const res = await api.updateTask(taskId, {
         ...taskData,
         updatedAt: new Date().toISOString()
     })
     const index = taskList.value.findIndex(t => t.id === taskId)
     if (index !== -1) {
-        taskList.value[index] = {
-            ...taskList.value[index],
-            ...taskData,
-            updatedAt: new Date().toISOString()
-        }
+        taskList.value[index] = res.data
     }
     return true
 }
@@ -199,23 +195,12 @@ export const addTeam = async (team) => {
         teamList.value.push(newTeam)
         return newTeam
     } catch (error) {
-        console.error('创建团队失败，使用模拟数据:', error)
-        // TODO: 后端实现后删除模拟数据
-        const mockTeam = {
-            id: Date.now(),
-            title: team.title,
-            tasks: [],
-            owner: currentUser.username,
-            admin: [],
-            member: []
-        }
-        highlightTeamId.value = mockTeam.id
-        teamList.value.push(mockTeam)
-        return mockTeam
+        console.error('创建团队失败:', error)
+        throw error
     }
 }
 
-// TODO:初始化任务列表
+// 初始化任务列表
 export const initTaskList = async (force = false) => {
     if (!force && taskList.value.length > 0) {
         return
@@ -238,34 +223,8 @@ export const initTeamList = async () => {
         const res = await api.getTeamList()
         teamList.value = res.data
     } catch (error) {
-        console.error('获取团队列表失败，使用模拟数据:', error)
-        // TODO: 后端实现后删除模拟数据
-        teamList.value = [
-            {
-                id: 1,
-                title: '前端开发组',
-                tasks: [],
-                owner: currentUser.username,
-                admin: ['admin_user'],
-                member: ['member1', 'member2']
-            },
-            {
-                id: 2,
-                title: '后端开发组',
-                tasks: [],
-                owner: 'other_user',
-                admin: [currentUser.username],
-                member: ['member3']
-            },
-            {
-                id: 3,
-                title: '测试组',
-                tasks: [],
-                owner: 'test_owner',
-                admin: [],
-                member: [currentUser.username, 'member4']
-            }
-        ]
+        console.error('获取团队列表失败:', error)
+        teamList.value = []
     }
 }
 

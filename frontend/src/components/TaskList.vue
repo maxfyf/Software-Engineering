@@ -6,7 +6,8 @@ import {
   startTask as startTaskAction,
   highlightTaskId,
   removeTask,
-  currentUser
+  currentUser,
+  teamList
 } from "@/store/user.js";
 import { handleEnter } from "@/utils/routeManager.js"
 import { View, CaretRight, Check, Edit, Delete } from "@element-plus/icons-vue";
@@ -115,6 +116,14 @@ const isCurrentAssignee = (task) => {
   return assignee === currentUser.username
 }
 
+// 判断当前用户是否为任务所属团队的管理员（与团队空间逻辑一致）
+const isTaskTeamAdmin = (task) => {
+  if (!task.team) return false
+  const team = teamList.value.find(t => t.title === task.team)
+  if (!team) return false
+  return team.owner === currentUser.username || team.admin?.includes(currentUser.username)
+}
+
 // 删除任务
 const deleteTask = (row) => {
   ElMessageBox.confirm(
@@ -189,11 +198,11 @@ const deleteTask = (row) => {
               </el-icon>
             </el-button>
 
-            <!-- 个人任务与用户作为负责人时可见 -->
+            <!-- 个人任务、负责人、团队管理员/Owner 可见 -->
             <el-button
                 link
                 type="text"
-                v-if="(scope.row.team === null || isCurrentAssignee(scope.row)) &&
+                v-if="(scope.row.team === null || isCurrentAssignee(scope.row) || isTaskTeamAdmin(scope.row)) &&
                   scope.row.status === '待办'"
                 @click="startTask(scope.row)"
             >
@@ -204,7 +213,7 @@ const deleteTask = (row) => {
             <el-button
                 link
                 type="text"
-                v-else-if="(scope.row.team === null || isCurrentAssignee(scope.row)) &&
+                v-else-if="(scope.row.team === null || isCurrentAssignee(scope.row) || isTaskTeamAdmin(scope.row)) &&
                   scope.row.status === '进行中'"
                 @click="checkTask(scope.row)"
             >
@@ -213,11 +222,11 @@ const deleteTask = (row) => {
               </el-icon>
             </el-button>
 
-            <!-- 个人任务与用户作为任务所属团队的管理员时可见 -->
+            <!-- 个人任务、自己创建的任务、所属团队管理员可见 -->
             <el-button
                 link
                 type="text"
-                v-if="scope.row.team === null || isAdmin"
+                v-if="scope.row.team === null || scope.row.owner === currentUser.username || isTaskTeamAdmin(scope.row)"
                 @click="editTask(scope.row)"
             >
               <el-icon>
@@ -225,12 +234,12 @@ const deleteTask = (row) => {
               </el-icon>
             </el-button>
 
-            <!-- 个人任务与用户作为任务所属团队的管理员时可见 -->
+            <!-- 个人任务、自己创建的任务、所属团队管理员可见 -->
             <el-button
                 link
                 type="text"
                 class="delete-button"
-                v-if="scope.row.team === null || isAdmin"
+                v-if="scope.row.team === null || scope.row.owner === currentUser.username || isTaskTeamAdmin(scope.row)"
                 @click="deleteTask(scope.row)"
             >
               <el-icon>

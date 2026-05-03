@@ -54,9 +54,13 @@ const hasChanges = () => {
   
   // 编辑模式：和原始任务比较
   if (!originalTask.value) return false
+
+  const originalAssignee = Array.isArray(originalTask.value.assignee)
+      ? (originalTask.value.assignee[0] || '')
+      : (originalTask.value.assignee || '')
   
   return newTitle.value !== originalTask.value.title ||
-         (isTeamTask.value && newAssignee.value !== originalTask.value.assignee) ||
+         (isTeamTask.value && newAssignee.value !== originalAssignee) ||
          newDescription.value !== (originalTask.value.description || '') ||
          newStatus.value !== originalTask.value.status ||
          newPriority.value !== originalTask.value.priority ||
