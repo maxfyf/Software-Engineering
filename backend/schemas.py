@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -29,6 +29,37 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
+TeamRoleValue = Literal["Owner", "Admin", "Member"]
+
+class TeamCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+
+class TeamResponse(BaseModel):
+    id: int
+    name: str
+    owner_username: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class TeamMemberCreate(BaseModel):
+    username: str = Field(..., min_length=4, max_length=20)
+
+class TeamMemberRoleUpdate(BaseModel):
+    role: Literal["Admin", "Member"]
+
+class TeamMemberResponse(BaseModel):
+    id: int
+    team_id: int
+    username: str
+    role: TeamRoleValue
+    joined_at: datetime
+
+    class Config:
+        from_attributes = True
+
 # 用于接收创建任务的数据
 class TaskCreate(BaseModel):
     title: str = Field(..., max_length=100)
@@ -36,6 +67,10 @@ class TaskCreate(BaseModel):
     status: str = "待办"
     priority: str = "中"
     due_date: Optional[datetime] = None
+
+    #任务归属ID
+    team_id: Optional[int] = None
+    assignee_username: Optional[str] = None
 
 # 用于接收更新任务的数据
 class TaskUpdate(BaseModel):
@@ -56,7 +91,9 @@ class TaskResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     owner_username: str
-
+    #任务归属ID，如果是团队任务则有值，否则为null
+    team_id: Optional[int] = None
+    assignee_username: Optional[str] = None
     class Config:
         from_attributes = True
 

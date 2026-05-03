@@ -274,3 +274,112 @@ def root():
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+# 团队任务相关接口
+# 仅团队管理员/创建者可管理任务，普通成员仅可查看与修改自身任务状态
+
+@app.get("/api/tasks/assigned", response_model=dict)
+def get_assigned_tasks(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    获取分配给当前用户的所有团队任务
+    无需指定团队，直接展示“我的待办”
+    """
+    tasks = crud.get_assigned_tasks(db, current_user.username)
+    return success_response("获取分配任务成功", [
+        {
+            "id": t.id,
+            "title": t.title,
+            "status": t.status,
+            "team_id": t.team_id,
+            "owner_username": t.owner_username,
+            "assignee_username": t.assignee_username,
+            "created_at": t.created_at.strftime("%Y-%m-%d %H:%M:%S")
+        } for t in tasks
+    ])
+
+
+@app.get("/api/teams/{team_id}/tasks", response_model=dict)
+def get_team_tasks(
+    team_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    获取指定团队的所有任务
+    必须是团队成员才能查看
+    """
+    if team_id <= 0:
+        return error_response("无效的团队ID", 400)
+    if not crud.require_team_member(db, team_id, current_user.username):
+        return error_response("无权访问该团队", 403)
+    
+    tasks = crud.get_team_tasks(db, team_id)
+    return success_response("获取团队任务成功", [
+        {
+            "id": t.id,
+            "title": t.title,
+            "status": t.status,
+            "owner_username": t.owner_username,
+            "assignee_username": t.assignee_username
+        } for t in tasks
+    ])
+
+
+@app.post("/api/teams/{team_id}/tasks", response_model=dict)
+def create_team_task(
+    team_id: int,
+    task: schemas.TaskCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    在指定团队下创建任务
+    仅管理员和创建者可操作
+    """
+    if team_id <= 0:
+        return error_response("无效的团队ID", 400)
+    if not task.title or not task.title.strip():
+        return error_response("任务标题不能为空", 400)
+    if not crud.require_team_role(db, team_id, current_user.username, {crud.ROLE_ADMIN, crud.ROLE_OWNER}):
+        return error_response("无权创建团队任务", 403)
+    
+    task.team_id = team_id
+    new_task = crud.create_team_task(db, task, current_user.username)
+    return success_response("团队任务创建成功", {"id": new_task.id})
+
+
+@app.put("/api/tasks/{task_id}/status", response_model=dict)
+def update_task_status(
+    task_id: int,
+    status: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    普通成员专用：仅更新任务状态
+    只能修改分配给自己的任务
+    """
+    if task_id <= 0:
+        return error_response("无效的任务ID", 400)
+    if not status or not status.strip():
+        return error_response("任务状态不能为空", 400)
+    try:
+        task = crud.get_task_by_id(db, task_id, current_user.username)
+    except HTTPException as e:
+        return error_response(e.detail, e.status_code)
+    if not task.assignee_username:
+        return error_response("该任务未分配任何人", 403)
+    
+    if task.assignee_username != current_user.username:
+        return error_response("只能修改分配给自己的任务状态", 403)
+    
+    updated_task = crud.update_task_status_only(db, task_id, status)
+    if not updated_task:
+        return error_response("任务状态更新失败", 500)
+    return success_response("任务状态更新成功", {
+        "id": updated_task.id,
+        "status": updated_task.status
+    })
