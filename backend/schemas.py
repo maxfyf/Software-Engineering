@@ -68,6 +68,10 @@ class TaskCreate(BaseModel):
     priority: str = "中"
     due_date: Optional[datetime] = None
 
+    #任务归属ID
+    team_id: Optional[int] = None
+    assignee_username: Optional[str] = None
+
 # 用于接收更新任务的数据
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
@@ -87,7 +91,9 @@ class TaskResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     owner_username: str
-
+    #任务归属ID，如果是团队任务则有值，否则为null
+    team_id: Optional[int] = None
+    assignee_username: Optional[str] = None
     class Config:
         from_attributes = True
 

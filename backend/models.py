@@ -100,3 +100,11 @@ class Task(Base):
 
     # 建立与 User 表的反向关系
     owner = relationship("User", back_populates="tasks", foreign_keys=[owner_username])
+    
+    #标记团队ID
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)  # 归属团队
+    assignee_username = Column(String(20), ForeignKey("users.username"), nullable=True)  # 被分配人
+    
+    #映射任务关系
+    team = relationship("Team", back_populates="tasks")
+    assignee = relationship("User", foreign_keys=[assignee_username])
