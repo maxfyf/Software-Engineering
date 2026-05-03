@@ -239,6 +239,8 @@ def delete_task(db: Session, task_id: int, username: str) -> None:
 
 def create_team_task(db: Session, task: schemas.TaskCreate, username: str) -> models.Task:
     """创建团队任务，绑定创建者与归属团队"""
+    if not task.title or not task.title.strip():
+        raise HTTPException(status_code=400, detail="任务标题不能为空")
     db_task = models.Task(
         **task.dict(exclude={"team_id", "assignee_username"}),
         owner_username=username,
@@ -253,6 +255,8 @@ def create_team_task(db: Session, task: schemas.TaskCreate, username: str) -> mo
 
 def get_team_tasks(db: Session, team_id: int) -> list[models.Task]:
     """获取指定团队下的全部任务"""
+    if team_id <= 0:
+        return []
     return db.query(models.Task).filter(models.Task.team_id == team_id).all()
 
 
@@ -263,6 +267,10 @@ def get_assigned_tasks(db: Session, username: str) -> list[models.Task]:
 
 def update_task_status_only(db: Session, task_id: int, status: str):
     """仅更新任务状态，用于普通成员修改自己的任务"""
+    if task_id <= 0:
+        return None
+    if not status or not status.strip():
+        return None
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task:
         return None
