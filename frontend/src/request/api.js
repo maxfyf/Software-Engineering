@@ -37,7 +37,7 @@ service.interceptors.response.use(
         const detail = error.response?.data?.detail
         const msg = error.response?.data?.msg
         const isLoginRequest = error.config.url.includes('/user/login')
-        
+
         if (status === 401) {
             if (isLoginRequest) {
                 // 登录接口的401错误，直接显示错误信息
@@ -88,7 +88,16 @@ const api = {
     getTaskById: (taskId) => request.get(`/task/${taskId}`),
     createTask: (data) => request.post('/task/create', data),
     updateTask: (taskId, data) => request.put(`/task/${taskId}`, data),
-    deleteTask: (taskId) => request.delete(`/task/${taskId}`)
+    deleteTask: (taskId) => request.delete(`/task/${taskId}`),
+
+    // 团队模块
+    getTeamList: () => request.get('/team/list'),
+    createTeam: (data) => request.post('/team/create', data),
+    deleteTeam: (teamId) => request.delete(`/team/${teamId}`),
+    addMember: (teamId, username, role) => request.post(`/team/${teamId}/member`, { username, role }),
+    removeMember: (teamId, username) => request.delete(`/team/${teamId}/member`, { params: { username } }),
+    setMemberRole: (teamId, username, role) => request.put(`/team/${teamId}/member/role`, { username, role }),
+
 }
 
 export default api

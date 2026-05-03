@@ -3,7 +3,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-# 用于接收 API 层传来的注册数据
+# 用于接收 API 传来的注册数据
 class UserCreate(BaseModel):
     # 基础长度兜底，防止数据库溢出
     username: str = Field(..., min_length=4, max_length=20)
@@ -13,7 +13,7 @@ class UserCreate(BaseModel):
     phone_number: str | None = None
     email: str | None = None
 
-# 用于将用户信息返回给 API 层（不包含密码）
+# 用于将用户信息返回给 API （不包含密码）
 class UserResponse(BaseModel):
     username: str
     first_name: str | None = None
@@ -101,4 +101,4 @@ class TaskResponse(BaseModel):
 class BaseResponse(BaseModel):
     code: int
     msg: str
-    data: Optional[dict | list | None] = None    
+    data: Optional[dict | list | None] = None

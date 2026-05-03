@@ -23,6 +23,7 @@
 .page-with-header {
   width: 100%;
   height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -49,6 +50,32 @@
 
 .content {
   flex: 1;
-  overflow: auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+:deep(.content) {
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--el-color-info-light-8);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--el-color-info);
+  }
+}
+
+:deep(.content) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--el-color-info-light-8) transparent;
 }
 </style>

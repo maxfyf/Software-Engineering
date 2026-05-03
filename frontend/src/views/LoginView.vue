@@ -32,7 +32,7 @@ const onHandleLogin = async () => {
     password: password.value
   })
   if (result && result.success && result.redirect) {
-    router.replace(result.redirect)
+    await router.replace(result.redirect)
   }
 }
 
@@ -50,7 +50,7 @@ const onHandleRegister = async () => {
   
   // 重置除了 username 以外的所有字段
   if (result && result.success) {
-    if (result.redirect) router.push(result.redirect)
+    if (result.redirect) await router.push(result.redirect)
     if (result.resetFields) {
       username.value = result.resetFields.username
       password.value = result.resetFields.password

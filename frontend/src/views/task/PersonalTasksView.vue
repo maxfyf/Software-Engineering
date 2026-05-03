@@ -1,15 +1,20 @@
 <script setup lang="js">
 import TaskViewWrapper from "@/components/TaskViewWrapper.vue";
+import { useRoute } from 'vue-router';
 
-const isPersonalTask = (task) => !task.teamId
+const route = useRoute();
+const isPersonalTask = (task) => {
+  return !task.team
+}
 </script>
 
 <template>
   <TaskViewWrapper
-      title="个人任务"
+      v-if="!route.path.includes('/edit')"
       :filter-fn="isPersonalTask"
       :show-new-button="true"
   />
+  <router-view v-else />
 </template>
 
 <style scoped>

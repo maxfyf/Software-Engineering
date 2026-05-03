@@ -1,7 +1,7 @@
 <script setup lang="js">
 import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { List, Setting } from "@element-plus/icons-vue";
+import { List, Connection, Setting } from "@element-plus/icons-vue";
 import { handleLogout, currentUser, isLoggedIn, initUserInfo } from '@/store/user.js'
 
 const route = useRoute()
@@ -10,11 +10,12 @@ const router = useRouter()
 // 导航栏选中状态
 const activeMenu = ref('/task')
 
-
 // 监听路由变化，更新导航栏选中状态
 watch(() => route.path, (newPath) => {
     if (newPath.startsWith('/task')) {
         activeMenu.value = '/task'
+    } else if (newPath.startsWith('/team')) {
+      activeMenu.value = '/team'
     } else if (newPath.startsWith('/settings')) {
         activeMenu.value = '/settings'
     } else {
@@ -31,7 +32,7 @@ onMounted(async () => {
 const onHandleLogout = async () => {
   const result = await handleLogout()
   if (result && result.success && result.redirect) {
-    router.push(result.redirect)
+    await router.push(result.redirect)
   }
 }
 </script>
@@ -58,6 +59,18 @@ const onHandleLogout = async () => {
         </el-icon>
         我的任务
       </el-menu-item>
+
+      <el-menu-item
+          index="/team"
+          class="route"
+          :class="{ 'active-border': activeMenu === '/team' }"
+      >
+        <el-icon>
+          <Connection/>
+        </el-icon>
+        我的团队
+      </el-menu-item>
+
       <el-menu-item
           index="/settings"
           class="route"
@@ -89,15 +102,15 @@ const onHandleLogout = async () => {
             <h2 class="popover-title">
               {{ currentUser.username }}
             </h2>
-            <p class="popover-info" v-if="currentUser.lastName !== '' && currentUser.firstName !== ''">
+            <p class="popover-info" v-if="currentUser.lastName && currentUser.firstName">
               <span class="key">全名：</span>
               {{ currentUser.lastName }}{{ currentUser.firstName }}
             </p>
-            <p class="popover-info" v-if="currentUser.phone !== ''">
+            <p class="popover-info" v-if="currentUser.phone">
               <span class="key">电话号码：</span>
               {{ currentUser.phone }}
             </p>
-            <p class="popover-info" v-if="currentUser.email !== ''">
+            <p class="popover-info" v-if="currentUser.email">
               <span class="key">电子邮箱：</span>
               {{ currentUser.email }}
             </p>

@@ -1,6 +1,15 @@
 <script setup lang="js">
 import { computed } from 'vue';
-import { taskAuthority, finishTask, startTask as startTaskAction, highlightTaskId, removeTask} from "@/store/user.js";
+import { useRoute, useRouter } from 'vue-router'
+import {
+  finishTask,
+  startTask as startTaskAction,
+  highlightTaskId,
+  removeTask,
+  currentUser,
+  teamList
+} from "@/store/user.js";
+import { handleEnter } from "@/utils/routeManager.js"
 import { View, CaretRight, Check, Edit, Delete } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
@@ -11,9 +20,14 @@ const props = defineProps({
     default: () => []
   },
 
-  router: {
-    type: Object,
-    required: true
+  showAssignee: {
+    type: Boolean,
+    default: false
+  },
+
+  isAdmin: {
+    type: Boolean,
+    default: false
   },
 
   currentPage: {
@@ -26,6 +40,9 @@ const props = defineProps({
     default: 10
   }
 })
+
+const route = useRoute();
+const router = useRouter();
 
 const emit = defineEmits(['pageChange', 'viewDetail'])
 
@@ -73,18 +90,42 @@ const checkTask = (row) => {
 const editTask = (row) => {
   console.log('编辑任务:', row)
   highlightTaskId.value = row.id
-  props.router.push({
-    path: '/task/edit',
-    query: {
-      isNew: 'false',
-      taskId: row.id
-    }
-  })
+
+  const newPage = {
+    path: 'edit',
+    params: [
+      {
+        key: 'isNew',
+        value: false
+      },
+      {
+        key: 'taskId',
+        value: row.id
+      }
+    ]
+  }
+  handleEnter(route, router, newPage)
+}
+
+// 判断当前用户是否为任务负责人
+const isCurrentAssignee = (task) => {
+  const assignee = task.assignee
+  if (Array.isArray(assignee)) {
+    return assignee.includes(currentUser.username)
+  }
+  return assignee === currentUser.username
+}
+
+// 判断当前用户是否为任务所属团队的管理员（与团队空间逻辑一致）
+const isTaskTeamAdmin = (task) => {
+  if (!task.team) return false
+  const team = teamList.value.find(t => t.title === task.team)
+  if (!team) return false
+  return team.owner === currentUser.username || team.admin?.includes(currentUser.username)
 }
 
 // 删除任务
 const deleteTask = (row) => {
-  highlightTaskId.value = null
   ElMessageBox.confirm(
       `确定要删除任务"${row.title}"吗？`,
       '',
@@ -95,6 +136,7 @@ const deleteTask = (row) => {
         type: undefined
       }
   ).then(() => {
+    highlightTaskId.value = null
     removeTask(row.id)
     ElMessage.success('任务已删除')
   }).catch(() => {
@@ -106,11 +148,45 @@ const deleteTask = (row) => {
 <template>
   <el-row>
     <el-col>
-      <el-table :data="pageData" stripe class="task-table" :row-class-name="tableRowClassName" :key="highlightTaskId">
-        <el-table-column prop="title" label="任务名称" min-width="50%" align="left" />
-        <el-table-column prop="status" label="状态" min-width="20%" align="center" />
-        <el-table-column prop="priority" label="优先级" min-width="15%" align="center" />
-        <el-table-column fixed="right" label="操作" min-width="15%" align="center">
+      <el-table
+          :data="pageData"
+          empty-text="暂无任务"
+          stripe
+          class="task-table"
+          :row-class-name="tableRowClassName"
+          :key="highlightTaskId"
+      >
+        <el-table-column
+            prop="title"
+            label="任务名称"
+            :min-width="showAssignee ? '40%' : '50%'"
+            align="left"
+        />
+        <el-table-column
+            v-if="showAssignee"
+            prop="assignee"
+            label="负责人"
+            min-width="20%"
+            align="center"
+        />
+        <el-table-column
+            prop="status"
+            label="状态"
+            :min-width="showAssignee ? '15%' : '20%'"
+            align="center"
+        />
+        <el-table-column
+            prop="priority"
+            label="优先级"
+            :min-width="showAssignee ? '10%' : '15%'"
+            align="center"
+        />
+        <el-table-column
+            fixed="right"
+            label="操作"
+            min-width="15%"
+            align="center"
+        >
           <template v-slot:default="scope">
             <el-button
                 link
@@ -122,10 +198,11 @@ const deleteTask = (row) => {
               </el-icon>
             </el-button>
 
+            <!-- 个人任务、负责人、团队管理员/Owner 可见 -->
             <el-button
                 link
                 type="text"
-                v-if="scope.row.authority >= taskAuthority.UPDATE_STATUS_ONLY &&
+                v-if="(scope.row.team === null || isCurrentAssignee(scope.row) || isTaskTeamAdmin(scope.row)) &&
                   scope.row.status === '待办'"
                 @click="startTask(scope.row)"
             >
@@ -136,7 +213,7 @@ const deleteTask = (row) => {
             <el-button
                 link
                 type="text"
-                v-else-if="scope.row.authority >= taskAuthority.UPDATE_STATUS_ONLY &&
+                v-else-if="(scope.row.team === null || isCurrentAssignee(scope.row) || isTaskTeamAdmin(scope.row)) &&
                   scope.row.status === '进行中'"
                 @click="checkTask(scope.row)"
             >
@@ -145,10 +222,11 @@ const deleteTask = (row) => {
               </el-icon>
             </el-button>
 
+            <!-- 个人任务、自己创建的任务、所属团队管理员可见 -->
             <el-button
                 link
                 type="text"
-                v-if="scope.row.authority === taskAuthority.WRITEABLE"
+                v-if="scope.row.team === null || scope.row.owner === currentUser.username || isTaskTeamAdmin(scope.row)"
                 @click="editTask(scope.row)"
             >
               <el-icon>
@@ -156,11 +234,12 @@ const deleteTask = (row) => {
               </el-icon>
             </el-button>
 
+            <!-- 个人任务、自己创建的任务、所属团队管理员可见 -->
             <el-button
                 link
                 type="text"
                 class="delete-button"
-                v-if="scope.row.authority === taskAuthority.WRITEABLE"
+                v-if="scope.row.team === null || scope.row.owner === currentUser.username || isTaskTeamAdmin(scope.row)"
                 @click="deleteTask(scope.row)"
             >
               <el-icon>

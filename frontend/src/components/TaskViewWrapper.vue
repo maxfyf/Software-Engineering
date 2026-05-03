@@ -1,16 +1,14 @@
 <script setup lang="js">
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
+import Route from "@/components/Route.vue";
 import Search from "@/components/Search.vue";
 import TaskList from "@/components/TaskList.vue";
 import TaskDetail from "@/components/TaskDetail.vue";
 import { useTaskView } from '@/utils/useTaskView.js';
+import { useRoute, useRouter } from "vue-router";
 import { Plus } from "@element-plus/icons-vue";
 
 const props = defineProps({
-  title: {
-    type: String,
-    required: true
-  },
   filterFn: {
     type: Function,
     default: null
@@ -18,8 +16,23 @@ const props = defineProps({
   showNewButton: {
     type: Boolean,
     default: false
+  },
+  showAssignee: {
+    type: Boolean,
+    default: false
+  },
+  isTeamSpace: {
+    type: Boolean,
+    default: false
+  },
+  isAdmin: {
+    type: Boolean,
+    default: false
   }
 })
+
+const route = useRoute()
+const router = useRouter()
 
 const {
   tasks,
@@ -28,19 +41,21 @@ const {
   pageSize,
   viewDialogVisible,
   currentTask,
-  router,
   handleSelect,
   handleNew,
   handlePageChange,
   handleViewDetail
-} = useTaskView(props.filterFn, props.title)
+} = useTaskView(props.filterFn)
 </script>
 
 <template>
   <HeaderWrapper>
     <template #header>
       <div class="inner-header">
-        <span class="route">{{ title }}</span>
+        <div class="route-wrapper">
+          <Route :route="route" :router="router" />
+        </div>
+
         <div class="search-wrapper">
           <Search :data="dataset" :onSelect="handleSelect" />
         </div>
@@ -51,14 +66,20 @@ const {
       <div v-if="showNewButton" class="header">
         <el-button type="primary" class="new-button" @click="handleNew">
           <el-icon><Plus/></el-icon>
-          &nbsp;新建个人任务
+          <span v-if="showAssignee === false">
+              &nbsp;新建个人任务
+            </span>
+          <span v-else>
+              &nbsp;新建团队任务
+            </span>
         </el-button>
       </div>
       <div v-else class="header-spacer" />
 
       <TaskList
           :tasks="tasks"
-          :router="router"
+          :show-assignee="showAssignee"
+          :is-admin="isAdmin"
           :current-page="currentPage"
           :page-size="pageSize"
           @page-change="handlePageChange"
@@ -68,26 +89,17 @@ const {
 
     <TaskDetail
         :current-task="currentTask"
+        :show-assignee="showAssignee"
         v-model:visible="viewDialogVisible"
     />
   </HeaderWrapper>
 </template>
 
 <style scoped>
-.inner-header {
-  height: 100%;
+.route-wrapper {
   display: flex;
-  flex-direction: row;
+  left: 20px;
   align-items: center;
-}
-
-.route {
-  display: inline-flex;
-  height: 100%;
-  align-items: center;
-  font-size: 20px;
-  font-weight: bold;
-  color: #333333;
 }
 
 .search-wrapper {
@@ -118,7 +130,7 @@ const {
 }
 
 .new-button {
-  width: 120px;
+  width: 128px;
   margin-left: auto;
   margin-right: 15px;
 }

@@ -1,13 +1,13 @@
 <script setup lang="js">
-import TaskViewWrapper from "@/components/TaskViewWrapper.vue";
+import TeamViewWrapper from "@/components/TeamViewWrapper.vue";
 import { useRoute } from 'vue-router';
 
 const route = useRoute();
 </script>
 
 <template>
-  <TaskViewWrapper
-      v-if="!route.path.includes('/edit')"
+  <TeamViewWrapper
+      v-if="!route.path.includes('/space')"
       :show-new-button="true"
   />
   <router-view v-else />

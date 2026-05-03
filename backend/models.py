@@ -24,8 +24,8 @@ class TeamRole(str, enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    username = Column(String(20), primary_key=True, index=True, unique=True) # 主键、不重复
-    password_hash = Column(String, nullable=False)                           # 存储加密后的密码
+    username = Column(String(20), primary_key=True, index=True, unique=True)  # 主键、不重复
+    password_hash = Column(String, nullable=False)                            # 存储加密后的密码
     first_name = Column(String, nullable=True)
     last_name = Column(String, nullable=True)
     phone_number = Column(String, nullable=True)
@@ -62,6 +62,7 @@ class Team(Base):
 
     owner = relationship("User", back_populates="owned_teams", foreign_keys=[owner_username])
     members = relationship("TeamMember", back_populates="team", cascade="all, delete-orphan")
+    tasks = relationship("Task", back_populates="team")
 
 
 class TeamMember(Base):
@@ -84,11 +85,11 @@ class Task(Base):
     __tablename__ = "tasks"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    title = Column(String(100), nullable=False)                 # 标题
-    description = Column(Text, nullable=True)                   # 描述
-    status = Column(String, default=TaskStatus.TODO.value)      # 状态，默认待办
-    priority = Column(String, default=TaskPriority.MEDIUM.value)# 优先级，默认中等
-    due_date = Column(DateTime, nullable=True)                  # 截止时间
+    title = Column(String(100), nullable=False)                  # 标题
+    description = Column(Text, nullable=True)                    # 描述
+    status = Column(String, default=TaskStatus.TODO.value)       # 状态，默认待办
+    priority = Column(String, default=TaskPriority.MEDIUM.value) # 优先级，默认中等
+    due_date = Column(DateTime, nullable=True)                   # 截止时间
     
     # 自动处理时间戳
     created_at = Column(DateTime, default=func.now())           # 创建时间
