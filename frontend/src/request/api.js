@@ -37,7 +37,7 @@ service.interceptors.response.use(
         const detail = error.response?.data?.detail
         const msg = error.response?.data?.msg
         const isLoginRequest = error.config.url.includes('/user/login')
-        
+
         if (status === 401) {
             if (isLoginRequest) {
                 // 登录接口的401错误，直接显示错误信息
