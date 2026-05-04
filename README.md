@@ -46,7 +46,8 @@ project_root/                                    # 项目根目录
 │   ├── schemas.py                               # Pydantic 接口数据模型（请求/响应）
 │   ├── security.py                              # 密码加密与 JWT 令牌逻辑等安全认证相关逻辑
 │   ├── tests/                                   # 后端单元测试
-│   │   └── test_crud.py                         # 业务逻辑层 CRUD 单元测试
+│   │   ├── test_crud.py                         # 业务逻辑层 CRUD 单元测试
+│   │   └── test_api.py                          # API 端点单元测试     
 │   └── task_manager.db                          # SQLite 数据库文件（后端启动后生成）
 ├── frontend/                                    # 前端目录
 │   ├── .vscode/                                 # 以VS Code为默认编辑器
