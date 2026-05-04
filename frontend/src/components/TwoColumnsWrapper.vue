@@ -13,30 +13,29 @@ const props = defineProps({
   }
 });
 
-// 拆分奇偶索引
-const leftList = computed(() => props.items.filter((_, index) => index % 2 === 0));
-const rightList = computed(() => props.items.filter((_, index) => index % 2 !== 0));
+const rowList = computed(() => {
+  const rows = [];
+  for (let i = 0; i < props.items.length; i += 2) {
+    rows.push(props.items.slice(i, i + 2));
+  }
+  return rows;
+});
 </script>
 
 <template>
   <div v-if="items.length === 0" class="empty-text-container">
     <span class="empty-text">
-      {{emptyText}}
+      {{ emptyText }}
     </span>
   </div>
   <div v-else class="two-column-container">
-    <!-- 左侧列 -->
     <div class="column">
-      <template v-for="(item, index) in leftList" :key="2 * index">
-        <slot name="item" class="item-container" :item="item" :index="2 * index"/>
-      </template>
-    </div>
-
-    <!-- 右侧列 -->
-    <div class="column">
-      <template v-for="(item, index) in rightList" :key="2 * index + 1">
-        <slot name="item" class="item-container" :item="item" :index="2 * index + 1"/>
-      </template>
+      <div v-for="(row, rowIndex) in rowList" class="row">
+        <div v-for="(item, columnIndex) in row" class="item-wrapper">
+          <slot name="item" :item="item" :index="2 * rowIndex + columnIndex" />
+        </div>
+        <div v-if="row.length === 1" class="item-wrapper"/>
+      </div>
     </div>
   </div>
 </template>
@@ -55,16 +54,26 @@ const rightList = computed(() => props.items.filter((_, index) => index % 2 !== 
 }
 
 .two-column-container {
-  display: flex;
   margin-top: 5px;
   margin-bottom: 20px;
   gap: 20px;
 }
 
 .column {
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 15px;
+}
+
+.row {
+  display: flex;
+  flex-direction: row;
+  gap: 15px;
+}
+
+.item-wrapper {
+  flex: 1;
+  top: 0;
+  bottom: 0;
 }
 </style>
