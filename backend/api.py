@@ -401,6 +401,11 @@ def create_team_endpoint(request: dict, current_user: User = Depends(get_current
     if len(title) > 12:
         raise HTTPException(status_code=400, detail="团队名称长度不能超过12个字符")
 
+    # 检查是否已存在同名团队
+    existing_team = db.query(Team).filter(Team.name == title).first()
+    if existing_team:
+        raise HTTPException(status_code=400, detail="团队名称已存在，请使用其他名称")
+
     team = crud.create_team(db, schemas.TeamCreate(name=title), current_user.username)
     return success_response("团队创建成功", serialize_team(team))
 
