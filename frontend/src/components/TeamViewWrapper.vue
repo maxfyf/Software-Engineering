@@ -75,6 +75,8 @@ const {
           v-model="newTeamTitle"
           type="text"
           placeholder="团队名"
+          maxlength="10"
+          show-word-limit
       />
       <template #footer>
         <div class="dialog-footer">

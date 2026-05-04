@@ -61,39 +61,45 @@ const enterTeamSpace = (item) => {
   <TwoColumnsWrapper :items="props.teams" empty-text="暂无团队">
     <template #item="{ item }">
       <el-card :class="item.id === highlightTeamId ? 'highlight-card' : 'card' ">
-        <div class="line">
-          <span class="title">{{item.title}}</span>
-          <el-button
-              link
-              type="text"
-              class="delete-button"
-              v-if="item.owner === currentUser.username"
-              @click="deleteTeam(item)"
-          >
-            <el-icon>
-              <Delete/>
-            </el-icon>
-          </el-button>
-        </div>
+        <div class="card-content">
+          <div class="title-line">
+            <span class="title">{{item.title}}</span>
+            <el-button
+                link
+                type="text"
+                class="delete-button"
+                v-if="item.owner === currentUser.username"
+                @click="deleteTeam(item)"
+            >
+              <el-icon>
+                <Delete/>
+              </el-icon>
+            </el-button>
+          </div>
 
-        <br>
-
-        <div class="line">
-          <span class="info">
-            创建者：{{item.owner}}&nbsp;&nbsp;&nbsp;
-            成员：{{1 + item.admin.length + item.member.length}}人&nbsp;&nbsp;&nbsp;
-            我的角色：{{role(item)}}
-          </span>
-          <el-button
-              link
-              type="text"
-              class="enter-button"
-              @click="enterTeamSpace(item)"
-          >
-            <el-icon>
-              <Right/>
-            </el-icon>
-          </el-button>
+          <div class="info-line">
+            <div class="info-wrapper">
+            <span class="info">
+              创建者：{{item.owner}}
+            </span>
+              <span class="info">
+              成员：{{1 + item.admin.length + item.member.length}}人
+            </span>
+              <span class="info">
+              我的角色：{{role(item)}}
+            </span>
+            </div>
+            <el-button
+                link
+                type="text"
+                class="enter-button"
+                @click="enterTeamSpace(item)"
+            >
+              <el-icon>
+                <Right/>
+              </el-icon>
+            </el-button>
+          </div>
         </div>
       </el-card>
     </template>
@@ -103,6 +109,7 @@ const enterTeamSpace = (item) => {
 <style scoped>
 .card {
   background-color: white;
+  height: 100% !important;
   display: flex;
   flex-direction: column;
 }
@@ -110,11 +117,20 @@ const enterTeamSpace = (item) => {
 .highlight-card {
   background-color: #ecf5ff;
   border-color: #ecf5ff;
+  height: 100% !important;
   display: flex;
   flex-direction: column;
 }
 
-.line {
+.card-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content:space-between;
+  gap: 20px;
+}
+
+.title-line {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -133,6 +149,24 @@ const enterTeamSpace = (item) => {
 
 .delete-button:hover {
   color: #f56c6c !important;
+}
+
+.info-line {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.info-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 30px;
+  margin-right: 20px;
+}
+
+.info {
+  display: inline-block;
+  width: auto;
 }
 
 .enter-button {

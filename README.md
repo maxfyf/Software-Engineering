@@ -45,6 +45,9 @@ project_root/                                    # 项目根目录
 │   ├── requirements.txt                         # 后端依赖列表 / Python项目核心配置文件
 │   ├── schemas.py                               # Pydantic 接口数据模型（请求/响应）
 │   ├── security.py                              # 密码加密与 JWT 令牌逻辑等安全认证相关逻辑
+│   ├── tests/                                   # 后端单元测试
+│   │   ├── test_crud.py                         # 业务逻辑层 CRUD 单元测试
+│   │   └── test_api.py                          # API 端点单元测试     
 │   └── task_manager.db                          # SQLite 数据库文件（后端启动后生成）
 ├── frontend/                                    # 前端目录
 │   ├── .vscode/                                 # 以VS Code为默认编辑器
@@ -175,3 +178,34 @@ project_root/                                    # 项目根目录
 - 开发模式前端网页地址：http://localhost:5173/
 - 构建模式前端网页地址：http://localhost:4173/
 
+##### 3.4 运行后端单元测试
+
+1. 打开命令行，切换到项目根目录 `Software-Engineering/` 后执行
+
+   ```bash
+   python3 -m unittest discover -s backend/tests
+   ```
+
+2. 如果只想运行某一个测试文件，可执行
+
+   ```bash
+   python3 -m unittest backend.tests.test_crud
+   ```
+
+- 当前测试基于 Python 标准库 `unittest`，无需额外安装 `pytest` 等测试框架。
+- 测试使用临时 SQLite 数据库，不会修改项目根目录下已有的 `task_manager.db` 数据。
+- 建议先完成 `backend/requirements.txt` 中依赖安装，再运行测试。
+
+### 4 测试说明
+
+##### 4.1 当前测试覆盖范围
+
+- `backend/tests/test_crud.py` 主要覆盖后端业务逻辑层 `backend/crud.py` 中的核心方法。
+- 已覆盖的重点场景包括：删除团队 `delete_team()`、注销账号 `cancel_account()`、添加团队成员 `add_team_member()`。
+- 测试重点验证团队删除时的任务清理、账号注销时的数据迁移与清理，以及团队成员权限控制是否符合预期。
+
+##### 4.2 测试设计说明
+
+- 每个测试用例都会独立创建临时数据库、初始化表结构，并在用例结束后自动清理，避免测试之间相互污染。
+- 单元测试直接调用业务逻辑层方法，不经过 FastAPI 路由，目的是更快定位 `crud.py` 内部业务规则是否正确。
+- 如需补充更多测试，建议按“一个业务方法对应一组场景”的方式继续在 `backend/tests/` 下扩展。

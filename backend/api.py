@@ -5,6 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from pydantic import BaseModel, Field
+
+from fastapi import Query
+from models import TaskStatus, Task #补充
 from typing import Optional
 from datetime import datetime
 
@@ -180,8 +183,7 @@ def get_user_info(current_user: User = Depends(get_current_user)):
 @app.delete("/api/user/cancel")
 def cancel_account(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """注销账号"""
-    db.delete(current_user)
-    db.commit()
+    crud.cancel_account(db, current_user.username)
     return success_response("账号已注销")
 
 # ===================== 任务模块 =====================
@@ -189,17 +191,21 @@ def cancel_account(current_user: User = Depends(get_current_user), db: Session =
 @app.get("/api/task/list")
 def get_task_list(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """获取任务列表 - 包括个人任务、分配给自己的任务，以及所属团队的所有任务"""
-    own_or_assigned = db.query(Task).filter(
-        or_(Task.owner_username == current_user.username, Task.assignee_username == current_user.username)
-    ).all()
-    
-    # 获取当前用户所属团队的所有任务
+    # 获取当前用户所属团队
     user_teams = crud.get_user_teams(db, current_user.username)
     team_ids = [t.id for t in user_teams]
+
+    # 个人任务：没有 team_id 的任务，用户是 owner 或 assignee
+    personal_tasks = db.query(Task).filter(
+        Task.team_id.is_(None),
+        or_(Task.owner_username == current_user.username, Task.assignee_username == current_user.username)
+    ).all()
+
+    # 团队任务：用户必须是团队成员才能看到
     team_tasks = db.query(Task).filter(Task.team_id.in_(team_ids)).all() if team_ids else []
-    
+
     # 合并去重
-    all_tasks = {task.id: task for task in own_or_assigned + team_tasks}
+    all_tasks = {task.id: task for task in personal_tasks + team_tasks}
     return success_response("获取成功", [serialize_task(task) for task in all_tasks.values()])
 
 @app.get("/api/task/{task_id}")
@@ -224,6 +230,29 @@ def get_task(task_id: int, current_user: User = Depends(get_current_user), db: S
 @app.post("/api/task/create")
 def create_task(task: TaskCreateRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """创建任务 - 个人任务任何人可创建，团队任务仅Admin/Owner可创建"""
+    target_team_id = None
+
+    # 处理团队任务
+    if task.team:
+        target_team_id = get_team_id_by_name(db, task.team)
+        if not target_team_id:
+            raise HTTPException(status_code=400, detail="团队不存在")
+        # 仅 Admin/Owner 可在团队中创建任务
+        if not crud.require_team_role(db, target_team_id, current_user.username, {crud.ROLE_ADMIN, crud.ROLE_OWNER}):
+            raise HTTPException(status_code=403, detail="无权在该团队中创建任务")
+
+    conflict = crud.find_task_title_conflict(
+        db,
+        title=task.title,
+        username=current_user.username,
+        team_id=target_team_id
+    )
+    if conflict:
+        raise HTTPException(
+            status_code=400,
+            detail="该团队中已存在同名任务" if target_team_id is not None else "个人任务中已存在同名任务"
+        )
+
     db_task = Task(
         title=task.title,
         description=task.description,
@@ -238,15 +267,8 @@ def create_task(task: TaskCreateRequest, current_user: User = Depends(get_curren
         except:
             pass
     
-    # 处理团队任务
-    if task.team:
-        team_id = get_team_id_by_name(db, task.team)
-        if not team_id:
-            raise HTTPException(status_code=400, detail="团队不存在")
-        # 仅 Admin/Owner 可在团队中创建任务
-        if not crud.require_team_role(db, team_id, current_user.username, {crud.ROLE_ADMIN, crud.ROLE_OWNER}):
-            raise HTTPException(status_code=403, detail="无权在该团队中创建任务")
-        db_task.team_id = team_id
+    if target_team_id is not None:
+        db_task.team_id = target_team_id
     
     # 处理负责人
     if task.assignee:
@@ -270,6 +292,16 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
     if not task.team_id:
         if task.owner_username != current_user.username:
             raise HTTPException(status_code=403, detail="无权编辑该任务")
+        new_title = task_update.title if task_update.title is not None else task.title
+        conflict = crud.find_task_title_conflict(
+            db,
+            title=new_title,
+            username=current_user.username,
+            team_id=None,
+            exclude_task_id=task.id
+        )
+        if conflict:
+            raise HTTPException(status_code=400, detail="个人任务中已存在同名任务")
         # 个人任务允许修改所有字段
         if task_update.title is not None:
             task.title = task_update.title
@@ -285,11 +317,27 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
             except:
                 pass
     else:
+        target_team_id = task.team_id
+        if task_update.team is not None:
+            target_team_id = get_team_id_by_name(db, task_update.team)
+            if task_update.team and not target_team_id:
+                raise HTTPException(status_code=400, detail="团队不存在")
+
         # 团队任务权限判断
         is_admin_or_owner = crud.require_team_role(db, task.team_id, current_user.username, {crud.ROLE_ADMIN, crud.ROLE_OWNER})
         is_assignee = task.assignee_username == current_user.username
         
         if is_admin_or_owner:
+            new_title = task_update.title if task_update.title is not None else task.title
+            conflict = crud.find_task_title_conflict(
+                db,
+                title=new_title,
+                username=current_user.username,
+                team_id=target_team_id,
+                exclude_task_id=task.id
+            )
+            if conflict:
+                raise HTTPException(status_code=400, detail="该团队中已存在同名任务")
             # Admin/Owner 可修改所有字段
             if task_update.title is not None:
                 task.title = task_update.title
@@ -305,7 +353,7 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
                 except:
                     pass
             if task_update.team is not None:
-                task.team_id = get_team_id_by_name(db, task_update.team)
+                task.team_id = target_team_id
             if task_update.assignee is not None:
                 task.assignee_username = task_update.assignee
         elif is_assignee:
@@ -374,9 +422,18 @@ def get_team_list(current_user: User = Depends(get_current_user), db: Session = 
 def create_team_endpoint(request: dict, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """创建团队"""
     title = request.get("title")
-    if not title:
+    if not title or not title.strip():
         raise HTTPException(status_code=400, detail="团队名称不能为空")
-    
+
+    title = title.strip()
+    if len(title) > 10:
+        raise HTTPException(status_code=400, detail="团队名称长度不能超过10个字符")
+
+    # 检查是否已存在同名团队
+    existing_team = db.query(Team).filter(Team.name == title).first()
+    if existing_team:
+        raise HTTPException(status_code=400, detail="团队名称已存在，请使用其他名称")
+
     team = crud.create_team(db, schemas.TeamCreate(name=title), current_user.username)
     return success_response("团队创建成功", serialize_team(team))
 
@@ -420,18 +477,18 @@ def add_member_endpoint(
 @app.delete("/api/team/{team_id}/member")
 def remove_member_endpoint(
     team_id: int,
-    username: str = None,
+    username: str = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """从团队中移除成员"""
     if not username:
         raise HTTPException(status_code=400, detail="用户名不能为空")
-    
+
     success, error = crud.remove_team_member(db, team_id, username, current_user.username)
     if error:
         raise HTTPException(status_code=400, detail=error)
-    
+
     return success_response("成员移除成功")
 
 @app.put("/api/team/{team_id}/member/role")
@@ -475,11 +532,7 @@ def health():
 
 @app.get("/api/tasks/assigned", response_model=dict)
 def get_assigned_tasks(
-<<<<<<< HEAD
-    current_user: schemas.UserResponse = Depends(get_current_user),
-=======
     current_user: User = Depends(get_current_user),
->>>>>>> backend/feature/team-permission
     db: Session = Depends(get_db)
 ):
     """
@@ -495,7 +548,7 @@ def get_assigned_tasks(
             "team_id": t.team_id,
             "owner_username": t.owner_username,
             "assignee_username": t.assignee_username,
-            "created_at": t.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            "created_at": t.created_at.strftime("%Y-%m-%d %H:%M:%S") if t.created_at else None #防止空值报错
         } for t in tasks
     ])
 
@@ -503,26 +556,17 @@ def get_assigned_tasks(
 @app.get("/api/teams/{team_id}/tasks", response_model=dict)
 def get_team_tasks(
     team_id: int,
-<<<<<<< HEAD
-    current_user: schemas.UserResponse = Depends(get_current_user),
-=======
     current_user: User = Depends(get_current_user),
->>>>>>> backend/feature/team-permission
     db: Session = Depends(get_db)
 ):
     """
     获取指定团队的所有任务
     必须是团队成员才能查看
     """
-<<<<<<< HEAD
+    if team_id <= 0:
+       raise HTTPException(status_code=400, detail="无效的团队ID")
     if not crud.require_team_member(db, team_id, current_user.username):
         raise HTTPException(status_code=403, detail="无权访问该团队")
-=======
-    if team_id <= 0:
-        return error_response("无效的团队ID", 400)
-    if not crud.require_team_member(db, team_id, current_user.username):
-        return error_response("无权访问该团队", 403)
->>>>>>> backend/feature/team-permission
     
     tasks = crud.get_team_tasks(db, team_id)
     return success_response("获取团队任务成功", [
@@ -540,28 +584,19 @@ def get_team_tasks(
 def create_team_task(
     team_id: int,
     task: schemas.TaskCreate,
-<<<<<<< HEAD
-    current_user: schemas.UserResponse = Depends(get_current_user),
-=======
     current_user: User = Depends(get_current_user),
->>>>>>> backend/feature/team-permission
     db: Session = Depends(get_db)
 ):
     """
     在指定团队下创建任务
     仅管理员和创建者可操作
     """
-<<<<<<< HEAD
+    if team_id <= 0:
+        raise HTTPException(status_code=400, detail="无效的团队ID")
+    if not task.title or not task.title.strip():
+        raise HTTPException(status_code=400, detail="任务标题不能为空")
     if not crud.require_team_role(db, team_id, current_user.username, {crud.ROLE_ADMIN, crud.ROLE_OWNER}):
         raise HTTPException(status_code=403, detail="无权创建团队任务")
-=======
-    if team_id <= 0:
-        return error_response("无效的团队ID", 400)
-    if not task.title or not task.title.strip():
-        return error_response("任务标题不能为空", 400)
-    if not crud.require_team_role(db, team_id, current_user.username, {crud.ROLE_ADMIN, crud.ROLE_OWNER}):
-        return error_response("无权创建团队任务", 403)
->>>>>>> backend/feature/team-permission
     
     task.team_id = team_id
     new_task = crud.create_team_task(db, task, current_user.username)
@@ -572,45 +607,40 @@ def create_team_task(
 def update_task_status(
     task_id: int,
     status: str,
-<<<<<<< HEAD
-    current_user: schemas.UserResponse = Depends(get_current_user),
-=======
     current_user: User = Depends(get_current_user),
->>>>>>> backend/feature/team-permission
     db: Session = Depends(get_db)
 ):
     """
     普通成员专用：仅更新任务状态
     只能修改分配给自己的任务
     """
-<<<<<<< HEAD
-    task = crud.get_task_by_id(db, task_id, current_user.username)
-    if not task:
-        raise HTTPException(status_code=404, detail="任务不存在")
-    
-    if task.assignee_username != current_user.username:
-        raise HTTPException(status_code=403, detail="只能修改分配给自己的任务状态")
-    
-    updated_task = crud.update_task_status_only(db, task_id, status)
-=======
+    #参数有效性校验
     if task_id <= 0:
-        return error_response("无效的任务ID", 400)
+        raise HTTPException(status_code=400, detail="无效的任务ID")
     if not status or not status.strip():
-        return error_response("任务状态不能为空", 400)
+        raise HTTPException(status_code=400, detail="任务状态不能为空")
+    
     try:
-        task = crud.get_task_by_id(db, task_id, current_user.username)
-    except HTTPException as e:
-        return error_response(e.detail, e.status_code)
-    if not task.assignee_username:
-        return error_response("该任务未分配任何人", 403)
-    
-    if task.assignee_username != current_user.username:
-        return error_response("只能修改分配给自己的任务状态", 403)
-    
-    updated_task = crud.update_task_status_only(db, task_id, status)
-    if not updated_task:
-        return error_response("任务状态更新失败", 500)
->>>>>>> backend/feature/team-permission
+        task = db.query(Task).filter(Task.id == task_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="任务不存在")
+       
+        if not task.assignee_username:
+            raise HTTPException(status_code=403, detail="该任务未分配任何人")
+        
+        if task.assignee_username != current_user.username:
+            raise HTTPException(status_code=403, detail="只能修改分配给自己的任务状态")
+
+        updated_task = crud.update_task_status_only(db, task_id, status)
+        if not updated_task:
+            raise HTTPException(status_code=500, detail="任务状态更新失败")
+
+    #服务器内部异常包装
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"服务器内部异常,任务状态更新失败: {str(e)}"
+        )    
     return success_response("任务状态更新成功", {
         "id": updated_task.id,
         "status": updated_task.status

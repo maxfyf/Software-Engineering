@@ -45,6 +45,18 @@ const teamMembers = computed(() => {
   return [currentTeam.value.owner, ...currentTeam.value.admin, ...currentTeam.value.member]
 })
 
+// 当前作用域内的任务列表（用于唯一性验证）
+// 个人任务只检查个人任务，团队任务只检查同一团队内的任务
+const scopeTaskList = computed(() => {
+  if (isTeamTask.value) {
+    // 团队任务：只检查同一团队内的任务
+    return taskList.value.filter(t => t.team === currentTeam.value?.title)
+  } else {
+    // 个人任务：只检查个人任务（team 为 null）
+    return taskList.value.filter(t => !t.team)
+  }
+})
+
 // 检查是否有修改
 const hasChanges = () => {
   if (isNew.value) {
@@ -125,11 +137,6 @@ const saveChanges = async () => {
     ElMessage.error('任务标题不能为空')
     return
   }
-
-  if (newTitle.value.length > 20) {
-    ElMessage.error('请将任务标题限制在20字以内')
-    return
-  }
   
   const taskData = {
     title: newTitle.value,
@@ -144,19 +151,18 @@ const saveChanges = async () => {
   
   if (isNew.value) {
     // 新建任务
-    let idx = taskList.value.findIndex(t => t.title === newTitle.value)
-    if(idx !== -1) {
-      ElMessage.error('该任务已存在')
+    const idx = scopeTaskList.value.findIndex(t => t.title === newTitle.value)
+    if (idx !== -1) {
+      ElMessage.error(isTeamTask.value ? '该团队中已存在同名任务' : '个人任务中已存在同名任务')
       return
     }
-    await addTask(taskData) 
+    await addTask(taskData)
     ElMessage.success('任务创建成功')
   } else {
     // 更新任务
-    let idx = taskList.value.findIndex(t => t.title === newTitle.value
-        && t.id !== taskId.value)
-    if(idx !== -1) {
-      ElMessage.error('任务标题重复')
+    const idx = scopeTaskList.value.findIndex(t => t.title === newTitle.value && t.id !== taskId.value)
+    if (idx !== -1) {
+      ElMessage.error(isTeamTask.value ? '该团队中已存在同名任务' : '个人任务中已存在同名任务')
       return
     }
     await updateTask(taskId.value, taskData)
@@ -213,6 +219,8 @@ onBeforeRouteLeave((to, from, next) => {
               class="title"
               v-model="newTitle"
               type="textarea"
+              maxlength="18"
+              show-word-limit
               :rows="1"
           />
         </div>
@@ -341,6 +349,11 @@ onBeforeRouteLeave((to, from, next) => {
 
 .title :deep(.el-textarea__inner) {
   resize: none;
+}
+
+:deep(.title .el-input__count) {
+  font-size: 16px;
+  margin-bottom: 5px;
 }
 
 .assignee {

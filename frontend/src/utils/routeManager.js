@@ -21,7 +21,6 @@ const routeParser = (route) => {
         let params = []
         for(let paramStr of paramList) {
             let param = paramStr.split('=')
-            console.log('param=', param)
             let key = param[0]
             let value = param[1]
             params.push({
@@ -51,7 +50,7 @@ export const handleEnter = (route, router, newPage) => {
     params.forEach((param) => {
         queryObj[param.key] = param.value
     })
-    console.log(params)
+
     router.push({
         path: newRoute,
         query: queryObj
@@ -123,7 +122,7 @@ export const translate = (route) => {
                     const isNew = getParam(res.params, 'isNew')
                     if(isNew === undefined) return ''
 
-                    if(isNew) innerRoute.push('新建个人任务')
+                    if(isNew === 'true') innerRoute.push('新建个人任务')
                     else {
                         const taskId = getParam(res.params, 'taskId')
                         if(taskId === undefined) return ''
@@ -133,6 +132,7 @@ export const translate = (route) => {
                         innerRoute.push('编辑个人任务\"' + task.title + '\"')
                     }
                     if(res.path.length > 4) return ''
+                    return innerRoute
                 default:
                     return ''
             }
@@ -159,12 +159,8 @@ export const translate = (route) => {
             switch(res.path[3]) {
                 case 'space':
                     const teamId = getParam(res.params, 'teamId')
-                    console.log(res)
                     if(teamId === undefined) return ''
-                    console.log('teamId=', teamId)
-                    console.log(teamList.value)
                     const team = teamList.value.find(team=> Number(team.id) === Number(teamId))
-                    console.log(team)
                     if(!team) return ''
                     innerRoute.push(team.title + '的团队空间')
 
@@ -174,7 +170,7 @@ export const translate = (route) => {
                             const isNew = getParam(res.params, 'isNew')
                             if(isNew === undefined) return ''
 
-                            if(isNew) innerRoute.push('新建团队任务')
+                            if(isNew === 'true') innerRoute.push('新建团队任务')
                             else {
                                 const taskId = getParam(res.params, 'taskId')
                                 if(taskId === undefined) return ''

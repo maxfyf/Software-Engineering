@@ -30,6 +30,11 @@ const props = defineProps({
     default: false
   },
 
+  isTeamSpace: {
+    type: Boolean,
+    default: false
+  },
+
   currentPage: {
     type: Number,
     default: 1
@@ -159,32 +164,32 @@ const deleteTask = (row) => {
         <el-table-column
             prop="title"
             label="任务名称"
-            :min-width="showAssignee ? '40%' : '50%'"
+            :min-width="showAssignee ? '38%' : '40%'"
             align="left"
         />
         <el-table-column
             v-if="showAssignee"
             prop="assignee"
             label="负责人"
-            min-width="20%"
+            min-width="25%"
             align="center"
         />
         <el-table-column
             prop="status"
             label="状态"
-            :min-width="showAssignee ? '15%' : '20%'"
+            :min-width="showAssignee ? '7%' : '20%'"
             align="center"
         />
         <el-table-column
             prop="priority"
             label="优先级"
-            :min-width="showAssignee ? '10%' : '15%'"
+            :min-width="showAssignee ? '10%' : '20%'"
             align="center"
         />
         <el-table-column
             fixed="right"
             label="操作"
-            min-width="15%"
+            min-width="20%"
             align="center"
         >
           <template v-slot:default="scope">
@@ -199,10 +204,12 @@ const deleteTask = (row) => {
             </el-button>
 
             <!-- 个人任务、负责人、团队管理员/Owner 可见 -->
+            <!-- 任务模块中，团队任务只有负责人能修改状态 -->
             <el-button
                 link
                 type="text"
-                v-if="(scope.row.team === null || isCurrentAssignee(scope.row) || isTaskTeamAdmin(scope.row)) &&
+                v-if="(scope.row.team === null && scope.row.owner === currentUser.username) ||
+                  (scope.row.team !== null && (isTeamSpace ? (isCurrentAssignee(scope.row) || isTaskTeamAdmin(scope.row)) : isCurrentAssignee(scope.row))) &&
                   scope.row.status === '待办'"
                 @click="startTask(scope.row)"
             >
@@ -213,7 +220,8 @@ const deleteTask = (row) => {
             <el-button
                 link
                 type="text"
-                v-else-if="(scope.row.team === null || isCurrentAssignee(scope.row) || isTaskTeamAdmin(scope.row)) &&
+                v-else-if="(scope.row.team === null && scope.row.owner === currentUser.username) ||
+                  (scope.row.team !== null && (isTeamSpace ? (isCurrentAssignee(scope.row) || isTaskTeamAdmin(scope.row)) : isCurrentAssignee(scope.row))) &&
                   scope.row.status === '进行中'"
                 @click="checkTask(scope.row)"
             >
@@ -222,11 +230,12 @@ const deleteTask = (row) => {
               </el-icon>
             </el-button>
 
-            <!-- 个人任务、自己创建的任务、所属团队管理员可见 -->
+            <!-- 编辑按钮：任务模块中团队任务不显示；团队空间中按权限显示 -->
             <el-button
                 link
                 type="text"
-                v-if="scope.row.team === null || scope.row.owner === currentUser.username || isTaskTeamAdmin(scope.row)"
+                v-if="(scope.row.team === null && scope.row.owner === currentUser.username) ||
+                  (scope.row.team !== null && isTeamSpace && (scope.row.owner === currentUser.username || isTaskTeamAdmin(scope.row)))"
                 @click="editTask(scope.row)"
             >
               <el-icon>
@@ -234,12 +243,13 @@ const deleteTask = (row) => {
               </el-icon>
             </el-button>
 
-            <!-- 个人任务、自己创建的任务、所属团队管理员可见 -->
+            <!-- 删除按钮：任务模块中团队任务不显示；团队空间中按权限显示 -->
             <el-button
                 link
                 type="text"
                 class="delete-button"
-                v-if="scope.row.team === null || scope.row.owner === currentUser.username || isTaskTeamAdmin(scope.row)"
+                v-if="(scope.row.team === null && scope.row.owner === currentUser.username) ||
+                  (scope.row.team !== null && isTeamSpace && (scope.row.owner === currentUser.username || isTaskTeamAdmin(scope.row)))"
                 @click="deleteTask(scope.row)"
             >
               <el-icon>

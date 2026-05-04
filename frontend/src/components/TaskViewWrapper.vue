@@ -80,6 +80,7 @@ const {
           :tasks="tasks"
           :show-assignee="showAssignee"
           :is-admin="isAdmin"
+          :is-team-space="isTeamSpace"
           :current-page="currentPage"
           :page-size="pageSize"
           @page-change="handlePageChange"

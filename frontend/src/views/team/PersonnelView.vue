@@ -4,7 +4,7 @@ import Draggable from 'vuedraggable'
 import { useRoute, useRouter } from 'vue-router'
 import HeaderWrapper from "@/components/HeaderWrapper.vue"
 import Route from "@/components/Route.vue"
-import { currentUser, teamList } from '@/store/user.js'
+import { currentUser, teamList, initTeamList, initTaskList } from '@/store/user.js'
 import { handleBack } from '@/utils/routeManager.js'
 import { Delete, Plus, InfoFilled } from "@element-plus/icons-vue"
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -39,6 +39,7 @@ const objects = computed(() => {
 })
 const isDragging = ref(false)
 const draggedMemberName = ref(null)
+const trashList = ref([])
 
 const isOwner = computed(() => team.value?.owner === currentUser.username)
 
@@ -117,7 +118,7 @@ const onDragChange = async (event) => {
     }
   } catch (error) {
     ElMessage.error('角色更改失败')
-    teamList.value = [...teamList.value]
+    await initTeamList()
   }
 }
 
@@ -130,8 +131,49 @@ const doRemoveMember = async (username) => {
       currentTeam.member = currentTeam.member.filter(m => m !== username)
     }
     ElMessage.success('成员已移除')
+    // 强制刷新任务列表，更新被转派任务的负责人显示
+    await initTaskList(true)
   } catch (error) {
     ElMessage.error('移除成员失败')
+    await initTeamList()
+  }
+}
+
+const handleTrashAdd = async (evt) => {
+  const name = evt.element?.name || evt.item?.textContent?.trim()
+  if (!name) {
+    ElMessage.error('无法获取成员名称')
+    trashList.value = []
+    return
+  }
+  trashList.value = []
+
+  // 可移除的成员列表
+  const removableMembers = [
+    ...(team.value?.admin || []),
+    ...(team.value?.member || [])
+  ]
+
+  if (!removableMembers.includes(name)) {
+    ElMessage.warning('该成员无法移除')
+    await initTeamList()
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要移除成员"${name}"吗？`,
+      '移除成员',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        confirmButtonType: 'danger'
+      }
+    )
+    await doRemoveMember(name)
+  } catch (error) {
+    ElMessage.info('已取消移除')
+    await initTeamList()
   }
 }
 
@@ -143,25 +185,6 @@ const handleRemoveMember = async () => {
 
   if (removableMembers.length === 0) {
     ElMessage.warning('没有可移除的成员')
-    return
-  }
-
-  if (draggedMemberName.value && removableMembers.includes(draggedMemberName.value)) {
-    const name = draggedMemberName.value
-    try {
-      await ElMessageBox.confirm(
-        `确定要移除成员"${name}"吗？`,
-        '移除成员',
-        {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          confirmButtonType: 'danger'
-        }
-      )
-      await doRemoveMember(name)
-    } catch (error) {
-      // 取消移除
-    }
     return
   }
 
@@ -211,7 +234,8 @@ const handleAddMember = async () => {
     newUsername.value = ''
     newAuthority.value = 'member'
   } catch (error) {
-    ElMessage.error('添加成员失败')
+    console.error('添加成员失败:', error)
+    await initTeamList()
   }
 }
 </script>
@@ -234,8 +258,22 @@ const handleAddMember = async () => {
         </template>
 
         <div v-if="isOwner" class="button-header">
-          <div v-if="isDragging" class="delete-button" @dragover.prevent @drop="handleRemoveMember" @click="handleRemoveMember">
-            <el-icon><Delete /></el-icon>
+          <div v-if="isDragging" class="delete-button-wrapper">
+            <Draggable
+                v-model="trashList"
+                group="personnel"
+                item-key="id"
+                :sort="false"
+                @add="handleTrashAdd"
+                class="trash-drop-zone"
+            >
+              <template #item="{ element }">
+                <div style="display: none;">{{ element.name }}</div>
+              </template>
+            </Draggable>
+            <div class="delete-button" @click="handleRemoveMember">
+              <el-icon><Delete /></el-icon>
+            </div>
           </div>
 
           <el-button type="primary" class="new-button" @click="handleAdd">
@@ -464,10 +502,29 @@ const handleAddMember = async () => {
   margin-bottom: 25px;
 }
 
-.delete-button {
+.delete-button-wrapper {
+  position: relative;
   font-size: 20px;
   margin-left: 40px;
   margin-right: auto;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.trash-drop-zone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+}
+
+.delete-button {
+  font-size: 20px;
 }
 
 .delete-button:hover {
