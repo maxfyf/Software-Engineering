@@ -219,7 +219,7 @@ onBeforeRouteLeave((to, from, next) => {
               class="title"
               v-model="newTitle"
               type="textarea"
-              maxlength="20"
+              maxlength="18"
               show-word-limit
               :rows="1"
           />
