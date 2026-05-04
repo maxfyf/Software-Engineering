@@ -32,6 +32,8 @@ const innerRoute = translate(props.route)
       </el-icon>
     </el-button>
 
+    <div class="gap"/>
+
     <div
         class="ancestor"
         v-for="(ancestor, index) in innerRoute.slice(0, innerRoute.length - 1)"
@@ -57,6 +59,10 @@ const innerRoute = translate(props.route)
   display: flex;
   flex-direction: row;
   align-items: center;
+}
+
+.gap {
+  width: 10px;
 }
 
 .ancestor {
