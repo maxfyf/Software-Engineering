@@ -183,7 +183,21 @@ def get_user_info(current_user: User = Depends(get_current_user)):
 @app.delete("/api/user/cancel")
 def cancel_account(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """注销账号"""
-    crud.cancel_account(db, current_user.username)
+    username = current_user.username
+    
+    # 将该用户负责的所有团队任务转派给对应团队的 Owner
+    tasks = db.query(Task).filter(
+        Task.assignee_username == username,
+        Task.team_id.isnot(None)
+    ).all()
+    
+    for task in tasks:
+        team = db.query(Team).filter(Team.id == task.team_id).first()
+        if team:
+            task.assignee_username = team.owner_username
+    
+    db.delete(current_user)
+    db.commit()
     return success_response("账号已注销")
 
 # ===================== 任务模块 =====================
@@ -191,17 +205,21 @@ def cancel_account(current_user: User = Depends(get_current_user), db: Session =
 @app.get("/api/task/list")
 def get_task_list(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """获取任务列表 - 包括个人任务、分配给自己的任务，以及所属团队的所有任务"""
-    own_or_assigned = db.query(Task).filter(
-        or_(Task.owner_username == current_user.username, Task.assignee_username == current_user.username)
-    ).all()
-    
-    # 获取当前用户所属团队的所有任务
+    # 获取当前用户所属团队
     user_teams = crud.get_user_teams(db, current_user.username)
     team_ids = [t.id for t in user_teams]
+
+    # 个人任务：没有 team_id 的任务，用户是 owner 或 assignee
+    personal_tasks = db.query(Task).filter(
+        Task.team_id.is_(None),
+        or_(Task.owner_username == current_user.username, Task.assignee_username == current_user.username)
+    ).all()
+
+    # 团队任务：用户必须是团队成员才能看到
     team_tasks = db.query(Task).filter(Task.team_id.in_(team_ids)).all() if team_ids else []
-    
+
     # 合并去重
-    all_tasks = {task.id: task for task in own_or_assigned + team_tasks}
+    all_tasks = {task.id: task for task in personal_tasks + team_tasks}
     return success_response("获取成功", [serialize_task(task) for task in all_tasks.values()])
 
 @app.get("/api/task/{task_id}")
@@ -376,9 +394,13 @@ def get_team_list(current_user: User = Depends(get_current_user), db: Session = 
 def create_team_endpoint(request: dict, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """创建团队"""
     title = request.get("title")
-    if not title:
+    if not title or not title.strip():
         raise HTTPException(status_code=400, detail="团队名称不能为空")
-    
+
+    title = title.strip()
+    if len(title) > 12:
+        raise HTTPException(status_code=400, detail="团队名称长度不能超过12个字符")
+
     team = crud.create_team(db, schemas.TeamCreate(name=title), current_user.username)
     return success_response("团队创建成功", serialize_team(team))
 
@@ -390,8 +412,9 @@ def delete_team_endpoint(team_id: int, current_user: User = Depends(get_current_
         raise HTTPException(status_code=404, detail="团队不存在")
     if team.owner_username != current_user.username:
         raise HTTPException(status_code=403, detail="只有拥有者可解散团队")
-
-    crud.delete_team(db, team_id)
+    
+    db.delete(team)
+    db.commit()
     return success_response("团队已解散")
 
 @app.post("/api/team/{team_id}/member")
@@ -421,18 +444,18 @@ def add_member_endpoint(
 @app.delete("/api/team/{team_id}/member")
 def remove_member_endpoint(
     team_id: int,
-    username: str = None,
+    username: str = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """从团队中移除成员"""
     if not username:
         raise HTTPException(status_code=400, detail="用户名不能为空")
-    
+
     success, error = crud.remove_team_member(db, team_id, username, current_user.username)
     if error:
         raise HTTPException(status_code=400, detail=error)
-    
+
     return success_response("成员移除成功")
 
 @app.put("/api/team/{team_id}/member/role")
