@@ -123,7 +123,7 @@ export const translate = (route) => {
                     const isNew = getParam(res.params, 'isNew')
                     if(isNew === undefined) return ''
 
-                    if(isNew) innerRoute.push('新建个人任务')
+                    if(isNew === true) innerRoute.push('新建个人任务')
                     else {
                         const taskId = getParam(res.params, 'taskId')
                         if(taskId === undefined) return ''
@@ -175,7 +175,7 @@ export const translate = (route) => {
                             const isNew = getParam(res.params, 'isNew')
                             if(isNew === undefined) return ''
 
-                            if(isNew) innerRoute.push('新建团队任务')
+                            if(isNew === true) innerRoute.push('新建团队任务')
                             else {
                                 const taskId = getParam(res.params, 'taskId')
                                 if(taskId === undefined) return ''
