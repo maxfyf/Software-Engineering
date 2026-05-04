@@ -79,11 +79,17 @@ const enterTeamSpace = (item) => {
         <br>
 
         <div class="line">
-          <span class="info">
-            创建者：{{item.owner}}&nbsp;&nbsp;&nbsp;
-            成员：{{1 + item.admin.length + item.member.length}}人&nbsp;&nbsp;&nbsp;
-            我的角色：{{role(item)}}
-          </span>
+          <div class="info-wrapper">
+            <span class="info">
+              创建者：{{item.owner}}
+            </span>
+            <span class="info">
+              成员：{{1 + item.admin.length + item.member.length}}人
+            </span>
+            <span class="info">
+              我的角色：{{role(item)}}
+            </span>
+          </div>
           <el-button
               link
               type="text"
@@ -133,6 +139,17 @@ const enterTeamSpace = (item) => {
 
 .delete-button:hover {
   color: #f56c6c !important;
+}
+
+.info-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 30px;
+}
+
+.info {
+  display: inline-block;
+  width: auto;
 }
 
 .enter-button {
