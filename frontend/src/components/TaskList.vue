@@ -159,7 +159,7 @@ const deleteTask = (row) => {
         <el-table-column
             prop="title"
             label="任务名称"
-            :min-width="showAssignee ? '40%' : '50%'"
+            :min-width="showAssignee ? '35%' : '50%'"
             align="left"
         />
         <el-table-column
@@ -178,13 +178,13 @@ const deleteTask = (row) => {
         <el-table-column
             prop="priority"
             label="优先级"
-            :min-width="showAssignee ? '10%' : '15%'"
+            min-width="10%"
             align="center"
         />
         <el-table-column
             fixed="right"
             label="操作"
-            min-width="15%"
+            min-width="20%"
             align="center"
         >
           <template v-slot:default="scope">
