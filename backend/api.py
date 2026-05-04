@@ -398,8 +398,8 @@ def create_team_endpoint(request: dict, current_user: User = Depends(get_current
         raise HTTPException(status_code=400, detail="团队名称不能为空")
 
     title = title.strip()
-    if len(title) > 12:
-        raise HTTPException(status_code=400, detail="团队名称长度不能超过12个字符")
+    if len(title) > 10:
+        raise HTTPException(status_code=400, detail="团队名称长度不能超过10个字符")
 
     # 检查是否已存在同名团队
     existing_team = db.query(Team).filter(Team.name == title).first()

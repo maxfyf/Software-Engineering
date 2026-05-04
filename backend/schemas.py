@@ -34,7 +34,7 @@ class Token(BaseModel):
 TeamRoleValue = Literal["Owner", "Admin", "Member"]
 
 class TeamCreate(BaseModel):
-    name: str = Field(..., min_length=1, max_length=12)
+    name: str = Field(..., min_length=1, max_length=10)
 
 class TeamResponse(BaseModel):
     id: int
