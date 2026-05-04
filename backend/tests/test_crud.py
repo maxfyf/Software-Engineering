@@ -17,6 +17,7 @@ if str(BACKEND_DIR) not in sys.path:
 import crud
 import models
 import schemas
+import api
 
 
 class CrudTestCase(unittest.TestCase):
@@ -209,6 +210,23 @@ class CancelAccountTests(CrudTestCase):
             cancelled = crud.cancel_account(self.db, "alice")
 
         self.assertTrue(cancelled)
+        self.assertIsNone(crud.get_user_by_username(self.db, "alice"))
+
+    def test_cancel_account_api_uses_crud_cleanup_logic(self):
+        # API 层也必须走业务逻辑层，不能直接 db.delete(current_user)。
+        self.add_user("alice")
+        self.add_user("bob")
+        owned_team = self.add_team("Owned Team", "alice")
+        self.add_task("owned team task", "alice", team_id=owned_team.id, assignee_username="alice")
+        shared_team = self.add_team("Shared Team", "bob")
+        self.add_team_member(shared_team.id, "alice", crud.ROLE_ADMIN)
+        self.add_task("shared team task", "alice", team_id=shared_team.id, assignee_username="alice")
+
+        current_user = crud.get_user_by_username(self.db, "alice")
+        response = api.cancel_account(current_user=current_user, db=self.db)
+
+        self.assertTrue(response["success"])
+        self.assertEqual(response["msg"], "账号已注销")
         self.assertIsNone(crud.get_user_by_username(self.db, "alice"))
 
 
