@@ -174,7 +174,8 @@ def remove_team_member(
     operator_username: str
 ) -> tuple[bool, str | None]:
     """Owner 从团队中移除非 Owner 成员；失败时返回错误信息"""
-    if not get_team_by_id(db, team_id):
+    team = get_team_by_id(db, team_id)
+    if not team:
         return False, "团队不存在"
     if not require_team_role(db, team_id, operator_username, {ROLE_OWNER}):
         return False, "团队权限不足"
@@ -185,153 +186,87 @@ def remove_team_member(
     if membership.role == ROLE_OWNER:
         return False, "不能移除 Owner"
 
-    db.delete(membership)
-    db.commit()
-    return True, None
-
-# 团队与成员管理相关
-
-def get_team_by_id(db: Session, team_id: int) -> models.Team | None:
-    """根据团队ID查询团队"""
-    return db.query(models.Team).filter(models.Team.id == team_id).first()
-
-def get_team_membership(db: Session, team_id: int, username: str) -> models.TeamMember | None:
-    """查询用户在指定团队中的成员身份"""
-    return db.query(models.TeamMember).filter(
-        models.TeamMember.team_id == team_id,
-        models.TeamMember.username == username
-    ).first()
-
-def require_team_member(db: Session, team_id: int, username: str) -> models.TeamMember | None:
-    """查询用户是否属于团队；不存在则返回 None"""
-    if not get_team_by_id(db, team_id):
-        return None
-    return get_team_membership(db, team_id, username)
-
-def require_team_role(
-    db: Session,
-    team_id: int,
-    username: str,
-    allowed_roles: set[str]
-) -> models.TeamMember | None:
-    """查询用户是否拥有指定团队角色；没有权限则返回 None"""
-    membership = require_team_member(db, team_id, username)
-    if not membership or membership.role not in allowed_roles:
-        return None
-    return membership
-
-def create_team(db: Session, team: schemas.TeamCreate, username: str) -> models.Team:
-    """创建团队，创建者自动成为 Owner"""
-    db_team = models.Team(name=team.name, owner_username=username)
-    db.add(db_team)
-    db.flush()
-
-    db_member = models.TeamMember(
-        team_id=db_team.id,
-        username=username,
-        role=ROLE_OWNER
-    )
-    db.add(db_member)
-    db.commit()
-    db.refresh(db_team)
-    return db_team
-
-def get_user_teams(db: Session, username: str) -> list[models.Team]:
-    """获取当前用户加入的团队"""
-    return db.query(models.Team).join(models.TeamMember).filter(
-        models.TeamMember.username == username
+    # 移除成员前，将其负责的团队任务转交给团队Owner
+    assigned_tasks = db.query(models.Task).filter(
+        models.Task.team_id == team_id,
+        models.Task.assignee_username == member_username
     ).all()
-
-def get_team_members(
-    db: Session,
-    team_id: int,
-    username: str
-) -> tuple[list[models.TeamMember] | None, str | None]:
-    """获取团队成员列表，失败时返回错误信息供 API 层处理"""
-    if not get_team_by_id(db, team_id):
-        return None, "团队不存在"
-    if not get_team_membership(db, team_id, username):
-        return None, "无权访问该团队"
-    members = db.query(models.TeamMember).filter(models.TeamMember.team_id == team_id).all()
-    return members, None
-
-def add_team_member(
-    db: Session,
-    team_id: int,
-    member_username: str,
-    operator_username: str
-) -> tuple[models.TeamMember | None, str | None]:
-    """Owner 将其他用户添加到团队，默认角色为 Member；失败时返回错误信息"""
-    if not get_team_by_id(db, team_id):
-        return None, "团队不存在"
-    if not require_team_role(db, team_id, operator_username, {ROLE_OWNER}):
-        return None, "团队权限不足"
-
-    user = get_user_by_username(db, member_username)
-    if not user:
-        return None, "用户不存在"
-
-    if get_team_membership(db, team_id, member_username):
-        return None, "用户已在团队中"
-
-    db_member = models.TeamMember(
-        team_id=team_id,
-        username=member_username,
-        role=ROLE_MEMBER
-    )
-    db.add(db_member)
-    db.commit()
-    db.refresh(db_member)
-    return db_member, None
-
-def update_team_member_role(
-    db: Session,
-    team_id: int,
-    member_username: str,
-    role: str,
-    operator_username: str
-) -> tuple[models.TeamMember | None, str | None]:
-    """Owner 将 Member 升为 Admin，或将 Admin 降为 Member；失败时返回错误信息"""
-    if not get_team_by_id(db, team_id):
-        return None, "团队不存在"
-    if not require_team_role(db, team_id, operator_username, {ROLE_OWNER}):
-        return None, "团队权限不足"
-
-    if role not in {ROLE_ADMIN, ROLE_MEMBER}:
-        return None, "角色只能设置为 Admin 或 Member"
-
-    membership = get_team_membership(db, team_id, member_username)
-    if not membership:
-        return None, "团队成员不存在"
-    if membership.role == ROLE_OWNER:
-        return None, "不能修改 Owner 角色"
-
-    membership.role = role
-    db.commit()
-    db.refresh(membership)
-    return membership, None
-
-def remove_team_member(
-    db: Session,
-    team_id: int,
-    member_username: str,
-    operator_username: str
-) -> tuple[bool, str | None]:
-    """Owner 从团队中移除非 Owner 成员；失败时返回错误信息"""
-    if not get_team_by_id(db, team_id):
-        return False, "团队不存在"
-    if not require_team_role(db, team_id, operator_username, {ROLE_OWNER}):
-        return False, "团队权限不足"
-
-    membership = get_team_membership(db, team_id, member_username)
-    if not membership:
-        return False, "团队成员不存在"
-    if membership.role == ROLE_OWNER:
-        return False, "不能移除 Owner"
+    for task in assigned_tasks:
+        task.assignee_username = team.owner_username
 
     db.delete(membership)
     db.commit()
     return True, None
+
+
+def delete_team(db: Session, team_id: int, *, commit: bool = True) -> bool:
+    """删除团队，并同步删除该团队下的全部任务。"""
+    team = get_team_by_id(db, team_id)
+    if not team:
+        return False
+
+    # 先显式删除团队任务，确保现有数据库也不会把团队任务退化成个人任务。
+    db.query(models.Task).filter(models.Task.team_id == team_id).delete(synchronize_session=False)
+    db.delete(team)
+    if commit:
+        db.commit()
+    return True
+
+
+def cancel_account(db: Session, username: str) -> bool:
+    """按业务规则注销账号，并清理/迁移与该用户关联的数据。"""
+    user = get_user_by_username(db, username)
+    if not user:
+        return False
+
+    # 1. 删除该用户的所有个人任务。
+    db.query(models.Task).filter(
+        models.Task.owner_username == username,
+        models.Task.team_id.is_(None)
+    ).delete(synchronize_session=False)
+
+    # 2. 解散该用户拥有的所有团队，并删除这些团队下的全部任务。
+    owned_teams = db.query(models.Team).filter(models.Team.owner_username == username).all()
+    for team in owned_teams:
+        delete_team(db, team.id, commit=False)
+
+    # 3. 将该用户负责的所有剩余团队任务转交给各自团队拥有者。
+    assigned_team_tasks = db.query(models.Task).join(
+        models.Team, models.Task.team_id == models.Team.id
+    ).filter(
+        models.Task.team_id.isnot(None),
+        models.Task.assignee_username == username
+    ).all()
+    for task in assigned_team_tasks:
+        task.assignee_username = task.team.owner_username
+
+    # 4. 对仍然保留的团队任务，如果该用户是创建者，则同步改为团队拥有者，
+    #    避免删除用户时留下 owner 外键引用。
+    owned_team_tasks = db.query(models.Task).join(
+        models.Team, models.Task.team_id == models.Team.id
+    ).filter(
+        models.Task.team_id.isnot(None),
+        models.Task.owner_username == username
+    ).all()
+    for task in owned_team_tasks:
+        task.owner_username = task.team.owner_username
+
+    # 5. 清理其他用户个人任务里指向该用户的负责人引用。
+    personal_assigned_tasks = db.query(models.Task).filter(
+        models.Task.team_id.is_(None),
+        models.Task.assignee_username == username
+    ).all()
+    for task in personal_assigned_tasks:
+        task.assignee_username = None
+
+    # 6. 将该用户从所有参与或管理的团队中移除。
+    db.query(models.TeamMember).filter(
+        models.TeamMember.username == username
+    ).delete(synchronize_session=False)
+
+    db.delete(user)
+    db.commit()
+    return True
 
 # 任务相关（创建、查询、更新、删除）
 

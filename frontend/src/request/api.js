@@ -95,7 +95,7 @@ const api = {
     createTeam: (data) => request.post('/team/create', data),
     deleteTeam: (teamId) => request.delete(`/team/${teamId}`),
     addMember: (teamId, username, role) => request.post(`/team/${teamId}/member`, { username, role }),
-    removeMember: (teamId, username) => request.delete(`/team/${teamId}/member`, { params: { username } }),
+    removeMember: (teamId, username) => request.delete(`/team/${teamId}/member`, { username }),
     setMemberRole: (teamId, username, role) => request.put(`/team/${teamId}/member/role`, { username, role }),
 
 }
