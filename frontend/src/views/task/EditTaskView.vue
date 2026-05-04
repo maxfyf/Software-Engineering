@@ -125,11 +125,6 @@ const saveChanges = async () => {
     ElMessage.error('任务标题不能为空')
     return
   }
-
-  if (newTitle.value.length > 20) {
-    ElMessage.error('请将任务标题限制在20字以内')
-    return
-  }
   
   const taskData = {
     title: newTitle.value,
@@ -213,6 +208,8 @@ onBeforeRouteLeave((to, from, next) => {
               class="title"
               v-model="newTitle"
               type="textarea"
+              maxlength="20"
+              show-word-limit
               :rows="1"
           />
         </div>
@@ -341,6 +338,11 @@ onBeforeRouteLeave((to, from, next) => {
 
 .title :deep(.el-textarea__inner) {
   resize: none;
+}
+
+:deep(.title .el-input__count) {
+  font-size: 16px;
+  margin-bottom: 5px;
 }
 
 .assignee {

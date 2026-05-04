@@ -74,7 +74,7 @@ const {
       <el-input
           v-model="newTeamTitle"
           type="text"
-          placeholder="团队名（最多12个字符）"
+          placeholder="团队名"
           maxlength="12"
           show-word-limit
       />
