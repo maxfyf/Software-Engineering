@@ -5,13 +5,15 @@ from pydantic import BaseModel, Field
 
 # 用于接收 API 传来的注册数据
 class UserCreate(BaseModel):
+    """用户注册请求的数据模型。"""
+
     # 基础长度兜底，防止数据库溢出
-    username: str = Field(..., min_length=4, max_length=20)
-    password: str = Field(..., min_length=6)
-    first_name: str | None = None
-    last_name: str | None = None
-    phone_number: str | None = None
-    email: str | None = None
+    username: str = Field(..., min_length=4, max_length=20, description="注册用户名。")
+    password: str = Field(..., min_length=6, description="注册密码。")
+    first_name: str | None = Field(None, description="名字，可为空。")
+    last_name: str | None = Field(None, description="姓氏，可为空。")
+    phone_number: str | None = Field(None, description="联系电话，可为空。")
+    email: str | None = Field(None, description="邮箱地址，可为空。")
 
 # 用于将用户信息返回给 API （不包含密码）
 class UserResponse(BaseModel):
@@ -62,15 +64,17 @@ class TeamMemberResponse(BaseModel):
 
 # 用于接收创建任务的数据
 class TaskCreate(BaseModel):
-    title: str = Field(..., max_length=100)
-    description: Optional[str] = None
-    status: str = "待办"
-    priority: str = "中"
-    due_date: Optional[datetime] = None
+    """团队任务创建接口使用的数据模型。"""
+
+    title: str = Field(..., max_length=100, description="任务标题。")
+    description: Optional[str] = Field(None, description="任务描述。")
+    status: str = Field("待办", description="任务状态。")
+    priority: str = Field("中", description="任务优先级。")
+    due_date: Optional[datetime] = Field(None, description="任务截止时间。")
 
     #任务归属ID
-    team_id: Optional[int] = None
-    assignee_username: Optional[str] = None
+    team_id: Optional[int] = Field(None, description="归属团队 ID。")
+    assignee_username: Optional[str] = Field(None, description="负责人用户名。")
 
 # 用于接收更新任务的数据
 class TaskUpdate(BaseModel):
@@ -82,6 +86,8 @@ class TaskUpdate(BaseModel):
 
 # 用于返回任务详情给前端
 class TaskResponse(BaseModel):
+    """任务详情响应的数据模型。"""
+
     id: int
     title: str
     description: Optional[str]

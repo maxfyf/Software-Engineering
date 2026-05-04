@@ -22,6 +22,8 @@ class TeamRole(str, enum.Enum):
     MEMBER = "Member"
 
 class User(Base):
+    """系统用户模型，保存登录信息、个人资料以及关联任务/团队关系。"""
+
     __tablename__ = "users"
 
     username = Column(String(20), primary_key=True, index=True, unique=True)  # 主键、不重复
@@ -52,6 +54,8 @@ class User(Base):
 
 
 class Team(Base):
+    """协作团队模型，包含拥有者、成员关系以及团队任务。"""
+
     __tablename__ = "teams"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
@@ -66,6 +70,8 @@ class Team(Base):
 
 
 class TeamMember(Base):
+    """团队成员关系模型，用于记录用户在团队中的角色。"""
+
     __tablename__ = "team_members"
     __table_args__ = (
         UniqueConstraint("team_id", "username", name="uq_team_member"),
@@ -82,6 +88,8 @@ class TeamMember(Base):
 
 
 class Task(Base):
+    """任务模型，统一表示个人任务和团队任务。"""
+
     __tablename__ = "tasks"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
