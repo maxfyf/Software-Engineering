@@ -333,6 +333,19 @@ def remove_team_member(
     db.commit()
     return True, None
 
+
+def delete_team(db: Session, team_id: int) -> bool:
+    """删除团队，并同步删除该团队下的全部任务。"""
+    team = get_team_by_id(db, team_id)
+    if not team:
+        return False
+
+    # 先显式删除团队任务，确保现有数据库也不会把团队任务退化成个人任务。
+    db.query(models.Task).filter(models.Task.team_id == team_id).delete(synchronize_session=False)
+    db.delete(team)
+    db.commit()
+    return True
+
 # 任务相关（创建、查询、更新、删除）
 
 def create_task(db: Session, task: schemas.TaskCreate, username: str) -> models.Task:

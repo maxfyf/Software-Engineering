@@ -391,9 +391,8 @@ def delete_team_endpoint(team_id: int, current_user: User = Depends(get_current_
         raise HTTPException(status_code=404, detail="团队不存在")
     if team.owner_username != current_user.username:
         raise HTTPException(status_code=403, detail="只有拥有者可解散团队")
-    
-    db.delete(team)
-    db.commit()
+
+    crud.delete_team(db, team_id)
     return success_response("团队已解散")
 
 @app.post("/api/team/{team_id}/member")

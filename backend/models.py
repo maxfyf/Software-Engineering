@@ -62,7 +62,7 @@ class Team(Base):
 
     owner = relationship("User", back_populates="owned_teams", foreign_keys=[owner_username])
     members = relationship("TeamMember", back_populates="team", cascade="all, delete-orphan")
-    tasks = relationship("Task", back_populates="team")
+    tasks = relationship("Task", back_populates="team", cascade="all, delete-orphan")
 
 
 class TeamMember(Base):
@@ -103,7 +103,7 @@ class Task(Base):
     owner = relationship("User", back_populates="tasks", foreign_keys=[owner_username])
     
     #标记团队ID
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)  # 归属团队
+    team_id = Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), nullable=True)  # 归属团队
     assignee_username = Column(String(20), ForeignKey("users.username"), nullable=True)  # 被分配人
     
     #映射任务关系
