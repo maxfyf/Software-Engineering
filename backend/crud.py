@@ -227,6 +227,7 @@ def cancel_account(db: Session, username: str) -> bool:
 
     # 2. 解散该用户拥有的所有团队，并删除这些团队下的全部任务。
     owned_teams = db.query(models.Team).filter(models.Team.owner_username == username).all()
+    owned_team_ids = [team.id for team in owned_teams]
     for team in owned_teams:
         delete_team(db, team.id, commit=False)
 
@@ -260,9 +261,14 @@ def cancel_account(db: Session, username: str) -> bool:
         task.assignee_username = None
 
     # 6. 将该用户从所有参与或管理的团队中移除。
-    db.query(models.TeamMember).filter(
+    membership_cleanup_query = db.query(models.TeamMember).filter(
         models.TeamMember.username == username
-    ).delete(synchronize_session=False)
+    )
+    if owned_team_ids:
+        membership_cleanup_query = membership_cleanup_query.filter(
+            ~models.TeamMember.team_id.in_(owned_team_ids)
+        )
+    membership_cleanup_query.delete(synchronize_session=False)
 
     # 经过前面的显式清理后，直接删除用户记录，避免 ORM 级联再次删除已处理过的关系对象。
     db.query(models.User).filter(

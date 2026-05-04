@@ -229,6 +229,25 @@ class CancelAccountTests(CrudTestCase):
         self.assertEqual(response["msg"], "账号已注销")
         self.assertIsNone(crud.get_user_by_username(self.db, "alice"))
 
+    def test_cancel_account_does_not_double_delete_team_memberships(self):
+        # 用户既拥有团队又参与其他团队时，不应因为重复删除 team_members 触发 SAWarning。
+        for username in ["alice", "bob", "carol"]:
+            self.add_user(username)
+
+        owned_team = self.add_team("Owned Team", "alice")
+        self.add_team_member(owned_team.id, "bob", crud.ROLE_MEMBER)
+
+        shared_team = self.add_team("Shared Team", "bob")
+        self.add_team_member(shared_team.id, "alice", crud.ROLE_ADMIN)
+        self.add_team_member(shared_team.id, "carol", crud.ROLE_MEMBER)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", SAWarning)
+            cancelled = crud.cancel_account(self.db, "alice")
+
+        self.assertTrue(cancelled)
+        self.assertIsNone(crud.get_user_by_username(self.db, "alice"))
+
 
 class TeamMemberCrudTests(CrudTestCase):
     def test_add_team_member_adds_member_role_by_default(self):
