@@ -214,5 +214,124 @@ class TeamMemberCrudTests(CrudTestCase):
         self.assertEqual(error, "团队权限不足")
 
 
+class TaskTitleConflictTests(CrudTestCase):
+    def test_personal_task_title_does_not_conflict_with_team_task_in_same_team(self):
+        # A 的个人任务标题不应阻止 B 在共同团队中创建同名团队任务。
+        self.add_user("alice")
+        self.add_user("bob")
+        team = self.add_team("Shared Team", "alice")
+        self.add_team_member(team.id, "bob", crud.ROLE_MEMBER)
+        self.add_task("T", "alice")
+
+        conflict = crud.find_task_title_conflict(
+            self.db,
+            title="T",
+            username="bob",
+            team_id=team.id,
+        )
+
+        self.assertIsNone(conflict)
+
+    def test_personal_task_title_conflicts_with_visible_personal_task(self):
+        # 与前端保持一致：当前用户可见的个人任务标题重复时，应判定冲突。
+        self.add_user("alice")
+        self.add_user("bob")
+        existing_task = self.add_task("T", "alice", assignee_username="bob")
+
+        conflict = crud.find_task_title_conflict(
+            self.db,
+            title="T",
+            username="bob",
+            team_id=None,
+        )
+
+        self.assertIsNotNone(conflict)
+        self.assertEqual(conflict.id, existing_task.id)
+
+    def test_team_task_title_conflicts_with_same_team_task(self):
+        # 同一团队内的团队任务标题应唯一。
+        self.add_user("owner")
+        team = self.add_team("Alpha", "owner")
+        existing_task = self.add_task("T", "owner", team_id=team.id)
+
+        conflict = crud.find_task_title_conflict(
+            self.db,
+            title="T",
+            username="owner",
+            team_id=team.id,
+        )
+
+        self.assertIsNotNone(conflict)
+        self.assertEqual(conflict.id, existing_task.id)
+
+    def test_team_task_title_does_not_conflict_across_teams(self):
+        # 不同团队之间允许同名团队任务。
+        self.add_user("owner")
+        alpha = self.add_team("Alpha", "owner")
+        beta = self.add_team("Beta", "owner")
+        self.add_task("T", "owner", team_id=alpha.id)
+
+        conflict = crud.find_task_title_conflict(
+            self.db,
+            title="T",
+            username="owner",
+            team_id=beta.id,
+        )
+
+        self.assertIsNone(conflict)
+
+    def test_personal_task_title_update_conflicts_with_same_scope_title(self):
+        # 更新个人任务标题时，应忽略自身，但不能与同作用域内其他个人任务重名。
+        self.add_user("alice")
+        self.add_task("Old", "alice")
+        existing_task = self.add_task("Target", "alice")
+        updating_task = self.add_task("Draft", "alice")
+
+        conflict = crud.find_task_title_conflict(
+            self.db,
+            title="Target",
+            username="alice",
+            team_id=None,
+            exclude_task_id=updating_task.id,
+        )
+
+        self.assertIsNotNone(conflict)
+        self.assertEqual(conflict.id, existing_task.id)
+
+    def test_team_task_title_update_conflicts_with_same_team_title(self):
+        # 更新团队任务标题时，应按当前团队作用域查重。
+        self.add_user("owner")
+        team = self.add_team("Alpha", "owner")
+        existing_task = self.add_task("Target", "owner", team_id=team.id)
+        updating_task = self.add_task("Draft", "owner", team_id=team.id)
+
+        conflict = crud.find_task_title_conflict(
+            self.db,
+            title="Target",
+            username="owner",
+            team_id=team.id,
+            exclude_task_id=updating_task.id,
+        )
+
+        self.assertIsNotNone(conflict)
+        self.assertEqual(conflict.id, existing_task.id)
+
+    def test_team_task_title_update_to_same_title_on_self_is_allowed(self):
+        # 更新团队任务且标题不变时，不应把自己识别为冲突项。
+        self.add_user("owner")
+        team = self.add_team("Alpha", "owner")
+        task = self.add_task("Same", "owner", team_id=team.id)
+
+        conflict = crud.find_task_title_conflict(
+            self.db,
+            title="Same",
+            username="owner",
+            team_id=team.id,
+            exclude_task_id=task.id,
+        )
+
+        self.assertIsNone(conflict)
+
+
 if __name__ == "__main__":
     unittest.main()

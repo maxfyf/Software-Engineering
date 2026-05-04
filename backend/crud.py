@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 import models, schemas, security
 from fastapi import HTTPException
 
@@ -269,6 +270,38 @@ def cancel_account(db: Session, username: str) -> bool:
     return True
 
 # 任务相关（创建、查询、更新、删除）
+
+def find_task_title_conflict(
+    db: Session,
+    *,
+    title: str,
+    username: str,
+    team_id: int | None,
+    exclude_task_id: int | None = None
+) -> models.Task | None:
+    """按前端当前作用域规则查询同名任务冲突。"""
+    if not title or not title.strip():
+        return None
+
+    query = db.query(models.Task).filter(models.Task.title == title)
+
+    if team_id is None:
+        # 个人任务：和当前用户可见的个人任务比较。
+        query = query.filter(
+            models.Task.team_id.is_(None),
+            or_(
+                models.Task.owner_username == username,
+                models.Task.assignee_username == username
+            )
+        )
+    else:
+        # 团队任务：只和同一团队内的任务比较。
+        query = query.filter(models.Task.team_id == team_id)
+
+    if exclude_task_id is not None:
+        query = query.filter(models.Task.id != exclude_task_id)
+
+    return query.first()
 
 def create_task(db: Session, task: schemas.TaskCreate, username: str) -> models.Task:
     """创建任务并绑定到当前登录用户，写入数据库"""

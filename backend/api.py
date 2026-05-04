@@ -244,6 +244,29 @@ def get_task(task_id: int, current_user: User = Depends(get_current_user), db: S
 @app.post("/api/task/create")
 def create_task(task: TaskCreateRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """创建任务 - 个人任务任何人可创建，团队任务仅Admin/Owner可创建"""
+    target_team_id = None
+
+    # 处理团队任务
+    if task.team:
+        target_team_id = get_team_id_by_name(db, task.team)
+        if not target_team_id:
+            raise HTTPException(status_code=400, detail="团队不存在")
+        # 仅 Admin/Owner 可在团队中创建任务
+        if not crud.require_team_role(db, target_team_id, current_user.username, {crud.ROLE_ADMIN, crud.ROLE_OWNER}):
+            raise HTTPException(status_code=403, detail="无权在该团队中创建任务")
+
+    conflict = crud.find_task_title_conflict(
+        db,
+        title=task.title,
+        username=current_user.username,
+        team_id=target_team_id
+    )
+    if conflict:
+        raise HTTPException(
+            status_code=400,
+            detail="该团队中已存在同名任务" if target_team_id is not None else "个人任务中已存在同名任务"
+        )
+
     db_task = Task(
         title=task.title,
         description=task.description,
@@ -258,15 +281,8 @@ def create_task(task: TaskCreateRequest, current_user: User = Depends(get_curren
         except:
             pass
     
-    # 处理团队任务
-    if task.team:
-        team_id = get_team_id_by_name(db, task.team)
-        if not team_id:
-            raise HTTPException(status_code=400, detail="团队不存在")
-        # 仅 Admin/Owner 可在团队中创建任务
-        if not crud.require_team_role(db, team_id, current_user.username, {crud.ROLE_ADMIN, crud.ROLE_OWNER}):
-            raise HTTPException(status_code=403, detail="无权在该团队中创建任务")
-        db_task.team_id = team_id
+    if target_team_id is not None:
+        db_task.team_id = target_team_id
     
     # 处理负责人
     if task.assignee:
@@ -290,6 +306,16 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
     if not task.team_id:
         if task.owner_username != current_user.username:
             raise HTTPException(status_code=403, detail="无权编辑该任务")
+        new_title = task_update.title if task_update.title is not None else task.title
+        conflict = crud.find_task_title_conflict(
+            db,
+            title=new_title,
+            username=current_user.username,
+            team_id=None,
+            exclude_task_id=task.id
+        )
+        if conflict:
+            raise HTTPException(status_code=400, detail="个人任务中已存在同名任务")
         # 个人任务允许修改所有字段
         if task_update.title is not None:
             task.title = task_update.title
@@ -305,11 +331,27 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
             except:
                 pass
     else:
+        target_team_id = task.team_id
+        if task_update.team is not None:
+            target_team_id = get_team_id_by_name(db, task_update.team)
+            if task_update.team and not target_team_id:
+                raise HTTPException(status_code=400, detail="团队不存在")
+
         # 团队任务权限判断
         is_admin_or_owner = crud.require_team_role(db, task.team_id, current_user.username, {crud.ROLE_ADMIN, crud.ROLE_OWNER})
         is_assignee = task.assignee_username == current_user.username
         
         if is_admin_or_owner:
+            new_title = task_update.title if task_update.title is not None else task.title
+            conflict = crud.find_task_title_conflict(
+                db,
+                title=new_title,
+                username=current_user.username,
+                team_id=target_team_id,
+                exclude_task_id=task.id
+            )
+            if conflict:
+                raise HTTPException(status_code=400, detail="该团队中已存在同名任务")
             # Admin/Owner 可修改所有字段
             if task_update.title is not None:
                 task.title = task_update.title
@@ -325,7 +367,7 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
                 except:
                     pass
             if task_update.team is not None:
-                task.team_id = get_team_id_by_name(db, task_update.team)
+                task.team_id = target_team_id
             if task_update.assignee is not None:
                 task.assignee_username = task_update.assignee
         elif is_assignee:
