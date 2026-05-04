@@ -503,11 +503,7 @@ def get_assigned_tasks(
 @app.get("/api/teams/{team_id}/tasks", response_model=dict)
 def get_team_tasks(
     team_id: int,
-<<<<<<< HEAD
     current_user: schemas.UserResponse = Depends(get_current_user),
-=======
-    current_user: User = Depends(get_current_user),
->>>>>>> backend/feature/team-permission
     db: Session = Depends(get_db)
 ):
     """
