@@ -560,22 +560,33 @@ def update_task_status(
     普通成员专用：仅更新任务状态
     只能修改分配给自己的任务
     """
+    #参数有效性校验
     if task_id <= 0:
         raise HTTPException(status_code=400, detail="无效的任务ID")
     if not status or not status.strip():
         raise HTTPException(status_code=400, detail="任务状态不能为空")
-    task = db.query(Task).filter(Task.id == task_id).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="任务不存在")
-    if not task.assignee_username:
-        raise HTTPException(status_code=403, detail="该任务未分配任何人")
+    
+    try:
+        task = db.query(Task).filter(Task.id == task_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="任务不存在")
+       
+        if not task.assignee_username:
+            raise HTTPException(status_code=403, detail="该任务未分配任何人")
+        
+        if task.assignee_username != current_user.username:
+            raise HTTPException(status_code=403, detail="只能修改分配给自己的任务状态")
 
-    if task.assignee_username != current_user.username:
-        raise HTTPException(status_code=403, detail="只能修改分配给自己的任务状态")
+        updated_task = crud.update_task_status_only(db, task_id, status)
+        if not updated_task:
+            raise HTTPException(status_code=500, detail="任务状态更新失败")
 
-    updated_task = crud.update_task_status_only(db, task_id, status)
-    if not updated_task:
-        raise HTTPException(status_code=500, detail="任务状态更新失败")
+    #服务器内部异常包装
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"服务器内部异常,任务状态更新失败: {str(e)}"
+        )    
     return success_response("任务状态更新成功", {
         "id": updated_task.id,
         "status": updated_task.status
