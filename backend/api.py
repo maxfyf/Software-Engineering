@@ -183,8 +183,7 @@ def get_user_info(current_user: User = Depends(get_current_user)):
 @app.delete("/api/user/cancel")
 def cancel_account(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """注销账号"""
-    db.delete(current_user)
-    db.commit()
+    crud.cancel_account(db, current_user.username)
     return success_response("账号已注销")
 
 # ===================== 任务模块 =====================

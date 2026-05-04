@@ -334,7 +334,7 @@ def remove_team_member(
     return True, None
 
 
-def delete_team(db: Session, team_id: int) -> bool:
+def delete_team(db: Session, team_id: int, *, commit: bool = True) -> bool:
     """删除团队，并同步删除该团队下的全部任务。"""
     team = get_team_by_id(db, team_id)
     if not team:
@@ -343,6 +343,63 @@ def delete_team(db: Session, team_id: int) -> bool:
     # 先显式删除团队任务，确保现有数据库也不会把团队任务退化成个人任务。
     db.query(models.Task).filter(models.Task.team_id == team_id).delete(synchronize_session=False)
     db.delete(team)
+    if commit:
+        db.commit()
+    return True
+
+
+def cancel_account(db: Session, username: str) -> bool:
+    """按业务规则注销账号，并清理/迁移与该用户关联的数据。"""
+    user = get_user_by_username(db, username)
+    if not user:
+        return False
+
+    # 1. 删除该用户的所有个人任务。
+    db.query(models.Task).filter(
+        models.Task.owner_username == username,
+        models.Task.team_id.is_(None)
+    ).delete(synchronize_session=False)
+
+    # 2. 解散该用户拥有的所有团队，并删除这些团队下的全部任务。
+    owned_teams = db.query(models.Team).filter(models.Team.owner_username == username).all()
+    for team in owned_teams:
+        delete_team(db, team.id, commit=False)
+
+    # 3. 将该用户负责的所有剩余团队任务转交给各自团队拥有者。
+    assigned_team_tasks = db.query(models.Task).join(
+        models.Team, models.Task.team_id == models.Team.id
+    ).filter(
+        models.Task.team_id.isnot(None),
+        models.Task.assignee_username == username
+    ).all()
+    for task in assigned_team_tasks:
+        task.assignee_username = task.team.owner_username
+
+    # 4. 对仍然保留的团队任务，如果该用户是创建者，则同步改为团队拥有者，
+    #    避免删除用户时留下 owner 外键引用。
+    owned_team_tasks = db.query(models.Task).join(
+        models.Team, models.Task.team_id == models.Team.id
+    ).filter(
+        models.Task.team_id.isnot(None),
+        models.Task.owner_username == username
+    ).all()
+    for task in owned_team_tasks:
+        task.owner_username = task.team.owner_username
+
+    # 5. 清理其他用户个人任务里指向该用户的负责人引用。
+    personal_assigned_tasks = db.query(models.Task).filter(
+        models.Task.team_id.is_(None),
+        models.Task.assignee_username == username
+    ).all()
+    for task in personal_assigned_tasks:
+        task.assignee_username = None
+
+    # 6. 将该用户从所有参与或管理的团队中移除。
+    db.query(models.TeamMember).filter(
+        models.TeamMember.username == username
+    ).delete(synchronize_session=False)
+
+    db.delete(user)
     db.commit()
     return True
 
