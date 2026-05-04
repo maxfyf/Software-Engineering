@@ -183,6 +183,8 @@ export const removeTeam = async (teamId) => {
     if (index !== -1) {
         teamList.value.splice(index, 1)
     }
+    // 强制刷新任务列表，清除已删除团队的任务
+    await initTaskList(true)
     return true
 }
 

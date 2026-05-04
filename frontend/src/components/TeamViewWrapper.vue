@@ -74,7 +74,9 @@ const {
       <el-input
           v-model="newTeamTitle"
           type="text"
-          placeholder="团队名"
+          placeholder="团队名（最多12个字符）"
+          maxlength="12"
+          show-word-limit
       />
       <template #footer>
         <div class="dialog-footer">

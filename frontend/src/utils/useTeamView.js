@@ -1,7 +1,8 @@
-import { ref, computed} from 'vue'
-import { teamList, highlightTeamId, addTeam } from '@/store/user.js'
+import { ref, computed, onMounted } from 'vue'
+import { teamList, highlightTeamId, addTeam, initTeamList } from '@/store/user.js'
 import { useRoute, useRouter } from 'vue-router'
 import { handleEnter } from "@/utils/routeManager.js";
+import { ElMessage } from 'element-plus';
 
 export function useTeamView(filterFn = null) {
     const route = useRoute()
@@ -22,6 +23,11 @@ export function useTeamView(filterFn = null) {
     const createDialogVisible = ref(false)
     const newTeamTitle = ref('')
 
+    // 初始化团队列表
+    onMounted(async () => {
+        await initTeamList()
+    })
+
     // 下拉框中选择团队进入团队空间的回调函数handleSelect（建议重构为handleSelectTask和handleSelectTeam)
     const handleSelect = (teamTitle) => {
         const team = teams.value.find(t => t.title === teamTitle)
@@ -39,15 +45,25 @@ export function useTeamView(filterFn = null) {
     // 确认创建团队
     const handleCreateTeam = async () => {
         if (!newTeamTitle.value || newTeamTitle.value.trim() === '') {
+            ElMessage.error('团队名称不能为空')
             return
         }
-        
-        await addTeam({
-            title: newTeamTitle.value.trim()
-        })
-        
-        createDialogVisible.value = false
-        newTeamTitle.value = ''
+
+        const trimmedTitle = newTeamTitle.value.trim()
+        if (trimmedTitle.length > 12) {
+            ElMessage.error('团队名称长度不能超过12个字符')
+            return
+        }
+
+        try {
+            await addTeam({
+                title: trimmedTitle
+            })
+            createDialogVisible.value = false
+            newTeamTitle.value = ''
+        } catch (error) {
+            console.error('创建团队失败:', error)
+        }
     }
 
     // 取消创建团队
