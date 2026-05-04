@@ -133,6 +133,7 @@ export const translate = (route) => {
                         innerRoute.push('编辑个人任务\"' + task.title + '\"')
                     }
                     if(res.path.length > 4) return ''
+                    return innerRoute
                 default:
                     return ''
             }
