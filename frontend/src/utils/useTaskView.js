@@ -15,8 +15,18 @@ export function useTaskView(filterFn = null) {
     return taskList.value
   })
 
-  // 搜索数据集
-  const dataset = computed(() => tasks.value.map(task => task.title))
+  // 搜索数据集，同名任务需要区分显示
+  const dataset = computed(() => {
+    return tasks.value.map(task => {
+      if (task.team) {
+        // 团队任务：显示 "任务名 (团队名)"
+        return `${task.title} (${task.team})`
+      } else {
+        // 个人任务：显示 "任务名 (个人)"
+        return `${task.title} (个人)`
+      }
+    })
+  })
 
   // 分页状态
   const currentPage = ref(1)
@@ -32,8 +42,23 @@ export function useTaskView(filterFn = null) {
   })
 
   // 搜索选中任务
-  const handleSelect = (taskName) => {
-    const task = tasks.value.find(t => t.title === taskName)
+  const handleSelect = (displayText) => {
+    // 解析显示文本：格式为 "任务名 (团队名)" 或 "任务名 (个人)"
+    const match = displayText.match(/^(.+) \((.+)\)$/)
+    if (!match) return
+
+    const title = match[1]
+    const teamInfo = match[2]
+
+    // 根据团队信息匹配正确的任务
+    const task = tasks.value.find(t => {
+      if (teamInfo === '个人') {
+        return t.title === title && t.team === null
+      } else {
+        return t.title === title && t.team === teamInfo
+      }
+    })
+
     if (task) {
       const index = tasks.value.findIndex(t => t.id === task.id)
       currentPage.value = Math.floor(index / pageSize.value) + 1
