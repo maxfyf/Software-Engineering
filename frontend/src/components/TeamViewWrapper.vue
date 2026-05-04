@@ -75,7 +75,7 @@ const {
           v-model="newTeamTitle"
           type="text"
           placeholder="团队名"
-          maxlength="12"
+          maxlength="10"
           show-word-limit
       />
       <template #footer>
