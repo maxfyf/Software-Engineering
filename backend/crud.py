@@ -216,8 +216,7 @@ def delete_team(db: Session, team_id: int, *, commit: bool = True) -> bool:
 
 def cancel_account(db: Session, username: str) -> bool:
     """按业务规则注销账号，并清理/迁移与该用户关联的数据。"""
-    user = get_user_by_username(db, username)
-    if not user:
+    if not get_user_by_username(db, username):
         return False
 
     # 1. 删除该用户的所有个人任务。
@@ -265,7 +264,10 @@ def cancel_account(db: Session, username: str) -> bool:
         models.TeamMember.username == username
     ).delete(synchronize_session=False)
 
-    db.delete(user)
+    # 经过前面的显式清理后，直接删除用户记录，避免 ORM 级联再次删除已处理过的关系对象。
+    db.query(models.User).filter(
+        models.User.username == username
+    ).delete(synchronize_session=False)
     db.commit()
     return True
 

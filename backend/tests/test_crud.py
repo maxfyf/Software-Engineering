@@ -2,9 +2,11 @@ import os
 import sys
 import tempfile
 import unittest
+import warnings
 from pathlib import Path
 
 from sqlalchemy import create_engine
+from sqlalchemy.exc import SAWarning
 from sqlalchemy.orm import sessionmaker
 
 
@@ -184,6 +186,30 @@ class CancelAccountTests(CrudTestCase):
     def test_cancel_account_returns_false_for_missing_user(self):
         # 不存在的用户无需清理，返回 False 即可。
         self.assertFalse(crud.cancel_account(self.db, "ghost"))
+
+    def test_cancel_account_succeeds_after_relationships_are_preloaded(self):
+        # 预加载 ORM 关系后再注销，也不应因重复级联删除触发 SQLAlchemy 告警或异常。
+        for username in ["alice", "bob"]:
+            self.add_user(username)
+
+        owned_team = self.add_team("Owned Team", "alice")
+        self.add_task("owned team task", "alice", team_id=owned_team.id, assignee_username="alice")
+        shared_team = self.add_team("Shared Team", "bob")
+        self.add_team_member(shared_team.id, "alice", crud.ROLE_ADMIN)
+        self.add_task("shared team task", "alice", team_id=shared_team.id, assignee_username="alice")
+        self.add_task("alice personal", "alice")
+
+        user = crud.get_user_by_username(self.db, "alice")
+        _ = list(user.team_memberships)
+        _ = list(user.tasks)
+        _ = list(user.owned_teams)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", SAWarning)
+            cancelled = crud.cancel_account(self.db, "alice")
+
+        self.assertTrue(cancelled)
+        self.assertIsNone(crud.get_user_by_username(self.db, "alice"))
 
 
 class TeamMemberCrudTests(CrudTestCase):
