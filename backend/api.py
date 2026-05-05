@@ -264,8 +264,8 @@ def create_task(task: TaskCreateRequest, current_user: User = Depends(get_curren
     if task.deadline:
         try:
             db_task.due_date = datetime.strptime(task.deadline, "%Y-%m-%d")
-        except:
-            pass
+        except ValueError:
+            raise HTTPException(status_code=400, detail="截止日期格式应为 YYYY-MM-DD")
     
     if target_team_id is not None:
         db_task.team_id = target_team_id
@@ -314,8 +314,8 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
         if task_update.deadline is not None:
             try:
                 task.due_date = datetime.strptime(task_update.deadline, "%Y-%m-%d")
-            except:
-                pass
+            except ValueError:
+                raise HTTPException(status_code=400, detail="截止日期格式应为 YYYY-MM-DD")
     else:
         target_team_id = task.team_id
         if task_update.team is not None:
@@ -350,8 +350,8 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
             if task_update.deadline is not None:
                 try:
                     task.due_date = datetime.strptime(task_update.deadline, "%Y-%m-%d")
-                except:
-                    pass
+                except ValueError:
+                    raise HTTPException(status_code=400, detail="截止日期格式应为 YYYY-MM-DD")
             if task_update.team is not None:
                 task.team_id = target_team_id
             if task_update.assignee is not None:
@@ -606,7 +606,7 @@ def create_team_task(
 @app.put("/api/tasks/{task_id}/status", response_model=dict)
 def update_task_status(
     task_id: int,
-    status: str,
+    task_status: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -617,7 +617,7 @@ def update_task_status(
     #参数有效性校验
     if task_id <= 0:
         raise HTTPException(status_code=400, detail="无效的任务ID")
-    if not status or not status.strip():
+    if not task_status or not task_status.strip():
         raise HTTPException(status_code=400, detail="任务状态不能为空")
     
     try:
@@ -631,7 +631,7 @@ def update_task_status(
         if task.assignee_username != current_user.username:
             raise HTTPException(status_code=403, detail="只能修改分配给自己的任务状态")
 
-        updated_task = crud.update_task_status_only(db, task_id, status)
+        updated_task = crud.update_task_status_only(db, task_id, task_status)
         if not updated_task:
             raise HTTPException(status_code=500, detail="任务状态更新失败")
 
