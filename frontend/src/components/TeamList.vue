@@ -43,15 +43,18 @@ const handleCommand = (command) => {
   }
 }
 
-const currentTeam = ref(undefined)
+const currentTeam = ref(null)
 const visible = computed(() => {
-  return currentTeam.value === undefined
+  return currentTeam.value !== null
 })
 const newOwner = ref('');
-const dialogResolve = ref(null)
+let resolveDialog = null;
 const closeDialog = () => {
-  currentTeam.value = undefined
-  dialogResolve.value = true
+  if (resolveDialog) {
+    resolveDialog(true)
+    resolveDialog = null
+  }
+  currentTeam.value = null
 }
 
 // 退出团队
@@ -72,16 +75,10 @@ const quitTeam = (item) => {
   ).then(async () => {
     if (item.owner === currentUser.username) {
       currentTeam.value = item
-      await new Promise(() => {
-        const stopWatch = watch(
-            () => dialogResolve.value,
-            (newValue) => {
-              if (newValue === true) {
-                stopWatch()
-                dialogResolve.value = null
-              }
-            }
-        )
+      console.log(currentTeam.value)
+      console.log(visible.value)
+      await new Promise((resolve) => {
+        resolveDialog = resolve
       })
       // TODO: 将该团队的owner改成newOwner
     }
@@ -114,6 +111,7 @@ const deleteTeam = (item) => {
 // 进入团队空间
 const enterTeamSpace = (item) => {
   console.log('进入团队空间:', item.id)
+  console.log(currentTeam.value)
   highlightTeamId.value = item.id
   emit('enterTeamSpace', item.id)
 }
@@ -184,18 +182,18 @@ const enterTeamSpace = (item) => {
     :show-close="false"
   >
     <template #header>
-      <span class="dialog-title">为{{currentTeam.value.title}}选择新的拥有者</span>
+      <span class="dialog-title">为{{currentTeam?.title}}选择新的拥有者</span>
     </template>
 
     <el-select v-model="newOwner">
       <el-option
-          v-for="item in currentTeam.value.admin"
+          v-for="item in currentTeam?.admin"
           :key="item"
           :label="item"
           :value="item"
       />
       <el-option
-          v-for="item in currentTeam.value.member"
+          v-for="item in currentTeam?.member"
           :key="item"
           :label="item"
           :value="item"
