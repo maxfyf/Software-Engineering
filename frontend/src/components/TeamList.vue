@@ -150,7 +150,7 @@ const enterTeamSpace = (item) => {
           <div class="info-line">
             <div class="info-wrapper">
             <span class="info">
-              创建者：{{item.owner}}
+              拥有者：{{item.owner}}
             </span>
               <span class="info">
               成员：{{1 + item.admin.length + item.member.length}}人
