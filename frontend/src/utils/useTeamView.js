@@ -16,7 +16,7 @@ export function useTeamView(filterFn = null) {
         return teamList.value
     })
 
-    // 团队名字符串数组dataset（建议重构为taskNames和teamNames）
+    // 团队名字符串数组dataset
     const dataset = computed(() => teams.value.map(team => team.title))
 
     // 新建团队弹窗状态
@@ -28,15 +28,16 @@ export function useTeamView(filterFn = null) {
         await initTeamList()
     })
 
-    // 下拉框中选择团队进入团队空间的回调函数handleSelect（建议重构为handleSelectTask和handleSelectTeam)
+    // 下拉框中选择团队进入团队空间的回调函数handleSelect
     const handleSelect = (teamTitle) => {
         const team = teams.value.find(t => t.title === teamTitle)
         if (team) {
             highlightTeamId.value = team.id
+            handleEnterTeamSpace(team.id)
         }
     }
 
-    // 创建新团队的函数handleNew（建议重构为handleNewTask和handleNewTeam)
+    // 创建新团队的函数handleNew
     const handleNew = () => {
         createDialogVisible.value = true
         newTeamTitle.value = ''
