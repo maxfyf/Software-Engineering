@@ -1,5 +1,6 @@
 <script setup lang="js">
-import { currentUser, highlightTeamId, removeTeam} from "@/store/user.js";
+import { currentUser, highlightTeamId, removeTeam, teamList } from "@/store/user.js";
+import api from "@/request/api.js";
 import { ElMessage, ElMessageBox } from "element-plus";
 import TwoColumnsWrapper from "@/components/TwoColumnsWrapper.vue";
 import { MoreFilled, Right } from "@element-plus/icons-vue";
@@ -73,18 +74,31 @@ const quitTeam = (item) => {
         type: undefined
       }
   ).then(async () => {
-    if (item.owner === currentUser.username) {
-      currentTeam.value = item
-      console.log(currentTeam.value)
-      console.log(visible.value)
-      await new Promise((resolve) => {
-        resolveDialog = resolve
-      })
-      // TODO: 将该团队的owner改成newOwner
+    try {
+      if (item.owner === currentUser.username) {
+        currentTeam.value = item
+        console.log(currentTeam.value)
+        console.log(visible.value)
+        await new Promise((resolve) => {
+          resolveDialog = resolve
+        })
+        // 将该团队的owner改成newOwner
+        await api.transferOwner(item.id, newOwner.value)
+      }
+      highlightTeamId.value = null
+      // 将该用户从团队中移除
+      await api.leaveTeam(item.id)
+      // 更新本地团队列表
+      const index = teamList.value.findIndex(t => t.id === item.id)
+      if (index !== -1) {
+        teamList.value.splice(index, 1)
+      }
+      ElMessage.success('已退出团队')
+    } catch (e) {
+      console.error('退出团队失败:', e)
     }
-    highlightTeamId.value = null
-    // TODO: 将该用户从团队中移除
-    ElMessage.success('已退出团队')
+  }).catch(() => {
+    console.log('取消退出')
   })
 }
 
