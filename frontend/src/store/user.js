@@ -22,7 +22,8 @@ export const taskInfo = {
     createdAt: '',
     updatedAt: '',
     team: null,
-    assignee: []
+    assignee: [],
+    predecessor: []
 }
 
 // 团队数据结构

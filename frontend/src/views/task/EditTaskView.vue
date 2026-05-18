@@ -3,9 +3,11 @@ import { ref, computed, onMounted} from "vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import Route from "@/components/Route.vue";
+import SelectableList from "@/components/SelectableList.vue";
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { taskList, addTask, getTaskById, updateTask, teamList } from '@/store/user.js';
+import {taskList, addTask, getTaskById, updateTask, teamList, currentUser} from '@/store/user.js';
 import { handleBack } from "@/utils/routeManager.js"
+import {Edit} from "@element-plus/icons-vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -19,6 +21,7 @@ const newTitle = ref('')
 const newAssignee = ref('')
 const newDescription = ref('')
 const newStatus = ref('待办')
+const newPredecessor = ref([])
 const newPriority = ref('中')
 const newDate = ref('')
 
@@ -57,6 +60,24 @@ const scopeTaskList = computed(() => {
   }
 })
 
+const candidateTaskList = computed(() => {
+  return scopeTaskList.value.filter(t => t.id !== taskId.value).map(task => task.title)
+})
+
+const showPredecessor = ref(false)
+const tempPredecessor = ref([])
+const showPredecessorDialog = () => {
+  showPredecessor.value = true
+}
+const closePredecessorDialog = () => {
+  showPredecessor.value = false
+}
+const updateNewPredecessor = () => {
+  // TODO: 基于窗口中选中的前置任务(tempPredecessor)更新newPredecessor
+
+  closePredecessorDialog()
+}
+
 // 检查是否有修改
 const hasChanges = () => {
   if (isNew.value) {
@@ -70,7 +91,8 @@ const hasChanges = () => {
   const originalAssignee = Array.isArray(originalTask.value.assignee)
       ? (originalTask.value.assignee[0] || '')
       : (originalTask.value.assignee || '')
-  
+
+  // TODO: 新增newPredecessor（注意：编辑模式下还需在加载页面时初始化newPredecessor）
   return newTitle.value !== originalTask.value.title ||
          (isTeamTask.value && newAssignee.value !== originalAssignee) ||
          newDescription.value !== (originalTask.value.description || '') ||
@@ -244,7 +266,7 @@ onBeforeRouteLeave((to, from, next) => {
               class="description"
               v-model="newDescription"
               type="textarea"
-              :rows="isTeamTask ? 8 : 10"
+              :rows="isTeamTask ? 7 : 9"
           />
         </div>
 
@@ -255,6 +277,20 @@ onBeforeRouteLeave((to, from, next) => {
             <el-option label="进行中" value="进行中"/>
             <el-option label="已完成" value="已完成"/>
           </el-select>
+        </div>
+
+        <div class="item">
+          <span class="key">前置任务：{{newPredecessor.length}}个</span>
+          <el-button
+              link
+              type="text"
+              class="edit-button"
+              @click="showPredecessorDialog"
+          >
+            <el-icon>
+              <Edit/>
+            </el-icon>
+          </el-button>
         </div>
 
         <div class="item">
@@ -310,6 +346,43 @@ onBeforeRouteLeave((to, from, next) => {
       </el-card>
     </div>
   </HeaderWrapper>
+
+  <el-dialog
+      v-model="showPredecessor"
+      width="600px"
+      center
+      :beforeClose="closePredecessorDialog"
+  >
+    <template #header>
+      <span class="dialog-title">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;编辑前置任务</span>
+    </template>
+    <div class="dialog-body">
+      <SelectableList
+          v-model="tempPredecessor"
+          :candidates="candidateTaskList"
+          emptyText="暂无其它任务"
+      />
+    </div>
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button
+            type="default"
+            class="cancel-button"
+            @click="closePredecessorDialog"
+        >
+          取消
+        </el-button>
+
+        <el-button
+            type="primary"
+            class="check-button"
+            @click="updateNewPredecessor"
+        >
+          确认
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped>
@@ -376,6 +449,11 @@ onBeforeRouteLeave((to, from, next) => {
   font-size: 15px;
 }
 
+.edit-button {
+  margin-left: 15px;
+  font-size: 24px;
+}
+
 .priority {
   width: 70px;
   font-size: 15px;
@@ -390,6 +468,42 @@ onBeforeRouteLeave((to, from, next) => {
   height: 35px;
   display: flex;
   flex-direction: row;
+}
+
+.dialog-title {
+  color: black;
+  font-weight: bold;
+  font-size: 20px;
+}
+
+.dialog-body {
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
+  margin: 0 15px 0 15px;
+}
+
+.dialog-footer {
+  width: 100%;
+  height: 30px;
+  display: flex;
+  flex-direction: row;
+}
+
+.cancel-button {
+  margin-left: 20%;
+  margin-right: auto;
+  width: 70px;
+  height: 100%;
+  font-size: 18px;
+}
+
+.check-button {
+  margin-left: auto;
+  margin-right: 20%;
+  width: 70px;
+  height: 100%;
+  font-size: 18px;
 }
 
 .cancel {
