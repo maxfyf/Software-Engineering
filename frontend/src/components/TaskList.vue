@@ -1,5 +1,5 @@
 <script setup lang="js">
-import { computed } from 'vue';
+import { computed, ref, h } from 'vue';
 import { useRoute, useRouter } from 'vue-router'
 import {
   finishTask,
@@ -11,7 +11,7 @@ import {
 } from "@/store/user.js";
 import { handleEnter } from "@/utils/routeManager.js"
 import { View, CaretRight, Check, Edit, Delete } from "@element-plus/icons-vue";
-import { ElMessage, ElMessageBox } from "element-plus";
+import { ElMessage, ElMessageBox, ElCheckbox } from "element-plus";
 
 const props = defineProps({
   tasks: {
@@ -130,9 +130,24 @@ const isTaskTeamAdmin = (task) => {
 }
 
 // 删除任务
+const cascade = ref(false)    // 级联标记
 const deleteTask = (row) => {
   ElMessageBox.confirm(
-      `确定要删除任务"${row.title}"吗？`,
+      h('div', [
+        h('p', `确定要删除任务"${row.title}"吗？`),
+        h(ElCheckbox, {
+          checked: cascade.value,
+          onInput: (event) => {
+            cascade.value = event.target.checked
+          },
+          style: {
+            position: 'absolute',
+            bottom: '13px',
+            left: '20px',
+            zIndex: 1
+          }
+        }, () => '级联删除')
+      ]),
       '',
       {
         confirmButtonText: '确定',
@@ -142,6 +157,7 @@ const deleteTask = (row) => {
       }
   ).then(() => {
     highlightTaskId.value = null
+    // TODO: 基于cascade.value决定是否级联删除
     removeTask(row.id)
     ElMessage.success('任务已删除')
   }).catch(() => {
