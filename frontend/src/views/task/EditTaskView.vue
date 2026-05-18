@@ -73,7 +73,11 @@ const closePredecessorDialog = () => {
   showPredecessor.value = false
 }
 const updateNewPredecessor = () => {
-  // TODO: 基于窗口中选中的前置任务(tempPredecessor)更新newPredecessor
+  /* TODO: 基于窗口中选中的前置任务(tempPredecessor)更新newPredecessor
+   *       记得检查“前置”这种偏序关系中是否出现环路，即编辑任务A的前置任务时，如果存在任务B为A的直接/间接后继任务，
+   *       而A又试图新增任务B为前置任务，此时拒绝确认操作，并提示用户新增前置任务B将导致拓扑排序中出现环路
+   *       实际实现中可以对每一个新增的前置任务，向上追溯其所有直接/间接任务，查找是否包含当前任务
+   */
 
   closePredecessorDialog()
 }

@@ -14,26 +14,26 @@ export const userInfo = {
 // 任务数据结构
 export const taskInfo = {
     id: null,
-    title: '',
-    description: '',
-    status: '',
-    priority: '',
-    deadline: '',
-    createdAt: '',
-    updatedAt: '',
-    team: null,
-    assignee: [],
-    predecessor: []
+    title: '',         //标题
+    description: '',   // 描述
+    status: '',        // 状态
+    priority: '',      // 优先级
+    deadline: '',      // 截止日期
+    createdAt: '',     // 创建时间
+    updatedAt: '',     // 更新时间
+    team: null,        // 所属团队
+    assignee: [],      // 负责人
+    predecessor: []    // 直接前置任务
 }
 
 // 团队数据结构
 export const teamInfo = {
     id: null,
-    title: '',
-    tasks: [],
-    owner: '',
-    admin: [],
-    member: []
+    title: '',         // 标题
+    tasks: [],         // 团队任务
+    owner: '',         // 拥有者
+    admin: [],         // 管理者
+    member: []         // 参与者
 }
 
 // 当前登录用户信息
