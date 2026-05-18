@@ -1,8 +1,10 @@
 <script setup lang="js">
-import { currentUser, highlightTeamId, removeTeam} from "@/store/user.js";
+import { currentUser, highlightTeamId, removeTeam, teamList } from "@/store/user.js";
+import api from "@/request/api.js";
 import { ElMessage, ElMessageBox } from "element-plus";
 import TwoColumnsWrapper from "@/components/TwoColumnsWrapper.vue";
-import { Delete, Right } from "@element-plus/icons-vue";
+import { MoreFilled, Right } from "@element-plus/icons-vue";
+import { computed, ref, watch } from "vue";
 
 const props = defineProps({
   teams: {
@@ -29,6 +31,77 @@ const role = (item) => {
   }
 }
 
+const handleCommand = (command) => {
+  switch (command.action) {
+    case 'quit':
+      quitTeam(command.item)
+      break;
+    case 'disband':
+      deleteTeam(command.item)
+      break;
+    default:
+      break;
+  }
+}
+
+const currentTeam = ref(null)
+const visible = computed(() => {
+  return currentTeam.value !== null
+})
+const newOwner = ref('');
+let resolveDialog = null;
+const closeDialog = () => {
+  if (resolveDialog) {
+    resolveDialog(true)
+    resolveDialog = null
+  }
+  currentTeam.value = null
+}
+
+// 退出团队
+const quitTeam = (item) => {
+  if (item.admin.length === 0 && item.member.length === 0) {
+    ElMessage.error('您是团队中的唯一成员，无法退出团队')
+    return
+  }
+  ElMessageBox.confirm(
+      `确定要退出团队"${item.title}"吗？`,
+      '',
+      {
+        confirmButtonText: '确定',
+        confirmButtonType: 'danger',
+        cancelButtonText: '取消',
+        type: undefined
+      }
+  ).then(async () => {
+    try {
+      if (item.owner === currentUser.username) {
+        currentTeam.value = item
+        console.log(currentTeam.value)
+        console.log(visible.value)
+        await new Promise((resolve) => {
+          resolveDialog = resolve
+        })
+        // 将该团队的owner改成newOwner
+        await api.transferOwner(item.id, newOwner.value)
+      }
+      highlightTeamId.value = null
+      // 将该用户从团队中移除
+      await api.leaveTeam(item.id)
+      // 更新本地团队列表
+      const index = teamList.value.findIndex(t => t.id === item.id)
+      if (index !== -1) {
+        teamList.value.splice(index, 1)
+      }
+      ElMessage.success('已退出团队')
+    } catch (e) {
+      console.error('退出团队失败:', e)
+    }
+  }).catch(() => {
+    console.log('取消退出')
+  })
+}
+
 // 解散团队
 const deleteTeam = (item) => {
   ElMessageBox.confirm(
@@ -52,6 +125,7 @@ const deleteTeam = (item) => {
 // 进入团队空间
 const enterTeamSpace = (item) => {
   console.log('进入团队空间:', item.id)
+  console.log(currentTeam.value)
   highlightTeamId.value = item.id
   emit('enterTeamSpace', item.id)
 }
@@ -64,23 +138,33 @@ const enterTeamSpace = (item) => {
         <div class="card-content">
           <div class="title-line">
             <span class="title">{{item.title}}</span>
-            <el-button
-                link
-                type="text"
-                class="delete-button"
-                v-if="item.owner === currentUser.username"
-                @click="deleteTeam(item)"
-            >
+            <el-dropdown class="more" trigger="click" @command="handleCommand">
               <el-icon>
-                <Delete/>
+                <MoreFilled/>
               </el-icon>
-            </el-button>
+
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item
+                      :command="{ action: 'quit', item: item }"
+                  >
+                    退出团队
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                      :command="{ action: 'disband', item: item }"
+                      v-if="item.owner === currentUser.username"
+                  >
+                    解散团队
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
 
           <div class="info-line">
             <div class="info-wrapper">
             <span class="info">
-              创建者：{{item.owner}}
+              拥有者：{{item.owner}}
             </span>
               <span class="info">
               成员：{{1 + item.admin.length + item.member.length}}人
@@ -104,6 +188,44 @@ const enterTeamSpace = (item) => {
       </el-card>
     </template>
   </TwoColumnsWrapper>
+
+  <el-dialog
+    v-model="visible"
+    width="500px"
+    center
+    :show-close="false"
+  >
+    <template #header>
+      <span class="dialog-title">为{{currentTeam?.title}}选择新的拥有者</span>
+    </template>
+
+    <el-select v-model="newOwner">
+      <el-option
+          v-for="item in currentTeam?.admin"
+          :key="item"
+          :label="item"
+          :value="item"
+      />
+      <el-option
+          v-for="item in currentTeam?.member"
+          :key="item"
+          :label="item"
+          :value="item"
+      />
+    </el-select>
+
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button
+            class="check"
+            type="primary"
+            @click="closeDialog"
+        >
+          确定
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped>
@@ -141,14 +263,15 @@ const enterTeamSpace = (item) => {
   font-weight: bold;
 }
 
-.delete-button {
+.more {
   font-size: 20px;
   margin-left: auto;
   margin-right: 0;
 }
 
-.delete-button:hover {
-  color: #f56c6c !important;
+.more:hover {
+  cursor: pointer;
+  color: #409eff;
 }
 
 .info-line {
@@ -173,5 +296,24 @@ const enterTeamSpace = (item) => {
   font-size: 30px;
   margin-left: auto;
   margin-right: 0;
+}
+
+.dialog-title {
+  color: black;
+  font-weight: bold;
+  font-size: 20px;
+}
+
+.dialog-footer {
+  width: 100%;
+  height: 30px;
+  display: flex;
+  justify-content: center;
+}
+
+.check {
+  width: 70px;
+  height: 100%;
+  font-size: 18px;
 }
 </style>
