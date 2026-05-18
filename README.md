@@ -68,6 +68,7 @@ project_root/                                    # 项目根目录
 │   │   │   ├── HeaderWrapper.vue                # 顶栏
 │   │   │   ├── Route.vue                        # 二级以上的内部路由
 │   │   │   ├── Search.vue                       # 搜索框
+│   │   │   ├── SelectableList.vue               # 多选框
 │   │   │   ├── SidebarWrapper.vue               # 侧边栏
 │   │   │   ├── TaskDetail.vue                   # 任务详情窗口
 │   │   │   ├── TaskList.vue                     # 任务列表
