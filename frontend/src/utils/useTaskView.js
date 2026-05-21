@@ -36,7 +36,7 @@ export function useTaskView(filterFn = null) {
   const viewDialogVisible = ref(false)
   const currentTask = ref(null)
 
-  // TODO:初始化
+  // 初始化任务列表
   onMounted(async () => {
     await initTaskList(false)
   })
