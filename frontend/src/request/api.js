@@ -88,7 +88,11 @@ const api = {
     getTaskById: (taskId) => request.get(`/task/${taskId}`),
     createTask: (data) => request.post('/task/create', data),
     updateTask: (taskId, data) => request.put(`/task/${taskId}`, data),
-    deleteTask: (taskId) => request.delete(`/task/${taskId}`),
+    deleteTask: (taskId, cascade = false) => request.delete(`/task/${taskId}`, { cascade }),
+    // 前置任务依赖关系
+    getPredecessors: (taskId) => request.get(`/task/${taskId}/predecessors`),
+    getSuccessors: (taskId) => request.get(`/task/${taskId}/successors`),
+    updatePredecessors: (taskId, predecessorIds) => request.put(`/task/${taskId}/predecessors`, { predecessorIds }),
 
     // 团队模块
     getTeamList: () => request.get('/team/list'),
