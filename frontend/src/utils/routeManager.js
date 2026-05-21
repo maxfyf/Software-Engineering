@@ -67,8 +67,8 @@ export const handleBack = (route, router, num) => {
     res.path.length -= num
     const newRoute = res.path.join('/')
 
-    // 根据需要可继续扩展
     let keys = new Set()
+    if(newRoute.indexOf('detail') !== -1) keys.add('showAssignee').add('taskId')
     if(newRoute.indexOf('edit') !== -1) keys.add('isNew').add('taskId')
     if(newRoute.indexOf('space') !== -1) keys.add('teamId')
 
@@ -117,6 +117,22 @@ export const translate = (route) => {
 
             if(res.path.length === 3) return innerRoute
             switch(res.path[3]) {
+                case 'detail':
+                    const showAssignee = getParam(res.params, 'showAssignee')
+                    if(showAssignee === undefined) return ''
+                    let prefix = ''
+                    if(showAssignee === 'true') prefix = '团队'
+                    else prefix = '个人'
+
+                    const taskId = getParam(res.params, 'taskId')
+                    if(taskId === undefined) return ''
+
+                    const task = taskList.value.find(task => Number(task.id) === Number(taskId))
+                    if(!task) return ''
+                    innerRoute.push(prefix + '任务\"' + task.title + '\"的详情')
+
+                    if(res.path.length  > 4) return ''
+                    return innerRoute
                 case 'edit':
                     if(innerRoute[0] === '团队任务') return ''
                     const isNew = getParam(res.params, 'isNew')
@@ -166,6 +182,19 @@ export const translate = (route) => {
 
                     if(res.path.length === 4) return innerRoute
                     switch(res.path[4]) {
+                        case 'detail':
+                            const showAssignee = getParam(res.params, 'showAssignee')
+                            if(showAssignee !== 'true') return ''
+
+                            const taskId = getParam(res.params, 'taskId')
+                            if(taskId === undefined) return ''
+
+                            const task = taskList.value.find(task => Number(task.id) === Number(taskId))
+                            if(!task) return ''
+                            innerRoute.push('团队任务\"' + task.title + '\"的详情')
+
+                            if(res.path.length  > 5) return ''
+                            return innerRoute
                         case 'edit':
                             const isNew = getParam(res.params, 'isNew')
                             if(isNew === undefined) return ''

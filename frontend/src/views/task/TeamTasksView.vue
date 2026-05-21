@@ -18,7 +18,7 @@ const isVisibleTask = (task) => {
 
 <template>
   <TaskViewWrapper
-      v-if="!route.path.includes('/edit')"
+      v-if="!route.path.includes('/detail') && !route.path.includes('/edit')"
       :filter-fn="isVisibleTask"
   />
   <router-view v-else />

@@ -5,9 +5,10 @@ import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import Route from "@/components/Route.vue";
 import SelectableList from "@/components/SelectableList.vue";
 import { ElMessage, ElMessageBox } from 'element-plus';
-import {taskList, addTask, getTaskById, updateTask, teamList, currentUser, getPredecessors, updatePredecessors} from '@/store/user.js';
+import { taskList, addTask, getTaskById, updateTask, teamList, getPredecessors, updatePredecessors }
+  from '@/store/user.js';
 import { handleBack } from "@/utils/routeManager.js"
-import {Edit} from "@element-plus/icons-vue";
+import { Edit } from "@element-plus/icons-vue";
 
 const route = useRoute();
 const router = useRouter();

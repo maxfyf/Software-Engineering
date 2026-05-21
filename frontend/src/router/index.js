@@ -26,6 +26,11 @@ const router = createRouter({
                     component: () => import('@/views/task/AllTasksView.vue'),
                     children: [
                         {
+                            path: 'detail',
+                            name: 'allTasksDetail',
+                            component: () => import('@/views/task/DetailView.vue')
+                        },
+                        {
                             path: 'edit',
                             name: 'allTasksEdit',
                             component: () => import('@/views/task/EditTaskView.vue')
@@ -38,6 +43,11 @@ const router = createRouter({
                     component: () => import('@/views/task/PersonalTasksView.vue'),
                     children: [
                         {
+                            path: 'detail',
+                            name: 'personalTasksDetail',
+                            component: () => import('@/views/task/DetailView.vue')
+                        },
+                        {
                             path: 'edit',
                             name: 'personalTasksEdit',
                             component: () => import('@/views/task/EditTaskView.vue')
@@ -49,6 +59,11 @@ const router = createRouter({
                     name: 'teamTasks',
                     component: () => import('@/views/task/TeamTasksView.vue'),
                     children: [
+                        {
+                            path: 'detail',
+                            name: 'teamTasksDetail',
+                            component: () => import('@/views/task/DetailView.vue')
+                        },
                         {
                             path: 'edit',
                             name: 'teamTasksEdit',
@@ -81,6 +96,11 @@ const router = createRouter({
                                     component: () => import('@/views/team/PersonnelView.vue')
                                 },
                                 {
+                                    path: 'detail',
+                                    name: 'allTeamsDetail',
+                                    component: () => import('@/views/task/DetailView.vue')
+                                },
+                                {
                                     path: 'edit',
                                     name: 'allTeamsEdit',
                                     component: () => import('@/views/task/EditTaskView.vue')
@@ -103,6 +123,11 @@ const router = createRouter({
                                     path: 'personnel',
                                     name: 'ownerTeamsPersonnel',
                                     component: () => import('@/views/team/PersonnelView.vue')
+                                },
+                                {
+                                    path: 'detail',
+                                    name: 'ownerTeamsDetail',
+                                    component: () => import('@/views/task/DetailView.vue')
                                 },
                                 {
                                     path: 'edit',
@@ -129,6 +154,11 @@ const router = createRouter({
                                     component: () => import('@/views/team/PersonnelView.vue')
                                 },
                                 {
+                                    path: 'detail',
+                                    name: 'adminTeamsDetail',
+                                    component: () => import('@/views/task/DetailView.vue')
+                                },
+                                {
                                     path: 'edit',
                                     name: 'adminTeamsEdit',
                                     component: () => import('@/views/task/EditTaskView.vue')
@@ -151,6 +181,11 @@ const router = createRouter({
                                     path: 'personnel',
                                     name: 'memberTeamsPersonnel',
                                     component: () => import('@/views/team/PersonnelView.vue')
+                                },
+                                {
+                                    path: 'detail',
+                                    name: 'memberTeamsDetail',
+                                    component: () => import('@/views/task/DetailView.vue')
                                 },
                                 {
                                     path: 'edit',

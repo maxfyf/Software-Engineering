@@ -50,7 +50,7 @@ const props = defineProps({
 const route = useRoute();
 const router = useRouter();
 
-const emit = defineEmits(['pageChange', 'viewDetail'])
+const emit = defineEmits(['pageChange'])
 
 const total = computed(() => props.tasks.length)
 const pageData = computed(() => {
@@ -72,10 +72,25 @@ const tableRowClassName = ({ row }) => {
   return ''
 }
 
-// 查看详情
-const viewDetail = (row) => {
+// 查看任务详情
+const viewTaskDetail = (row) => {
+  console.log('查看任务详情:', row)
   highlightTaskId.value = row.id
-  emit('viewDetail', row)
+
+  const newPage = {
+    path: 'detail',
+    params: [
+      {
+        key: 'showAssignee',
+        value: props.showAssignee
+      },
+      {
+        key: 'taskId',
+        value: row.id
+      }
+    ]
+  }
+  handleEnter(route, router, newPage)
 }
 
 // 开始任务
@@ -235,14 +250,14 @@ const deleteTask = (row) => {
             <el-button
                 link
                 type="text"
-                @click="viewDetail(scope.row)"
+                @click="viewTaskDetail(scope.row)"
             >
               <el-icon>
                 <View/>
               </el-icon>
             </el-button>
 
-            <!-- 个人任务、负责人、团队管理员/Owner 可见 -->
+            <!-- 个人任务、负责人、团队管理者/拥有者可见 -->
             <!-- 任务模块中，团队任务只有负责人能修改状态 -->
             <el-button
                 link
@@ -321,8 +336,6 @@ const deleteTask = (row) => {
   display: flex;
   justify-content: flex-end;
 }
-
-
 
 :deep(.el-table__row.highlight-row) {
   background-color: #ecf5ff !important;

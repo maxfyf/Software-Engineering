@@ -32,10 +32,6 @@ export function useTaskView(filterFn = null) {
   const currentPage = ref(1)
   const pageSize = ref(10)
 
-  // 详情弹窗状态
-  const viewDialogVisible = ref(false)
-  const currentTask = ref(null)
-
   // 初始化任务列表
   onMounted(async () => {
     await initTaskList(false)
@@ -63,8 +59,6 @@ export function useTaskView(filterFn = null) {
       const index = tasks.value.findIndex(t => t.id === task.id)
       currentPage.value = Math.floor(index / pageSize.value) + 1
       highlightTaskId.value = task.id
-      currentTask.value = task
-      viewDialogVisible.value = true
     }
   }
 
@@ -87,22 +81,13 @@ export function useTaskView(filterFn = null) {
     currentPage.value = page
   }
 
-  // 查看详情
-  const handleViewDetail = (task) => {
-    currentTask.value = task
-    viewDialogVisible.value = true
-  }
-
   return {
     tasks,
     dataset,
     currentPage,
     pageSize,
-    viewDialogVisible,
-    currentTask,
     handleSelect,
     handleNew,
-    handlePageChange,
-    handleViewDetail
+    handlePageChange
   }
 }

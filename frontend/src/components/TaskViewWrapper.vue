@@ -3,7 +3,6 @@ import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import Route from "@/components/Route.vue";
 import Search from "@/components/Search.vue";
 import TaskList from "@/components/TaskList.vue";
-import TaskDetail from "@/components/TaskDetail.vue";
 import { useTaskView } from '@/utils/useTaskView.js';
 import { useRoute, useRouter } from "vue-router";
 import { Plus } from "@element-plus/icons-vue";
@@ -39,12 +38,9 @@ const {
   dataset,
   currentPage,
   pageSize,
-  viewDialogVisible,
-  currentTask,
   handleSelect,
   handleNew,
-  handlePageChange,
-  handleViewDetail
+  handlePageChange
 } = useTaskView(props.filterFn)
 </script>
 
@@ -84,15 +80,8 @@ const {
           :current-page="currentPage"
           :page-size="pageSize"
           @page-change="handlePageChange"
-          @view-detail="handleViewDetail"
       />
     </div>
-
-    <TaskDetail
-        :current-task="currentTask"
-        :show-assignee="showAssignee"
-        v-model:visible="viewDialogVisible"
-    />
   </HeaderWrapper>
 </template>
 
