@@ -394,7 +394,7 @@ onBeforeRouteLeave((to, from, next) => {
               class="description"
               v-model="newDescription"
               type="textarea"
-              :rows="isTeamTask ? 7 : 9"
+              :rows="isTeamTask ? 6 : 8"
           />
         </div>
 
