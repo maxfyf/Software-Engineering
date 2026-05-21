@@ -5,7 +5,7 @@ import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import Route from "@/components/Route.vue";
 import SelectableList from "@/components/SelectableList.vue";
 import { ElMessage, ElMessageBox } from 'element-plus';
-import {taskList, addTask, getTaskById, updateTask, teamList, currentUser} from '@/store/user.js';
+import {taskList, addTask, getTaskById, updateTask, teamList, currentUser, getPredecessors, updatePredecessors} from '@/store/user.js';
 import { handleBack } from "@/utils/routeManager.js"
 import {Edit} from "@element-plus/icons-vue";
 
@@ -67,28 +67,93 @@ const candidateTaskList = computed(() => {
 const showPredecessor = ref(false)
 const tempPredecessor = ref([])
 const showPredecessorDialog = () => {
+  // 打开窗口时，将当前已有的前置任务复制到 tempPredecessor
+  tempPredecessor.value = newPredecessor.value.slice()
   showPredecessor.value = true
 }
 const closePredecessorDialog = () => {
   showPredecessor.value = false
 }
 const updateNewPredecessor = () => {
-  /* TODO: 基于窗口中选中的前置任务(tempPredecessor)更新newPredecessor
-   *       记得检查“前置”这种偏序关系中是否出现环路，即编辑任务A的前置任务时，如果存在任务B为A的直接/间接后继任务，
-   *       而A又试图新增任务B为前置任务，此时拒绝确认操作，并提示用户新增前置任务B将导致拓扑排序中出现环路
-   *       实际实现中可以对每一个新增的前置任务，向上追溯其所有直接/间接任务，查找是否包含当前任务
-   */
+  // 检查非法状态：已完成的任务不能添加未完成的前置任务
+  if (newStatus.value === '已完成') {
+    const hasUnfinishedPredecessor = tempPredecessor.value.some(title => {
+      const task = scopeTaskList.value.find(t => t.title === title)
+      return task && task.status !== '已完成'
+    })
+    if (hasUnfinishedPredecessor) {
+      ElMessage.error('已完成的任务不能添加未完成的前置任务')
+      return
+    }
+  }
 
+  // 检查环路
+  const hasCycle = checkCycleInPredecessors(tempPredecessor.value)
+  if (hasCycle) {
+    ElMessage.error('新增前置任务将导致依赖关系出现环路，请重新选择')
+    return
+  }
+
+  // 更新 newPredecessor
+  newPredecessor.value = tempPredecessor.value.slice()
   closePredecessorDialog()
+}
+
+// 检查新增前置任务是否会形成环路
+const checkCycleInPredecessors = (selectedPredecessors) => {
+  if (isNew.value || !taskId.value) return false
+
+  // 获取当前任务ID
+  const currentId = taskId.value
+
+  // 对于每个选中的前置任务，追溯其前置任务链
+  for (const predTitle of selectedPredecessors) {
+    const predTask = scopeTaskList.value.find(t => t.title === predTitle)
+    if (!predTask) continue
+
+    // 直接自引用检查
+    if (predTask.id === currentId) return true
+
+    // 递归追溯前置任务链
+    const visited = new Set()
+    if (tracePredecessorChain(predTask.id, currentId, visited)) {
+      return true
+    }
+  }
+  return false
+}
+
+// 递归追溯任务的前置任务链，检查是否包含目标任务
+const tracePredecessorChain = (taskId, targetId, visited) => {
+  if (visited.has(taskId)) return false
+  visited.add(taskId)
+
+  const task = taskList.value.find(t => t.id === taskId)
+  if (!task || !task.predecessor) return false
+
+  for (const predItem of task.predecessor) {
+    // predecessor 可能是标题或ID
+    let predTask
+    if (typeof predItem === 'number') {
+      predTask = taskList.value.find(t => t.id === predItem)
+    } else {
+      predTask = taskList.value.find(t => t.title === predItem || t.id === predItem)
+    }
+    if (!predTask) continue
+
+    if (predTask.id === targetId) return true
+    if (tracePredecessorChain(predTask.id, targetId, visited)) return true
+  }
+  return false
 }
 
 // 检查是否有修改
 const hasChanges = () => {
   if (isNew.value) {
     // 新建模式：任何输入都算有修改
-    return newTitle.value || newDescription.value || newDate.value
+    return newTitle.value || newDescription.value || newDate.value || newPredecessor.value.length > 0
   }
-  
+
   // 编辑模式：和原始任务比较
   if (!originalTask.value) return false
 
@@ -96,13 +161,17 @@ const hasChanges = () => {
       ? (originalTask.value.assignee[0] || '')
       : (originalTask.value.assignee || '')
 
-  // TODO: 新增newPredecessor（注意：编辑模式下还需在加载页面时初始化newPredecessor）
+  // 比较前置任务列表
+  const originalPredecessorStr = (originalTask.value.predecessor || []).sort().join(',')
+  const newPredecessorStr = newPredecessor.value.slice().sort().join(',')
+
   return newTitle.value !== originalTask.value.title ||
          (isTeamTask.value && newAssignee.value !== originalAssignee) ||
          newDescription.value !== (originalTask.value.description || '') ||
          newStatus.value !== originalTask.value.status ||
          newPriority.value !== originalTask.value.priority ||
-         newDate.value !== (originalTask.value.deadline || '')
+         newDate.value !== (originalTask.value.deadline || '') ||
+         originalPredecessorStr !== newPredecessorStr
 }
 
 // 页面加载时，根据路由参数初始化数据
@@ -129,7 +198,7 @@ const loadTaskData = async (id) => {
   const task = await getTaskById(id)
   if (task) {
     originalTask.value = task
-    
+
     // 设置表单值
     newTitle.value = task.title
     if (isTeamTask.value) {
@@ -140,6 +209,32 @@ const loadTaskData = async (id) => {
     newStatus.value = task.status
     newPriority.value = task.priority
     newDate.value = task.deadline || ''
+
+    // 初始化前置任务列表
+    if (task.predecessor && Array.isArray(task.predecessor)) {
+      // predecessor 可能是任务标题数组或任务ID数组
+      if (typeof task.predecessor[0] === 'string' && !task.predecessor[0].match(/^\d+$/)) {
+        // 是任务标题数组
+        newPredecessor.value = task.predecessor.slice()
+      } else {
+        // 是任务ID数组，需要转换为标题
+        const predTitles = task.predecessor.map(predId => {
+          const predTask = taskList.value.find(t => t.id === predId || t.id === parseInt(predId))
+          return predTask?.title || ''
+        }).filter(title => title)
+        newPredecessor.value = predTitles
+      }
+    } else {
+      // 从后端获取前置任务列表
+      try {
+        const predecessors = await getPredecessors(id)
+        const predTitles = predecessors.map(pred => pred.title)
+        newPredecessor.value = predTitles
+      } catch (error) {
+        console.error('获取前置任务失败:', error)
+        newPredecessor.value = []
+      }
+    }
   }
 }
 
@@ -154,6 +249,7 @@ const resetForm = () => {
   newStatus.value = '待办'
   newPriority.value = '中'
   newDate.value = ''
+  newPredecessor.value = []
 }
 
 // 保存所有更改并回退到来源页面
@@ -163,18 +259,36 @@ const saveChanges = async () => {
     ElMessage.error('任务标题不能为空')
     return
   }
-  
+
+  // 检查已完成任务是否存在未完成的前置任务
+  if (newStatus.value === '已完成') {
+    const hasUnfinished = newPredecessor.value.some(title => {
+      const task = scopeTaskList.value.find(t => t.title === title)
+      return task && task.status !== '已完成'
+    })
+    if (hasUnfinished) {
+      ElMessage.error('存在未完成的前置任务，无法将状态设为已完成')
+      return
+    }
+  }
+
   const taskData = {
     title: newTitle.value,
-    ...(isTeamTask.value && { 
+    ...(isTeamTask.value && {
       assignee: newAssignee.value,
       team: currentTeam.value?.title || null }),
     description: newDescription.value,
     status: newStatus.value,
     priority: newPriority.value,
-    deadline: newDate.value
+    deadline: newDate.value || null 
   }
-  
+
+  // 将前置任务标题转换为ID数组
+  const predecessorIds = newPredecessor.value.map(title => {
+    const task = scopeTaskList.value.find(t => t.title === title)
+    return task?.id
+  }).filter(id => id !== undefined)
+
   if (isNew.value) {
     // 新建任务
     const idx = scopeTaskList.value.findIndex(t => t.title === newTitle.value)
@@ -182,7 +296,15 @@ const saveChanges = async () => {
       ElMessage.error(isTeamTask.value ? '该团队中已存在同名任务' : '个人任务中已存在同名任务')
       return
     }
-    await addTask(taskData)
+    // 创建任务时包含前置任务信息
+    const newTask = await addTask({
+      ...taskData,
+      predecessor: predecessorIds
+    })
+    // 如果有前置任务，调用后端API设置依赖关系
+    if (predecessorIds.length > 0 && newTask.id) {
+      await updatePredecessors(newTask.id, predecessorIds)
+    }
     ElMessage.success('任务创建成功')
   } else {
     // 更新任务
@@ -192,9 +314,11 @@ const saveChanges = async () => {
       return
     }
     await updateTask(taskId.value, taskData)
+    // 更新前置任务依赖关系
+    await updatePredecessors(taskId.value, predecessorIds)
     ElMessage.success('任务更新成功')
   }
-  
+
   // 返回来源页面
   resetForm()
   isLeaving.value = true  // 标记正在离开，跳过守卫

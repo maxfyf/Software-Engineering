@@ -7,7 +7,8 @@ import {
   highlightTaskId,
   removeTask,
   currentUser,
-  teamList
+  teamList,
+  taskList
 } from "@/store/user.js";
 import { handleEnter } from "@/utils/routeManager.js"
 import { View, CaretRight, Check, Edit, Delete } from "@element-plus/icons-vue";
@@ -78,17 +79,39 @@ const viewDetail = (row) => {
 }
 
 // 开始任务
-const startTask = (row) => {
+const startTask = async (row) => {
   highlightTaskId.value = row.id
-  startTaskAction(row.id)
-  ElMessage.success('任务已开始')
+  const ok = await startTaskAction(row.id)
+  if (ok) {
+    ElMessage.success('任务已开始')
+  }
 }
 
 // 完成任务
-const checkTask = (row) => {
+const checkTask = async (row) => {
+  // 检查是否存在未完成的前置任务
+  const predecessorList = row.predecessor || []
+  if (predecessorList.length > 0) {
+    const hasUnfinished = predecessorList.some(predItem => {
+      // predecessor 可能是标题或ID
+      let predTask
+      if (typeof predItem === 'number') {
+        predTask = taskList.value.find(t => t.id === predItem)
+      } else {
+        predTask = taskList.value.find(t => t.title === predItem || t.id === predItem)
+      }
+      return predTask && predTask.status !== '已完成'
+    })
+    if (hasUnfinished) {
+      ElMessage.error('存在未完成的前置任务，无法完成此任务')
+      return
+    }
+  }
   highlightTaskId.value = row.id
-  finishTask(row.id)
-  ElMessage.success('任务已完成')
+  const ok = await finishTask(row.id)
+  if (ok) {
+    ElMessage.success('任务已完成')
+  }
 }
 
 // 编辑任务
@@ -136,9 +159,9 @@ const deleteTask = (row) => {
       h('div', [
         h('p', `确定要删除任务"${row.title}"吗？`),
         h(ElCheckbox, {
-          checked: cascade.value,
-          onInput: (event) => {
-            cascade.value = event.target.checked
+          modelValue: cascade.value,
+          'onUpdate:modelValue': (val) => {
+            cascade.value = val
           },
           style: {
             position: 'absolute',
@@ -157,8 +180,8 @@ const deleteTask = (row) => {
       }
   ).then(() => {
     highlightTaskId.value = null
-    // TODO: 基于cascade.value决定是否级联删除
-    removeTask(row.id)
+    // 传递 cascade 参数给后端
+    removeTask(row.id, cascade.value)
     ElMessage.success('任务已删除')
   }).catch(() => {
     console.log('取消删除')
@@ -224,9 +247,9 @@ const deleteTask = (row) => {
             <el-button
                 link
                 type="text"
-                v-if="(scope.row.team === null && scope.row.owner === currentUser.username) ||
+                v-if="((scope.row.team === null && scope.row.owner === currentUser.username) ||
                   (scope.row.team !== null && (isTeamSpace ? (isCurrentAssignee(scope.row) || isTaskTeamAdmin(scope.row)) : isCurrentAssignee(scope.row))) &&
-                  scope.row.status === '待办'"
+                  scope.row.status === '待办')"
                 @click="startTask(scope.row)"
             >
               <el-icon>
@@ -236,9 +259,9 @@ const deleteTask = (row) => {
             <el-button
                 link
                 type="text"
-                v-else-if="(scope.row.team === null && scope.row.owner === currentUser.username) ||
+                v-else-if="((scope.row.team === null && scope.row.owner === currentUser.username) ||
                   (scope.row.team !== null && (isTeamSpace ? (isCurrentAssignee(scope.row) || isTaskTeamAdmin(scope.row)) : isCurrentAssignee(scope.row))) &&
-                  scope.row.status === '进行中'"
+                  scope.row.status === '进行中')"
                 @click="checkTask(scope.row)"
             >
               <el-icon>
