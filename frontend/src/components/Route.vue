@@ -73,15 +73,6 @@ const innerRoute = translate(props.route)
   color: #333333;
 }
 
-.clickable {
-  cursor: pointer;
-}
-
-.clickable:hover {
-  text-decoration: underline;
-  color: #409eff;
-}
-
 .present {
   display: inline-flex;
   height: 100%;

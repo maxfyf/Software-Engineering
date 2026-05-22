@@ -95,3 +95,12 @@ a,
   gap: 15px;
   align-items: center;
 }
+
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover {
+  text-decoration: underline;
+  color: #409eff;
+}

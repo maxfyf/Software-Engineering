@@ -10,11 +10,17 @@ const route = useRoute();
 const router = useRouter();
 
 const task = ref(null)
+const predecessor = ref([])
 
 // 页面加载时，根据路由参数初始化数据
 onMounted(async () => {
   task.value = taskList.value.find(t => t.id === Number(route.query.taskId))
+  // TODO: 初始化predecessor数组表示当前任务的所有前置任务名称字符串
 })
+
+const viewDetail = (index) => {
+  // TODO: 跳转到predecessor[index]对应任务的详情页面
+}
 
 const formatDate = (dateStr) => {
   if (!dateStr) return '未设置'
@@ -41,57 +47,70 @@ const formatDate = (dateStr) => {
           <p class="item">
             <span class="key">任务标题：</span>
             <span class="content">
-            {{ task?.title }}
-          </span>
+              {{ task?.title }}
+            </span>
           </p>
           <p v-if="task?.team !== null" class="item">
             <span class="key">所属团队：</span>
             <span class="content">
-            {{ task?.team }}
-          </span>
+              {{ task?.team }}
+            </span>
           </p>
           <p v-if="task?.team !== null" class="item">
             <span class="key">负责人：</span>
             <span class="content">
-            {{ Array.isArray(task?.assignee) ? task?.assignee.join(', ') : task?.assignee }}
-          </span>
+              {{ Array.isArray(task?.assignee) ? task?.assignee.join(', ') : task?.assignee }}
+            </span>
           </p>
           <p v-if="task?.description !== ''" class="item">
             <span class="key">描述：</span>
             <span class="content">
-            {{ task?.description }}
-          </span>
+              {{ task?.description }}
+            </span>
           </p>
           <p class="item">
             <span class="key">状态：</span>
             <span class="content">
-            {{ task?.status }}
-          </span>
+              {{ task?.status }}
+            </span>
           </p>
           <p class="item">
             <span class="key">优先级：</span>
             <span class="content">
-            {{ task?.priority }}
-          </span>
+              {{ task?.priority }}
+            </span>
           </p>
           <p v-if="task?.deadline !== null" class="item">
             <span class="key">截止时间：</span>
             <span class="content">
-            {{ task?.deadline }}
-          </span>
+              {{ task?.deadline }}
+            </span>
           </p>
           <p class="item">
             <span class="key">创建时间：</span>
             <span class="content">
-            {{ formatDate(task?.createdAt) }}
-          </span>
+              {{ formatDate(task?.createdAt) }}
+            </span>
           </p>
           <p class="item">
             <span class="key">更新时间：</span>
             <span class="content">
-            {{ formatDate(task?.updatedAt) }}
-          </span>
+              {{ formatDate(task?.updatedAt) }}
+            </span>
           </p>
+          <div v-if="predecessor.length > 0" class="item">
+            <span class="key">前置任务：</span>
+            <div class="content">
+              <p
+                  v-for="(item, index) in predecessor"
+                  :key="index"
+                  class="clickable"
+                  @click="viewDetail(index)"
+              >
+                {{item}}
+              </p>
+            </div>
+          </div>
         </div>
 
         <template #footer>
