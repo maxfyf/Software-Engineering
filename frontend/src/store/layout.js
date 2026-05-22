@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 export const minWidth = 200    //最小宽度：200px
 export const maxWidthPercent = 0.4    //最大宽度占比：40%
@@ -10,3 +10,4 @@ export const getContainerWidth = () => {
 
 let maxWidth = getContainerWidth() * maxWidthPercent
 export const sidebarWidth = ref((3 * minWidth + maxWidth) / 4)
+export const contentWidth = computed(() => getContainerWidth() - sidebarWidth.value)
