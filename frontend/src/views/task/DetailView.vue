@@ -9,12 +9,10 @@ import HeaderWrapper from "@/components/HeaderWrapper.vue";
 const route = useRoute();
 const router = useRouter();
 
-const showAssignee = ref(false);
 const task = ref(null)
 
 // 页面加载时，根据路由参数初始化数据
 onMounted(async () => {
-  showAssignee.value = route.query.showAssignee === 'true'
   task.value = taskList.value.find(t => t.id === Number(route.query.taskId))
 })
 
@@ -52,7 +50,7 @@ const formatDate = (dateStr) => {
             {{ task?.team }}
           </span>
           </p>
-          <p v-if="showAssignee" class="item">
+          <p v-if="task?.team !== null" class="item">
             <span class="key">负责人：</span>
             <span class="content">
             {{ Array.isArray(task?.assignee) ? task?.assignee.join(', ') : task?.assignee }}

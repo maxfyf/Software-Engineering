@@ -81,10 +81,6 @@ const viewTaskDetail = (row) => {
     path: 'detail',
     params: [
       {
-        key: 'showAssignee',
-        value: props.showAssignee
-      },
-      {
         key: 'taskId',
         value: row.id
       }
