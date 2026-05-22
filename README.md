@@ -70,7 +70,6 @@ project_root/                                    # 项目根目录
 │   │   │   ├── Search.vue                       # 搜索框
 │   │   │   ├── SelectableList.vue               # 多选框
 │   │   │   ├── SidebarWrapper.vue               # 侧边栏
-│   │   │   ├── TaskDetail.vue                   # 任务详情窗口
 │   │   │   ├── TaskList.vue                     # 任务列表
 │   │   │   ├── TaskViewWrapper.vue              # 任务列表容器
 │   │   │   ├── TeamList.vue                     # 团队列表
@@ -92,6 +91,7 @@ project_root/                                    # 项目根目录
 │   │   │   │   └── UserInfoView.vue             # 个人资料界面
 │   │   │   ├── task/                            # 任务路由下的界面
 │   │   │   │   ├── AllTasksView.vue             # 全部任务界面
+│   │   │   │   ├── DetailView.vue               # 任务详情界面
 │   │   │   │   ├── EditTaskView.vue             # 新建/编辑任务界面
 │   │   │   │   ├── PersonalTasksView.vue        # 个人任务界面
 │   │   │   │   └── TeamTasksView.vue            # 团队任务界面
