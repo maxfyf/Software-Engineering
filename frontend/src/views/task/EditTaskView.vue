@@ -8,7 +8,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { taskList, addTask, getTaskById, updateTask, teamList, getPredecessors, updatePredecessors }
   from '@/store/user.js';
 import { handleBack } from "@/utils/routeManager.js"
-import { Edit } from "@element-plus/icons-vue";
+import {Check, Edit} from "@element-plus/icons-vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -416,9 +416,21 @@ onBeforeRouteLeave((to, from, next) => {
               class="edit-button"
               @click="showPredecessorDialog"
           >
-            <el-icon>
-              <Edit/>
-            </el-icon>
+            <el-popover
+                placement="bottom"
+                :offset="0"
+                trigger="hover"
+                popper-style="min-width: 0; width: auto;"
+            >
+              <template #reference>
+                <el-icon>
+                  <Edit/>
+                </el-icon>
+              </template>
+              <div>
+                编辑前置任务
+              </div>
+            </el-popover>
           </el-button>
         </div>
 

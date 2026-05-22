@@ -88,8 +88,9 @@ const onHandleLogout = async () => {
       <span v-if="isLoggedIn">
         <el-popover
           placement="bottom"
-          width="350px"
-          height="250px"
+          :width="350"
+          :height="250"
+          :offset="0"
           trigger="hover"
           :append-to-body="true"
           popper-class="top-layer-popover"
@@ -206,7 +207,7 @@ const onHandleLogout = async () => {
 
 .top-layer-popover .popover-content {
   position: relative;
-  z-index: 10000;
+  z-index: 200;
 }
 
 .popover-title {
