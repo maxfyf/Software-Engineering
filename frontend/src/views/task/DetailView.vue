@@ -39,60 +39,62 @@ const formatDate = (dateStr) => {
 
     <div class="main-content-wrapper">
       <el-card class="box-card">
-        <p class="item">
-          <span class="key">任务标题：</span>
-          <span class="content">
+        <div class="item-wrapper">
+          <p class="item">
+            <span class="key">任务标题：</span>
+            <span class="content">
             {{ task?.title }}
           </span>
-        </p>
-        <p v-if="task?.team !== null" class="item">
-          <span class="key">所属团队：</span>
-          <span class="content">
+          </p>
+          <p v-if="task?.team !== null" class="item">
+            <span class="key">所属团队：</span>
+            <span class="content">
             {{ task?.team }}
           </span>
-        </p>
-        <p v-if="showAssignee" class="item">
-          <span class="key">负责人：</span>
-          <span class="content">
+          </p>
+          <p v-if="showAssignee" class="item">
+            <span class="key">负责人：</span>
+            <span class="content">
             {{ Array.isArray(task?.assignee) ? task?.assignee.join(', ') : task?.assignee }}
           </span>
-        </p>
-        <p v-if="task?.description !== ''" class="item">
-          <span class="key">描述：</span>
-          <span class="content">
+          </p>
+          <p v-if="task?.description !== ''" class="item">
+            <span class="key">描述：</span>
+            <span class="content">
             {{ task?.description }}
           </span>
-        </p>
-        <p class="item">
-          <span class="key">状态：</span>
-          <span class="content">
+          </p>
+          <p class="item">
+            <span class="key">状态：</span>
+            <span class="content">
             {{ task?.status }}
           </span>
-        </p>
-        <p class="item">
-          <span class="key">优先级：</span>
-          <span class="content">
+          </p>
+          <p class="item">
+            <span class="key">优先级：</span>
+            <span class="content">
             {{ task?.priority }}
           </span>
-        </p>
-        <p v-if="task?.deadline !== null" class="item">
-          <span class="key">截止时间：</span>
-          <span class="content">
+          </p>
+          <p v-if="task?.deadline !== null" class="item">
+            <span class="key">截止时间：</span>
+            <span class="content">
             {{ task?.deadline }}
           </span>
-        </p>
-        <p class="item">
-          <span class="key">创建时间：</span>
-          <span class="content">
+          </p>
+          <p class="item">
+            <span class="key">创建时间：</span>
+            <span class="content">
             {{ formatDate(task?.createdAt) }}
           </span>
-        </p>
-        <p class="item">
-          <span class="key">更新时间：</span>
-          <span class="content">
+          </p>
+          <p class="item">
+            <span class="key">更新时间：</span>
+            <span class="content">
             {{ formatDate(task?.updatedAt) }}
           </span>
-        </p>
+          </p>
+        </div>
 
         <template #footer>
           <div class="footer">
@@ -127,6 +129,11 @@ const formatDate = (dateStr) => {
   overflow-y: auto;
 }
 
+.item-wrapper {
+  padding: 0 20px;
+  overflow-x: visible;
+}
+
 .item {
   width: 100%;
   display: flex;
@@ -144,6 +151,7 @@ const formatDate = (dateStr) => {
 
 .content {
   font-size: 19px;
+  word-break: break-word;
 }
 
 .footer {
