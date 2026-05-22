@@ -19,11 +19,11 @@ export function useTaskView(filterFn = null) {
   const dataset = computed(() => {
     return tasks.value.map(task => {
       if (task.team) {
-        // 团队任务：显示 "任务名 (团队名)"
-        return `${task.title} (${task.team})`
+        // 团队任务
+        return { data: `${task.title}`, aux: `${task.team}` }
       } else {
-        // 个人任务：显示 "任务名 (个人)"
-        return `${task.title} (个人)`
+        // 个人任务
+        return { data: `${task.title}`, aux: `个人` }
       }
     })
   })

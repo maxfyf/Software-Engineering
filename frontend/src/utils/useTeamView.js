@@ -17,7 +17,11 @@ export function useTeamView(filterFn = null) {
     })
 
     // 团队名字符串数组dataset
-    const dataset = computed(() => teams.value.map(team => team.title))
+    const dataset = computed(() => {
+        return teams.value.map(team => {
+            return { data: team.title, aux: '' }
+        })
+    })
 
     // 新建团队弹窗状态
     const createDialogVisible = ref(false)

@@ -91,7 +91,8 @@ const onHandleLogout = async () => {
           width="350px"
           height="250px"
           trigger="hover"
-          popper-class="hover-popover"
+          :append-to-body="true"
+          popper-class="top-layer-popover"
         >
           <template #reference>
             <span class="username">
@@ -197,6 +198,15 @@ const onHandleLogout = async () => {
   margin-right: 30px;
   color: #409eff;
   cursor: pointer;
+}
+
+.top-layer-popover {
+  z-index: 200;
+}
+
+.top-layer-popover .popover-content {
+  position: relative;
+  z-index: 10000;
 }
 
 .popover-title {

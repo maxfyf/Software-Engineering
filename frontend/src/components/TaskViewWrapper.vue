@@ -27,6 +27,10 @@ const props = defineProps({
   isAdmin: {
     type: Boolean,
     default: false
+  },
+  showAux: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -42,6 +46,11 @@ const {
   handleNew,
   handlePageChange
 } = useTaskView(props.filterFn)
+
+const handleSelectTask = () => {
+  handleSelect()
+  // TODO: 进入任务详情页面
+}
 </script>
 
 <template>
@@ -53,7 +62,7 @@ const {
         </div>
 
         <div class="search-wrapper">
-          <Search :data="dataset" :onSelect="handleSelect" />
+          <Search :dataset="dataset" :onSelect="handleSelectTask" :showAux="showAux" />
         </div>
       </div>
     </template>

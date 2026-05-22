@@ -4,9 +4,14 @@ import { ref, computed, watch, nextTick, onMounted } from 'vue'
 
 const props = defineProps({
   // 搜索数据集
-  data: {
+  dataset: {
     type: Array,
-    default: () => []
+    required: true
+  },
+  // 是否显示辅助信息
+  showAux: {
+    type: Boolean,
+    default: false
   },
   // 下拉框最大高度
   maxHeight: {
@@ -43,13 +48,14 @@ const fixedDropdownStyle = ref({
 
 // 计算属性：筛选前缀匹配结果
 const filteredOptions = computed(() => {
+  console.log(props.dataset)
   if (!searchText.value) return []
   const keyword = searchText.value
   if (keyword === '') return []
 
-  return props.data.filter(str => {
-    if (!str) return false
-    return str.startsWith(keyword)
+  return props.dataset.filter(d => {
+    if (!d) return false
+    return d.data.startsWith(keyword)
   })
 })
 
@@ -209,9 +215,13 @@ onMounted(() => {
           v-for="(item, idx) in filteredOptions"
           :key="idx"
           class="dropdown-item"
-          @click="selectOption(item)"
+          @click="selectOption(item?.data)"
       >
-        <span v-html="match(item)"></span>
+        <span v-html="match(item?.data)"/>
+        <span v-if="showAux" class="aux">
+          &nbsp;&nbsp;&nbsp;
+          <span v-html="match(item?.aux)"/>
+        </span>
       </div>
     </div>
   </div>
@@ -237,13 +247,40 @@ onMounted(() => {
 
 .search-dropdown {
   background-color: white;
+  color: white;
   border: 1px solid #e7e7e7;
   border-bottom-left-radius: 10px;
   border-bottom-right-radius: 10px;
   margin-top: 1px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
   overflow-y: auto;
-  z-index: 9999;
+  z-index: 100;
+}
+
+:deep(.search-dropdown) {
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--el-color-info-light-8);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--el-color-info);
+  }
+}
+
+:deep(.search-dropdown) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--el-color-info-light-8) transparent;
 }
 
 .no-match {
@@ -265,5 +302,10 @@ onMounted(() => {
 
 .dropdown-item:hover:not(.no-result) {
   background-color: #f5f7fa;
+}
+
+.aux {
+  color: lightgrey;
+  font-style: italic;
 }
 </style>
