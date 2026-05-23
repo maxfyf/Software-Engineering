@@ -38,13 +38,12 @@ export function useTaskView(filterFn = null) {
   })
 
   // 搜索选中任务
-  const handleSelect = (displayText) => {
-    // 解析显示文本：格式为 "任务名 (团队名)" 或 "任务名 (个人)"
-    const match = displayText.match(/^(.+) \((.+)\)$/)
-    if (!match) return
+  const handleSelect = (selectedItem) => {
+    // selectedItem 格式为 { data: 任务标题, aux: 团队名或'个人' }
+    const title = selectedItem?.data
+    const teamInfo = selectedItem?.aux
 
-    const title = match[1]
-    const teamInfo = match[2]
+    if (!title) return null
 
     // 根据团队信息匹配正确的任务
     const task = tasks.value.find(t => {
@@ -60,6 +59,8 @@ export function useTaskView(filterFn = null) {
       currentPage.value = Math.floor(index / pageSize.value) + 1
       highlightTaskId.value = task.id
     }
+
+    return task
   }
 
   // 新建任务

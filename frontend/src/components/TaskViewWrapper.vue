@@ -6,6 +6,7 @@ import TaskList from "@/components/TaskList.vue";
 import { useTaskView } from '@/utils/useTaskView.js';
 import { useRoute, useRouter } from "vue-router";
 import { Plus } from "@element-plus/icons-vue";
+import { handleEnter } from "@/utils/routeManager.js";
 
 const props = defineProps({
   filterFn: {
@@ -47,9 +48,21 @@ const {
   handlePageChange
 } = useTaskView(props.filterFn)
 
-const handleSelectTask = () => {
-  handleSelect()
-  // TODO: 进入任务详情页面
+const handleSelectTask = (selectedItem) => {
+  const task = handleSelect(selectedItem)
+  // 跳转到选中任务的详情页面
+  if (task) {
+    const newPage = {
+      path: 'detail',
+      params: [
+        {
+          key: 'taskId',
+          value: task.id
+        }
+      ]
+    }
+    handleEnter(route, router, newPage)
+  }
 }
 </script>
 

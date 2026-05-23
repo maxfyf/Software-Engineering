@@ -33,7 +33,8 @@ export function useTeamView(filterFn = null) {
     })
 
     // 下拉框中选择团队进入团队空间的回调函数handleSelect
-    const handleSelect = (teamTitle) => {
+    const handleSelect = (selectedItem) => {
+        const teamTitle = selectedItem?.data
         const team = teams.value.find(t => t.title === teamTitle)
         if (team) {
             highlightTeamId.value = team.id

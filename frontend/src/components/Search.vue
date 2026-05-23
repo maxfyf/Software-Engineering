@@ -48,7 +48,6 @@ const fixedDropdownStyle = ref({
 
 // 计算属性：筛选前缀匹配结果
 const filteredOptions = computed(() => {
-  console.log(props.dataset)
   if (!searchText.value) return []
   const keyword = searchText.value
   if (keyword === '') return []
@@ -134,21 +133,21 @@ const handleBlur = () => {
 }
 
 // 选中下拉项
-const selectOption = (str) => {
+const selectOption = (item) => {
   if (blurTimeout.value) {
     clearTimeout(blurTimeout.value)
     blurTimeout.value = null
   }
 
-  searchText.value = str
+  searchText.value = item?.data
   showDropdown.value = false
 
-  emit('select', str)
-  emit('update:modelValue', str)
-  emit('input', str) // 兼容旧版
+  emit('select', item)
+  emit('update:modelValue', item?.data)
+  emit('input', item?.data)
 
   if (props.onSelect) {
-    props.onSelect(str)
+    props.onSelect(item)
   }
 }
 
@@ -215,7 +214,7 @@ onMounted(() => {
           v-for="(item, idx) in filteredOptions"
           :key="idx"
           class="dropdown-item"
-          @click="selectOption(item?.data)"
+          @click="selectOption(item)" 
       >
         <span v-html="match(item?.data)"/>
         <span v-if="showAux" class="aux">
@@ -247,7 +246,6 @@ onMounted(() => {
 
 .search-dropdown {
   background-color: white;
-  color: white;
   border: 1px solid #e7e7e7;
   border-bottom-left-radius: 10px;
   border-bottom-right-radius: 10px;
