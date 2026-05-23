@@ -2,7 +2,7 @@
 import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { handleBack } from "@/utils/routeManager.js";
-import { taskList } from "@/store/user.js";
+import { taskList, getPredecessors, getSuccessors } from "@/store/user.js";
 import Route from "@/components/Route.vue";
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
 
@@ -10,16 +10,45 @@ const route = useRoute();
 const router = useRouter();
 
 const task = ref(null)
-const predecessor = ref([])
+const predecessorTasks = ref([])
+const successorTasks = ref([])
 
 // 页面加载时，根据路由参数初始化数据
 onMounted(async () => {
   task.value = taskList.value.find(t => t.id === Number(route.query.taskId))
-  // TODO: 初始化predecessor数组表示当前任务的所有前置任务名称字符串
+  // 从 API 获取前置任务和后继任务列表
+  if (task.value) {
+    const predecessors = await getPredecessors(task.value.id)
+    predecessorTasks.value = predecessors.map(pred => ({
+      id: pred.id,
+      title: pred.title,
+      status: pred.status
+    }))
+    const successors = await getSuccessors(task.value.id)
+    successorTasks.value = successors.map(succ => ({
+      id: succ.id,
+      title: succ.title,
+      status: succ.status
+    }))
+  }
 })
 
 const viewDetail = (index) => {
-  // TODO: 跳转到predecessor[index]对应任务的详情页面
+  const predTask = predecessorTasks.value[index]
+  // 跳转到前置任务的详情页面
+  router.push({
+    path: '/task/all/detail',
+    query: { taskId: predTask.id }
+  })
+}
+
+const viewSuccessorDetail = (index) => {
+  const succTask = successorTasks.value[index]
+  // 跳转到后继任务的详情页面
+  router.push({
+    path: '/task/all/detail',
+    query: { taskId: succTask.id }
+  })
 }
 
 const formatDate = (dateStr) => {
@@ -98,7 +127,7 @@ const formatDate = (dateStr) => {
               {{ formatDate(task?.updatedAt) }}
             </span>
           </p>
-          <div v-if="predecessor.length > 0" class="item">
+          <div v-if="predecessorTasks.length > 0" class="item">
             <span class="key">前置任务：</span>
             <div class="content">
               <p
@@ -169,6 +198,17 @@ const formatDate = (dateStr) => {
 .content {
   font-size: 19px;
   word-break: break-word;
+}
+
+.clickable {
+  cursor: pointer;
+  color: #409eff;
+  margin: 0;
+  padding: 2px 0;
+}
+
+.clickable:hover {
+  text-decoration: underline;
 }
 
 .footer {

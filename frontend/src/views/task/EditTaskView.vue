@@ -214,7 +214,7 @@ const loadTaskData = async (id) => {
     // 初始化前置任务列表
     if (task.predecessor && Array.isArray(task.predecessor)) {
       // predecessor 可能是任务标题数组或任务ID数组
-      if (typeof task.predecessor[0] === 'string' && !task.predecessor[0].match(/^\d+$/)) {
+      if (task.predecessor && task.predecessor.length > 0 && typeof task.predecessor[0] === 'string' && !task.predecessor[0].match(/^\d+$/)) {
         // 是任务标题数组
         newPredecessor.value = task.predecessor.slice()
       } else {
