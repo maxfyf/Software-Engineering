@@ -101,6 +101,8 @@ const api = {
     addMember: (teamId, username, role) => request.post(`/team/${teamId}/member`, { username, role }),
     removeMember: (teamId, username) => request.delete(`/team/${teamId}/member`, { username }),
     setMemberRole: (teamId, username, role) => request.put(`/team/${teamId}/member/role`, { username, role }),
+    transferOwner: (teamId, newOwner) => request.put(`/team/${teamId}/owner`, { newOwner }),
+    leaveTeam: (teamId) => request.post(`/team/${teamId}/leave`),
 
 }
 
