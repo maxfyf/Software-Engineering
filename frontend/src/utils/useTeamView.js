@@ -17,7 +17,11 @@ export function useTeamView(filterFn = null) {
     })
 
     // 团队名字符串数组dataset
-    const dataset = computed(() => teams.value.map(team => team.title))
+    const dataset = computed(() => {
+        return teams.value.map(team => {
+            return { data: team.title, aux: '' }
+        })
+    })
 
     // 新建团队弹窗状态
     const createDialogVisible = ref(false)
@@ -29,7 +33,8 @@ export function useTeamView(filterFn = null) {
     })
 
     // 下拉框中选择团队进入团队空间的回调函数handleSelect
-    const handleSelect = (teamTitle) => {
+    const handleSelect = (selectedItem) => {
+        const teamTitle = selectedItem?.data
         const team = teams.value.find(t => t.title === teamTitle)
         if (team) {
             highlightTeamId.value = team.id

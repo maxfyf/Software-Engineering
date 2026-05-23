@@ -21,7 +21,9 @@ const filterByTeam = (task) => task.team === team.value?.title
 </script>
 
 <template>
-  <router-view v-if="route.path.includes('/edit') || route.path.includes('/personnel')" />
+  <router-view v-if="route.path.includes('/detail') ||
+                     route.path.includes('/edit') ||
+                     route.path.includes('/personnel')" />
   <template v-else>
     <TaskViewWrapper
         :filter-fn="filterByTeam"

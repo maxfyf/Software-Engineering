@@ -42,7 +42,7 @@ const {
           <Route :route="route" :router="router"/>
         </div>
         <div class="search-wrapper">
-          <Search :data="dataset" :onSelect="handleSelect" />
+          <Search :dataset="dataset" :onSelect="handleSelect" />
         </div>
       </div>
     </template>

@@ -1,5 +1,5 @@
 <script setup lang="js">
-import { computed } from 'vue';
+import { computed, ref, h } from 'vue';
 import { useRoute, useRouter } from 'vue-router'
 import {
   finishTask,
@@ -7,11 +7,12 @@ import {
   highlightTaskId,
   removeTask,
   currentUser,
-  teamList
+  teamList,
+  taskList
 } from "@/store/user.js";
 import { handleEnter } from "@/utils/routeManager.js"
 import { View, CaretRight, Check, Edit, Delete } from "@element-plus/icons-vue";
-import { ElMessage, ElMessageBox } from "element-plus";
+import { ElMessage, ElMessageBox, ElCheckbox } from "element-plus";
 
 const props = defineProps({
   tasks: {
@@ -49,7 +50,7 @@ const props = defineProps({
 const route = useRoute();
 const router = useRouter();
 
-const emit = defineEmits(['pageChange', 'viewDetail'])
+const emit = defineEmits(['pageChange'])
 
 const total = computed(() => props.tasks.length)
 const pageData = computed(() => {
@@ -71,24 +72,57 @@ const tableRowClassName = ({ row }) => {
   return ''
 }
 
-// 查看详情
-const viewDetail = (row) => {
+// 查看任务详情
+const viewTaskDetail = (row) => {
+  console.log('查看任务详情:', row)
   highlightTaskId.value = row.id
-  emit('viewDetail', row)
+
+  const newPage = {
+    path: 'detail',
+    params: [
+      {
+        key: 'taskId',
+        value: row.id
+      }
+    ]
+  }
+  handleEnter(route, router, newPage)
 }
 
 // 开始任务
-const startTask = (row) => {
+const startTask = async (row) => {
   highlightTaskId.value = row.id
-  startTaskAction(row.id)
-  ElMessage.success('任务已开始')
+  const ok = await startTaskAction(row.id)
+  if (ok) {
+    ElMessage.success('任务已开始')
+  }
 }
 
 // 完成任务
-const checkTask = (row) => {
+const checkTask = async (row) => {
+  // 检查是否存在未完成的前置任务
+  const predecessorList = row.predecessor || []
+  if (predecessorList.length > 0) {
+    const hasUnfinished = predecessorList.some(predItem => {
+      // predecessor 可能是标题或ID
+      let predTask
+      if (typeof predItem === 'number') {
+        predTask = taskList.value.find(t => t.id === predItem)
+      } else {
+        predTask = taskList.value.find(t => t.title === predItem || t.id === predItem)
+      }
+      return predTask && predTask.status !== '已完成'
+    })
+    if (hasUnfinished) {
+      ElMessage.error('存在未完成的前置任务，无法完成此任务')
+      return
+    }
+  }
   highlightTaskId.value = row.id
-  finishTask(row.id)
-  ElMessage.success('任务已完成')
+  const ok = await finishTask(row.id)
+  if (ok) {
+    ElMessage.success('任务已完成')
+  }
 }
 
 // 编辑任务
@@ -121,6 +155,18 @@ const isCurrentAssignee = (task) => {
   return assignee === currentUser.username
 }
 
+// 判断是否展示进展任务按钮
+const showUpdateTask = (item) => {
+  if(item.owner === currentUser.username) return true
+  if(item.team === null) return true
+  if(props.isTeamSpace) {
+    return isCurrentAssignee(item) || isTaskTeamAdmin(item)
+  }
+  else {
+    return isCurrentAssignee(item)
+  }
+}
+
 // 判断当前用户是否为任务所属团队的管理员（与团队空间逻辑一致）
 const isTaskTeamAdmin = (task) => {
   if (!task.team) return false
@@ -130,9 +176,24 @@ const isTaskTeamAdmin = (task) => {
 }
 
 // 删除任务
+const cascade = ref(false)    // 级联标记
 const deleteTask = (row) => {
   ElMessageBox.confirm(
-      `确定要删除任务"${row.title}"吗？`,
+      h('div', [
+        h('p', `确定要删除任务"${row.title}"吗？`),
+        h(ElCheckbox, {
+          modelValue: cascade.value,
+          'onUpdate:modelValue': (val) => {
+            cascade.value = val
+          },
+          style: {
+            position: 'absolute',
+            bottom: '13px',
+            left: '20px',
+            zIndex: 1
+          }
+        }, () => '级联删除')
+      ]),
       '',
       {
         confirmButtonText: '确定',
@@ -142,7 +203,8 @@ const deleteTask = (row) => {
       }
   ).then(() => {
     highlightTaskId.value = null
-    removeTask(row.id)
+    // 传递 cascade 参数给后端
+    removeTask(row.id, cascade.value)
     ElMessage.success('任务已删除')
   }).catch(() => {
     console.log('取消删除')
@@ -196,38 +258,70 @@ const deleteTask = (row) => {
             <el-button
                 link
                 type="text"
-                @click="viewDetail(scope.row)"
+                @click="viewTaskDetail(scope.row)"
             >
-              <el-icon>
-                <View/>
-              </el-icon>
+              <el-popover
+                  placement="bottom"
+                  :offset="0"
+                  trigger="hover"
+                  popper-style="min-width: 0; width: auto;"
+              >
+                <template #reference>
+                  <el-icon>
+                    <View/>
+                  </el-icon>
+                </template>
+                <div>
+                  查看详情
+                </div>
+              </el-popover>
             </el-button>
 
-            <!-- 个人任务、负责人、团队管理员/Owner 可见 -->
+            <!-- 个人任务、负责人、团队管理者/拥有者可见 -->
             <!-- 任务模块中，团队任务只有负责人能修改状态 -->
             <el-button
                 link
                 type="text"
-                v-if="(scope.row.team === null && scope.row.owner === currentUser.username) ||
-                  (scope.row.team !== null && (isTeamSpace ? (isCurrentAssignee(scope.row) || isTaskTeamAdmin(scope.row)) : isCurrentAssignee(scope.row))) &&
-                  scope.row.status === '待办'"
+                v-if="showUpdateTask(scope.row) && scope.row.status === '待办'"
                 @click="startTask(scope.row)"
             >
-              <el-icon>
-                <CaretRight/>
-              </el-icon>
+              <el-popover
+                  placement="bottom"
+                  :offset="0"
+                  trigger="hover"
+                  popper-style="min-width: 0; width: auto;"
+              >
+                <template #reference>
+                  <el-icon>
+                    <CaretRight/>
+                  </el-icon>
+                </template>
+                <div>
+                  开始任务
+                </div>
+              </el-popover>
             </el-button>
             <el-button
                 link
                 type="text"
-                v-else-if="(scope.row.team === null && scope.row.owner === currentUser.username) ||
-                  (scope.row.team !== null && (isTeamSpace ? (isCurrentAssignee(scope.row) || isTaskTeamAdmin(scope.row)) : isCurrentAssignee(scope.row))) &&
-                  scope.row.status === '进行中'"
+                v-else-if="showUpdateTask(scope.row) && scope.row.status === '进行中'"
                 @click="checkTask(scope.row)"
             >
-              <el-icon>
-                <Check/>
-              </el-icon>
+              <el-popover
+                  placement="bottom"
+                  :offset="0"
+                  trigger="hover"
+                  popper-style="min-width: 0; width: auto;"
+              >
+                <template #reference>
+                  <el-icon>
+                    <Check/>
+                  </el-icon>
+                </template>
+                <div>
+                  完成任务
+                </div>
+              </el-popover>
             </el-button>
 
             <!-- 编辑按钮：任务模块中团队任务不显示；团队空间中按权限显示 -->
@@ -238,9 +332,21 @@ const deleteTask = (row) => {
                   (scope.row.team !== null && isTeamSpace && (scope.row.owner === currentUser.username || isTaskTeamAdmin(scope.row)))"
                 @click="editTask(scope.row)"
             >
-              <el-icon>
-                <Edit/>
-              </el-icon>
+              <el-popover
+                  placement="bottom"
+                  :offset="0"
+                  trigger="hover"
+                  popper-style="min-width: 0; width: auto;"
+              >
+                <template #reference>
+                  <el-icon>
+                    <Edit/>
+                  </el-icon>
+                </template>
+                <div>
+                  编辑任务
+                </div>
+              </el-popover>
             </el-button>
 
             <!-- 删除按钮：任务模块中团队任务不显示；团队空间中按权限显示 -->
@@ -252,9 +358,21 @@ const deleteTask = (row) => {
                   (scope.row.team !== null && isTeamSpace && (scope.row.owner === currentUser.username || isTaskTeamAdmin(scope.row)))"
                 @click="deleteTask(scope.row)"
             >
-              <el-icon>
-                <Delete/>
-              </el-icon>
+              <el-popover
+                  placement="bottom"
+                  :offset="0"
+                  trigger="hover"
+                  popper-style="min-width: 0; width: auto;"
+              >
+                <template #reference>
+                  <el-icon>
+                    <Delete/>
+                  </el-icon>
+                </template>
+                <div>
+                  删除任务
+                </div>
+              </el-popover>
             </el-button>
           </template>
         </el-table-column>
@@ -282,8 +400,6 @@ const deleteTask = (row) => {
   display: flex;
   justify-content: flex-end;
 }
-
-
 
 :deep(.el-table__row.highlight-row) {
   background-color: #ecf5ff !important;
