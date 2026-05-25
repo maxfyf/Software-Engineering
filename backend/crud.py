@@ -191,15 +191,42 @@ def remove_team_member(
     if not is_self_leave and operator_membership.role != ROLE_OWNER:
         return False, "团队权限不足"
     if membership.role == ROLE_OWNER:
-        return False, "不能移除 Owner"
+        if not is_self_leave:
+            return False, "不能移除 Owner"
 
-    # 移除成员前，将其负责的团队任务转交给团队 Owner。
+        new_owner = db.query(models.TeamMember).filter(
+            models.TeamMember.team_id == team_id,
+            models.TeamMember.username != member_username,
+            models.TeamMember.role == ROLE_ADMIN
+        ).order_by(
+            models.TeamMember.joined_at.asc(),
+            models.TeamMember.id.asc()
+        ).first()
+        if not new_owner:
+            new_owner = db.query(models.TeamMember).filter(
+                models.TeamMember.team_id == team_id,
+                models.TeamMember.username != member_username,
+                models.TeamMember.role == ROLE_MEMBER
+            ).order_by(
+                models.TeamMember.joined_at.asc(),
+                models.TeamMember.id.asc()
+            ).first()
+        if not new_owner:
+            return False, "仅含 Owner 的团队不允许退出"
+
+        team.owner_username = new_owner.username
+        new_owner.role = ROLE_OWNER
+        task_assignee_username = new_owner.username
+    else:
+        task_assignee_username = team.owner_username
+
+    # 移除成员前，将其负责的团队任务转交给当前 Owner；Owner 离队时转交给新 Owner。
     assigned_tasks = db.query(models.Task).filter(
         models.Task.team_id == team_id,
         models.Task.assignee_username == member_username
     ).all()
     for task in assigned_tasks:
-        task.assignee_username = team.owner_username
+        task.assignee_username = task_assignee_username
 
     db.delete(membership)
     db.commit()

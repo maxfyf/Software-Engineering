@@ -350,6 +350,59 @@ class TeamMemberCrudTests(CrudTestCase):
         self.assertEqual(error, "团队权限不足")
         self.assertIsNotNone(crud.get_team_membership(self.db, team.id, "other"))
 
+    def test_single_owner_cannot_leave_team(self):
+        # 仅含 Owner 一人的团队不允许主动退出。
+        self.add_user("owner")
+        team = self.add_team("Core Team", "owner")
+
+        success, error = crud.remove_team_member(self.db, team.id, "owner", "owner")
+
+        self.assertFalse(success)
+        self.assertEqual(error, "仅含 Owner 的团队不允许退出")
+        self.assertEqual(crud.get_team_by_id(self.db, team.id).owner_username, "owner")
+        self.assertIsNotNone(crud.get_team_membership(self.db, team.id, "owner"))
+
+    def test_owner_leave_transfers_ownership_to_admin_first(self):
+        # Owner 主动退出时，应优先把 Owner 权限移交给 Admin。
+        for username in ["owner", "member", "admin"]:
+            self.add_user(username)
+        team = self.add_team("Core Team", "owner")
+        self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
+        self.add_team_member(team.id, "admin", crud.ROLE_ADMIN)
+        task = self.add_task(
+            "owner assigned task",
+            "owner",
+            team_id=team.id,
+            assignee_username="owner",
+        )
+
+        success, error = crud.remove_team_member(self.db, team.id, "owner", "owner")
+
+        self.assertTrue(success)
+        self.assertIsNone(error)
+        self.db.refresh(team)
+        self.assertEqual(team.owner_username, "admin")
+        self.assertIsNone(crud.get_team_membership(self.db, team.id, "owner"))
+        self.assertEqual(crud.get_team_membership(self.db, team.id, "admin").role, crud.ROLE_OWNER)
+        self.db.refresh(task)
+        self.assertEqual(task.assignee_username, "admin")
+
+    def test_owner_leave_transfers_ownership_to_member_without_admin(self):
+        # 没有 Admin 时，Owner 主动退出应把 Owner 权限移交给 Member。
+        self.add_user("owner")
+        self.add_user("member")
+        team = self.add_team("Core Team", "owner")
+        self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
+
+        success, error = crud.remove_team_member(self.db, team.id, "owner", "owner")
+
+        self.assertTrue(success)
+        self.assertIsNone(error)
+        self.db.refresh(team)
+        self.assertEqual(team.owner_username, "member")
+        self.assertIsNone(crud.get_team_membership(self.db, team.id, "owner"))
+        self.assertEqual(crud.get_team_membership(self.db, team.id, "member").role, crud.ROLE_OWNER)
+
 
 class TaskTitleConflictTests(CrudTestCase):
     def test_personal_task_title_does_not_conflict_with_team_task_in_same_team(self):
