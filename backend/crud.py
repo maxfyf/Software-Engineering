@@ -174,20 +174,26 @@ def remove_team_member(
     member_username: str,
     operator_username: str
 ) -> tuple[bool, str | None]:
-    """Owner 从团队中移除非 Owner 成员；失败时返回错误信息"""
+    """Owner 移除成员，或成员主动离开团队；失败时返回错误信息。"""
     team = get_team_by_id(db, team_id)
     if not team:
         return False, "团队不存在"
-    if not require_team_role(db, team_id, operator_username, {ROLE_OWNER}):
+
+    operator_membership = get_team_membership(db, team_id, operator_username)
+    if not operator_membership:
         return False, "团队权限不足"
 
     membership = get_team_membership(db, team_id, member_username)
     if not membership:
         return False, "团队成员不存在"
+
+    is_self_leave = member_username == operator_username
+    if not is_self_leave and operator_membership.role != ROLE_OWNER:
+        return False, "团队权限不足"
     if membership.role == ROLE_OWNER:
         return False, "不能移除 Owner"
 
-    # 移除成员前，将其负责的团队任务转交给团队Owner
+    # 移除成员前，将其负责的团队任务转交给团队 Owner。
     assigned_tasks = db.query(models.Task).filter(
         models.Task.team_id == team_id,
         models.Task.assignee_username == member_username
