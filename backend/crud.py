@@ -77,6 +77,18 @@ def require_team_role(
         return None
     return membership
 
+def validate_team_task_assignee(
+    db: Session,
+    team_id: int,
+    assignee_username: str | None
+) -> str | None:
+    """校验团队任务负责人必须仍是该团队成员。"""
+    if not assignee_username:
+        return None
+    if not get_team_membership(db, team_id, assignee_username):
+        return "团队任务负责人必须是团队成员"
+    return None
+
 def create_team(db: Session, team: schemas.TeamCreate, username: str) -> models.Team:
     """创建团队，创建者自动成为 Owner"""
     db_team = models.Team(name=team.name, owner_username=username)
@@ -345,10 +357,18 @@ def find_task_title_conflict(
     return query.first()
 
 def create_task(db: Session, task: schemas.TaskCreate, username: str) -> models.Task:
-    """创建任务并绑定到当前登录用户，写入数据库"""
-    # 使用前端传入的任务数据，并绑定当前用户名作为归属
+    """创建任务并绑定到当前登录用户，写入数据库。"""
+    if task.team_id is not None:
+        if not get_team_by_id(db, task.team_id):
+            raise HTTPException(status_code=400, detail="团队不存在")
+        if not require_team_role(db, task.team_id, username, {ROLE_ADMIN, ROLE_OWNER}):
+            raise HTTPException(status_code=403, detail="无权在该团队中创建任务")
+        assignee_error = validate_team_task_assignee(db, task.team_id, task.assignee_username)
+        if assignee_error:
+            raise HTTPException(status_code=400, detail=assignee_error)
+
     db_task = models.Task(
-        **task.dict(),
+        **task.model_dump(),
         owner_username=username
     )
     db.add(db_task)
@@ -357,26 +377,52 @@ def create_task(db: Session, task: schemas.TaskCreate, username: str) -> models.
     return db_task
 
 def get_tasks(db: Session, username: str) -> list[models.Task]:
-    """获取当前用户的所有任务列表（仅查询自己创建的任务）"""
-    return db.query(models.Task).filter(models.Task.owner_username == username).all()
+    """获取当前用户可访问的个人任务和团队任务。"""
+    personal_tasks = db.query(models.Task).filter(
+        models.Task.team_id.is_(None),
+        or_(
+            models.Task.owner_username == username,
+            models.Task.assignee_username == username
+        )
+    ).all()
+    team_tasks = db.query(models.Task).join(
+        models.TeamMember,
+        models.Task.team_id == models.TeamMember.team_id
+    ).filter(
+        models.TeamMember.username == username
+    ).all()
+    return list({task.id: task for task in personal_tasks + team_tasks}.values())
 
 def get_task_by_id(db: Session, task_id: int, username: str) -> models.Task:
-    """根据任务ID查询单条任务（仅允许查询自己的任务，不存在则返回404）"""
-    task = db.query(models.Task).filter(
-        models.Task.id == task_id,
-        models.Task.owner_username == username
-    ).first()
-    
+    """根据任务ID查询单条任务；团队任务必须按成员关系授权。"""
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在或无权访问")
-    return task
+    if task.team_id is None:
+        if task.owner_username == username or task.assignee_username == username:
+            return task
+    elif get_team_membership(db, task.team_id, username):
+        return task
+    raise HTTPException(status_code=404, detail="任务不存在或无权访问")
 
 def update_task(db: Session, task_id: int, task: schemas.TaskUpdate, username: str) -> models.Task:
-    """更新指定任务（仅允许更新自己的任务）"""
+    """更新指定任务；团队任务按成员角色校验权限。"""
     db_task = get_task_by_id(db, task_id, username)
+    updates = task.model_dump(exclude_unset=True)
+
+    if db_task.team_id is None:
+        if db_task.owner_username != username:
+            raise HTTPException(status_code=403, detail="无权编辑该任务")
+    else:
+        membership = get_team_membership(db, db_task.team_id, username)
+        if not membership:
+            raise HTTPException(status_code=403, detail="无权编辑该任务")
+        if membership.role not in {ROLE_ADMIN, ROLE_OWNER}:
+            if db_task.assignee_username != username or set(updates) != {"status"}:
+                raise HTTPException(status_code=403, detail="无权编辑该任务")
     
     # 仅更新前端传入的字段
-    for key, value in task.dict(exclude_unset=True).items():
+    for key, value in updates.items():
         setattr(db_task, key, value)
     
     db.commit()
@@ -384,8 +430,13 @@ def update_task(db: Session, task_id: int, task: schemas.TaskUpdate, username: s
     return db_task
 
 def delete_task(db: Session, task_id: int, username: str) -> None:
-    """删除指定任务（仅允许删除自己的任务）"""
+    """删除指定任务；团队任务仅 Owner/Admin 可删除。"""
     db_task = get_task_by_id(db, task_id, username)
+    if db_task.team_id is None:
+        if db_task.owner_username != username:
+            raise HTTPException(status_code=403, detail="无权删除该任务")
+    elif not require_team_role(db, db_task.team_id, username, {ROLE_ADMIN, ROLE_OWNER}):
+        raise HTTPException(status_code=403, detail="无权删除该团队任务")
     db.delete(db_task)
     db.commit()
 
@@ -394,8 +445,16 @@ def create_team_task(db: Session, task: schemas.TaskCreate, username: str) -> mo
     """创建团队任务，绑定创建者与归属团队"""
     if not task.title or not task.title.strip():
         raise HTTPException(status_code=400, detail="任务标题不能为空")
+    if task.team_id is None or not get_team_by_id(db, task.team_id):
+        raise HTTPException(status_code=400, detail="团队不存在")
+    if not require_team_role(db, task.team_id, username, {ROLE_ADMIN, ROLE_OWNER}):
+        raise HTTPException(status_code=403, detail="无权创建团队任务")
+    assignee_error = validate_team_task_assignee(db, task.team_id, task.assignee_username)
+    if assignee_error:
+        raise HTTPException(status_code=400, detail=assignee_error)
+
     db_task = models.Task(
-        **task.dict(exclude={"team_id", "assignee_username"}),
+        **task.model_dump(exclude={"team_id", "assignee_username"}),
         owner_username=username,
         team_id=task.team_id,
         assignee_username=task.assignee_username
@@ -414,8 +473,19 @@ def get_team_tasks(db: Session, team_id: int) -> list[models.Task]:
 
 
 def get_assigned_tasks(db: Session, username: str) -> list[models.Task]:
-    """获取分配给当前用户的团队任务"""
-    return db.query(models.Task).filter(models.Task.assignee_username == username).all()
+    """获取分配给当前用户且仍可访问的任务。"""
+    personal_tasks = db.query(models.Task).filter(
+        models.Task.team_id.is_(None),
+        models.Task.assignee_username == username
+    ).all()
+    team_tasks = db.query(models.Task).join(
+        models.TeamMember,
+        models.Task.team_id == models.TeamMember.team_id
+    ).filter(
+        models.Task.assignee_username == username,
+        models.TeamMember.username == username
+    ).all()
+    return list({task.id: task for task in personal_tasks + team_tasks}.values())
 
 
 def update_task_status_only(db: Session, task_id: int, status: str):

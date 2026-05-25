@@ -404,6 +404,118 @@ class TeamMemberCrudTests(CrudTestCase):
         self.assertEqual(crud.get_team_membership(self.db, team.id, "member").role, crud.ROLE_OWNER)
 
 
+class TaskAccessCrudTests(CrudTestCase):
+    def assert_http_error(self, status_code: int, func, *args, **kwargs):
+        with self.assertRaises(api.HTTPException) as ctx:
+            func(*args, **kwargs)
+        self.assertEqual(ctx.exception.status_code, status_code)
+
+    def test_departed_owner_cannot_access_team_task_by_owner_field(self):
+        # Owner 离队后，即使任务 owner_username 仍是原 Owner，也不能继续访问或操作团队任务。
+        self.add_user("owner")
+        self.add_user("member")
+        team = self.add_team("Core Team", "owner")
+        self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
+        task = self.add_task(
+            "legacy owner task",
+            "owner",
+            team_id=team.id,
+            assignee_username="owner",
+        )
+
+        success, error = crud.remove_team_member(self.db, team.id, "owner", "owner")
+
+        self.assertTrue(success)
+        self.assertIsNone(error)
+        self.assertEqual(task.owner_username, "owner")
+        self.assert_http_error(404, crud.get_task_by_id, self.db, task.id, "owner")
+        self.assert_http_error(
+            404,
+            crud.update_task,
+            self.db,
+            task.id,
+            schemas.TaskUpdate(status="进行中"),
+            "owner",
+        )
+        self.assert_http_error(404, crud.delete_task, self.db, task.id, "owner")
+
+    def test_get_assigned_tasks_excludes_stale_team_assignment_after_membership_removed(self):
+        # 即使数据库残留负责人字段，已非团队成员的用户也不能再看到该团队任务。
+        self.add_user("owner")
+        self.add_user("member")
+        team = self.add_team("Core Team", "owner")
+        membership = self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
+        stale_task = self.add_task(
+            "stale assignment",
+            "owner",
+            team_id=team.id,
+            assignee_username="member",
+        )
+        self.db.delete(membership)
+        self.db.commit()
+
+        assigned_tasks = crud.get_assigned_tasks(self.db, "member")
+
+        self.assertNotIn(stale_task.id, [task.id for task in assigned_tasks])
+
+    def test_get_tasks_includes_team_tasks_only_for_current_members(self):
+        # 团队任务可见性必须来自成员关系，而不是 owner/assignee 字段残留。
+        for username in ["owner", "member", "outsider"]:
+            self.add_user(username)
+        team = self.add_team("Core Team", "owner")
+        self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
+        task = self.add_task("team task", "owner", team_id=team.id)
+
+        member_tasks = crud.get_tasks(self.db, "member")
+        outsider_tasks = crud.get_tasks(self.db, "outsider")
+
+        self.assertIn(task.id, [item.id for item in member_tasks])
+        self.assertNotIn(task.id, [item.id for item in outsider_tasks])
+
+    def test_create_team_task_rejects_non_member_assignee(self):
+        # 团队任务负责人必须是当前团队成员。
+        self.add_user("owner")
+        self.add_user("outsider")
+        team = self.add_team("Core Team", "owner")
+        task = schemas.TaskCreate(
+            title="invalid assignment",
+            team_id=team.id,
+            assignee_username="outsider",
+        )
+
+        self.assert_http_error(400, crud.create_team_task, self.db, task, "owner")
+
+    def test_member_can_only_update_assigned_team_task_status(self):
+        # 普通成员只能更新分配给自己的团队任务状态，不能改标题等其他字段。
+        self.add_user("owner")
+        self.add_user("member")
+        team = self.add_team("Core Team", "owner")
+        self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
+        task = self.add_task(
+            "member task",
+            "owner",
+            team_id=team.id,
+            assignee_username="member",
+        )
+
+        updated = crud.update_task(
+            self.db,
+            task.id,
+            schemas.TaskUpdate(status="进行中"),
+            "member",
+        )
+
+        self.assertEqual(updated.status, "进行中")
+        self.assert_http_error(
+            403,
+            crud.update_task,
+            self.db,
+            task.id,
+            schemas.TaskUpdate(title="new title"),
+            "member",
+        )
+
+
 class TaskTitleConflictTests(CrudTestCase):
     def test_personal_task_title_does_not_conflict_with_team_task_in_same_team(self):
         # A 的个人任务标题不应阻止 B 在共同团队中创建同名团队任务。
