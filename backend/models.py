@@ -117,3 +117,18 @@ class Task(Base):
     #映射任务关系
     team = relationship("Team", back_populates="tasks")
     assignee = relationship("User", foreign_keys=[assignee_username])
+
+
+class TaskDependency(Base):
+    """任务依赖关系模型（有向无环图的边）"""
+    __tablename__ = "task_dependencies"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    # 前置任务 ID (起点)
+    predecessor_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
+    # 后继任务 ID (终点)
+    successor_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
+
+    # 建立关系，方便在 ORM 中直接跨表查询
+    predecessor = relationship("Task", foreign_keys=[predecessor_id], backref="successors")
+    successor = relationship("Task", foreign_keys=[successor_id], backref="predecessors")

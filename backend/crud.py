@@ -350,10 +350,25 @@ def update_task(db: Session, task_id: int, task: schemas.TaskUpdate, username: s
     db.refresh(db_task)
     return db_task
 
-def delete_task(db: Session, task_id: int, username: str) -> None:
-    """删除指定任务（仅允许删除自己的任务）"""
-    db_task = get_task_by_id(db, task_id, username)
-    db.delete(db_task)
+def delete_task_with_dependencies(db: Session, task_id: int, is_cascade: bool):
+    """支持级联/非级联删除的图节点清理逻辑"""
+    if not is_cascade:
+        # 非级联：仅删除当前任务（外键 ondelete="CASCADE" 会自动清理相关的依赖关系记录）
+        db.query(models.Task).filter(models.Task.id == task_id).delete()
+    else:
+        # 级联删除：找出所有后继子图节点进行批量删除
+        tasks_to_delete = set()
+        queue = [task_id]
+        
+        while queue:
+            current = queue.pop(0)
+            tasks_to_delete.add(current)
+            deps = db.query(models.TaskDependency).filter(models.TaskDependency.predecessor_id == current).all()
+            for dep in deps:
+                if dep.successor_id not in tasks_to_delete:
+                    queue.append(dep.successor_id)
+        
+        db.query(models.Task).filter(models.Task.id.in_(tasks_to_delete)).delete(synchronize_session=False)
     db.commit()
 
 
@@ -399,3 +414,46 @@ def update_task_status_only(db: Session, task_id: int, status: str):
     db.commit()
     db.refresh(task)
     return task
+
+def create_task_dependency(db: Session, predecessor_id: int, successor_id: int) -> tuple[bool, str | None]:
+    """创建依赖关系，包含隔离校验与成环检测"""
+    if predecessor_id == successor_id:
+        return False, "任务不能依赖自身"
+
+    task_pre = db.query(models.Task).filter(models.Task.id == predecessor_id).first()
+    task_suc = db.query(models.Task).filter(models.Task.id == successor_id).first()
+    
+    if not task_pre or not task_suc:
+        return False, "任务不存在"
+
+    # 防线1：隔离校验（个人任务只能依赖个人任务，团队任务只能依赖同团队任务）
+    if task_pre.team_id != task_suc.team_id:
+        return False, "禁止跨团队或跨个人/团队类型建立依赖关系"
+
+    # 防线2：成环检测 (DFS 或 BFS 寻找是否存在从 successor 到 predecessor 的路径)
+    if _check_cycle(db, start_node_id=successor_id, target_node_id=predecessor_id):
+        return False, "禁止出现前置任务关系环路"
+
+    # 写入数据库
+    db_dep = models.TaskDependency(predecessor_id=predecessor_id, successor_id=successor_id)
+    db.add(db_dep)
+    db.commit()
+    return True, None
+
+def _check_cycle(db: Session, start_node_id: int, target_node_id: int) -> bool:
+    """BFS 判断是否能从 start 走到 target，如果能，说明加了这条边就会成环"""
+    queue = [start_node_id]
+    visited = set([start_node_id])
+    
+    while queue:
+        current = queue.pop(0)
+        if current == target_node_id:
+            return True # 发现环路
+            
+        # 查找 current 的所有直接后继
+        deps = db.query(models.TaskDependency).filter(models.TaskDependency.predecessor_id == current).all()
+        for dep in deps:
+            if dep.successor_id not in visited:
+                visited.add(dep.successor_id)
+                queue.append(dep.successor_id)
+    return False

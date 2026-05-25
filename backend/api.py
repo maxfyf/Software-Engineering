@@ -1,13 +1,12 @@
 # backend/api.py - 统一的 FastAPI 后端入口
 
-from fastapi import FastAPI, Depends, HTTPException, status, Header
+from fastapi import FastAPI, Depends, HTTPException, status, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from pydantic import BaseModel, Field
 
-from fastapi import Query
-from models import TaskStatus, Task #补充
+from models import TaskStatus, TaskDependency #补充
 from typing import Optional
 from datetime import datetime
 
@@ -55,6 +54,10 @@ class TaskUpdateRequest(BaseModel):
     deadline: Optional[str] = None
     team: Optional[str] = None
     assignee: Optional[str] = None
+
+class DependencyCreateRequest(BaseModel):
+    predecessor_id: int = Field(..., description="前置任务ID")
+    successor_id: int = Field(..., description="后继任务ID")   
 
 # ===================== 统一响应格式 =====================
 
@@ -288,6 +291,19 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
     
+
+    # ------------------ Lab3 新增：状态一致性防御检查 ------------------
+    if task_update.status is not None and task_update.status == TaskStatus.DONE.value:
+        unfinished_predecessors = db.query(TaskDependency).join(
+            Task, TaskDependency.predecessor_id == Task.id
+        ).filter(
+            TaskDependency.successor_id == task_id,
+            Task.status != TaskStatus.DONE.value
+        ).count()
+        if unfinished_predecessors > 0:
+            raise HTTPException(status_code=400, detail="编辑后将产生非法状态：当前任务存在未完成的前置任务")
+    # -------------------------------------------------------------------
+
     # 个人任务：仅 owner 可编辑
     if not task.team_id:
         if task.owner_username != current_user.username:
@@ -371,7 +387,7 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
     return success_response("更新成功", serialize_task(task))
 
 @app.delete("/api/task/{task_id}")
-def delete_task(task_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def delete_task(task_id: int, isCascade: bool = Query(False, description="是否级联删除所有后继任务"), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """删除任务 - 个人任务仅owner可删除，团队任务仅Admin/Owner可删除"""
     task = db.query(Task).filter(Task.id == task_id).first()
     
@@ -386,11 +402,9 @@ def delete_task(task_id: int, current_user: User = Depends(get_current_user), db
         # 团队任务：仅 Admin/Owner 可删除
         if not crud.require_team_role(db, task.team_id, current_user.username, {crud.ROLE_ADMIN, crud.ROLE_OWNER}):
             raise HTTPException(status_code=403, detail="无权删除该团队任务")
-    
-    db.delete(task)
-    db.commit()
-    
-    return success_response("删除成功")
+    # 调用 crud 扩展的图节点删除逻辑（替代原有的 db.delete(task)）
+    crud.delete_task_with_dependencies(db, task_id, is_cascade=isCascade)
+    return success_response(f"{'级联' if isCascade else '非级联'}删除成功")
 
 # ===================== 团队管理模块 =====================
 
@@ -630,13 +644,25 @@ def update_task_status(
         
         if task.assignee_username != current_user.username:
             raise HTTPException(status_code=403, detail="只能修改分配给自己的任务状态")
-
+        #------------------ Lab3 新增：状态一致性防御检查 ------------------
+        if task_status == TaskStatus.DONE.value:
+            unfinished_predecessors = db.query(TaskDependency).join(
+                Task, TaskDependency.predecessor_id == Task.id
+            ).filter(
+                TaskDependency.successor_id == task_id,
+                Task.status != TaskStatus.DONE.value
+            ).count()
+            if unfinished_predecessors > 0:
+                raise HTTPException(status_code=400, detail="更新失败：该任务存在未完成的前置任务")
+        # -------------------------------------------------------------------
         updated_task = crud.update_task_status_only(db, task_id, task_status)
         if not updated_task:
             raise HTTPException(status_code=500, detail="任务状态更新失败")
-
-    #服务器内部异常包装
+    except HTTPException:
+        # 【新增】：如果是我们主动抛出的 HTTP 异常（400/403/404等），直接原样抛出，不要拦截
+        raise
     except Exception as e:
+        # 只有真正的代码崩溃（比如数据库断连、空指针），才会被这里捕获转为 500
         raise HTTPException(
             status_code=500,
             detail=f"服务器内部异常,任务状态更新失败: {str(e)}"
@@ -645,3 +671,33 @@ def update_task_status(
         "id": updated_task.id,
         "status": updated_task.status
     })
+
+
+@app.post("/api/task/dependency")
+def create_dependency(
+    request: DependencyCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """建立任务前置依赖关系（包含图隔离和成环检测防御）"""
+    task_pre = db.query(Task).filter(Task.id == request.predecessor_id).first()
+    task_suc = db.query(Task).filter(Task.id == request.successor_id).first()
+    
+    if not task_pre or not task_suc:
+        raise HTTPException(status_code=404, detail="前置或后继任务不存在")
+    
+    # 基础可达权限校验（必须是任务相关的参与者或团队成员）
+    for t in [task_pre, task_suc]:
+        if t.team_id:
+            if not crud.require_team_member(db, t.team_id, current_user.username):
+                raise HTTPException(status_code=403, detail="无权操作该团队的任务关系")
+        else:
+            if t.owner_username != current_user.username and t.assignee_username != current_user.username:
+                raise HTTPException(status_code=403, detail="无权操作该个人任务的关系")
+
+    # 调用 crud 执行核心业务隔离与成环算法检测
+    success, err_msg = crud.create_task_dependency(db, request.predecessor_id, request.successor_id)
+    if not success:
+        raise HTTPException(status_code=400, detail=err_msg)
+        
+    return success_response("依赖关系建立成功")
