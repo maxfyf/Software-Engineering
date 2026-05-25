@@ -246,7 +246,10 @@ def remove_team_member(
 
 
 def delete_team(db: Session, team_id: int, *, commit: bool = True) -> bool:
-    """删除团队，并同步删除该团队下的全部任务。"""
+    """删除团队、成员关系和团队任务；团队任务不迁移为个人任务。
+
+    当前后端没有独立的任务依赖关系表，删除团队任务后不会保留团队空间内的依赖关系。
+    """
     team = get_team_by_id(db, team_id)
     if not team:
         return False

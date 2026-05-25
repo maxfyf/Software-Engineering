@@ -119,6 +119,21 @@ class DeleteTeamTests(CrudTestCase):
         # 不存在的团队应直接返回 False，而不是抛出异常。
         self.assertFalse(crud.delete_team(self.db, 9999))
 
+    def test_delete_team_removes_former_member_access_to_team_space(self):
+        # 团队解散后，原成员不应再通过团队空间看到团队或团队任务。
+        self.add_user("owner")
+        self.add_user("member")
+        team = self.add_team("Alpha", "owner")
+        self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
+        self.add_task("team task", "owner", team_id=team.id, assignee_username="member")
+
+        deleted = crud.delete_team(self.db, team.id)
+
+        self.assertTrue(deleted)
+        self.assertEqual(crud.get_user_teams(self.db, "member"), [])
+        self.assertIsNone(crud.require_team_member(self.db, team.id, "member"))
+        self.assertEqual(crud.get_team_tasks(self.db, team.id), [])
+
 
 class CancelAccountTests(CrudTestCase):
     def test_cancel_account_cleans_up_owned_teams_memberships_and_task_assignments(self):
