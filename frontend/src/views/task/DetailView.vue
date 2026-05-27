@@ -57,7 +57,10 @@ const viewPredecessorDetail = async (index) => {
   // 跳转到前置任务的详情页面
   await router.push({
     path: route.path,
-    query: { taskId: predTask.id }
+    query: {
+      ...route.query,
+      taskId: predTask.id
+    }
   })
   await routeRef.value?.refreshRoute()
 }
@@ -68,7 +71,10 @@ const viewSuccessorDetail = async (index) => {
   // 跳转到后继任务的详情页面
   await router.push({
     path: route.path,
-    query: { taskId: succTask.id }
+    query: {
+      ...route.query,
+      taskId: succTask.id
+    }
   })
   await routeRef.value?.refreshRoute()
 }
