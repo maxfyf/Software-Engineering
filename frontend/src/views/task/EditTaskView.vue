@@ -211,30 +211,18 @@ const loadTaskData = async (id) => {
     newPriority.value = task.priority
     newDate.value = task.deadline || ''
 
-    // 初始化前置任务列表
-    if (task.predecessor && Array.isArray(task.predecessor)) {
-      // predecessor 可能是任务标题数组或任务ID数组
-      if (task.predecessor && task.predecessor.length > 0 && typeof task.predecessor[0] === 'string' && !task.predecessor[0].match(/^\d+$/)) {
-        // 是任务标题数组
-        newPredecessor.value = task.predecessor.slice()
-      } else {
-        // 是任务ID数组，需要转换为标题
-        const predTitles = task.predecessor.map(predId => {
-          const predTask = taskList.value.find(t => t.id === predId || t.id === parseInt(predId))
-          return predTask?.title || ''
-        }).filter(title => title)
-        newPredecessor.value = predTitles
+    // 编辑页必须从依赖接口读取最新关系，避免 task.predecessor 为空数组时跳过真实数据。
+    try {
+      const predecessors = await getPredecessors(id)
+      const predTitles = predecessors.map(pred => pred.title)
+      newPredecessor.value = predTitles
+      originalTask.value = {
+        ...task,
+        predecessor: predTitles
       }
-    } else {
-      // 从后端获取前置任务列表
-      try {
-        const predecessors = await getPredecessors(id)
-        const predTitles = predecessors.map(pred => pred.title)
-        newPredecessor.value = predTitles
-      } catch (error) {
-        console.error('获取前置任务失败:', error)
-        newPredecessor.value = []
-      }
+    } catch (error) {
+      console.error('获取前置任务失败:', error)
+      newPredecessor.value = []
     }
   }
 }
@@ -306,6 +294,7 @@ const saveChanges = async () => {
     if (predecessorIds.length > 0 && newTask.id) {
       await updatePredecessors(newTask.id, predecessorIds)
     }
+    newTask.predecessor = newPredecessor.value.slice()
     ElMessage.success('任务创建成功')
   } else {
     // 更新任务

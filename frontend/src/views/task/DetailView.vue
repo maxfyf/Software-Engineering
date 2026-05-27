@@ -1,8 +1,8 @@
 <script setup lang="js">
-import { onMounted, ref } from "vue";
+import { ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { handleBack } from "@/utils/routeManager.js";
-import { taskList, getPredecessors, getSuccessors } from "@/store/user.js";
+import { getTaskById, getPredecessors, getSuccessors } from "@/store/user.js";
 import Route from "@/components/Route.vue";
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
 
@@ -13,40 +13,59 @@ const task = ref(null)
 const predecessorTasks = ref([])
 const successorTasks = ref([])
 
-// 页面加载时，根据路由参数初始化数据
-onMounted(async () => {
-  task.value = taskList.value.find(t => t.id === Number(route.query.taskId))
-  // 从 API 获取前置任务和后继任务列表
-  if (task.value) {
-    const predecessors = await getPredecessors(task.value.id)
-    predecessorTasks.value = predecessors.map(pred => ({
-      id: pred.id,
-      title: pred.title,
-      status: pred.status
-    }))
-    const successors = await getSuccessors(task.value.id)
-    successorTasks.value = successors.map(succ => ({
-      id: succ.id,
-      title: succ.title,
-      status: succ.status
-    }))
+const loadTaskDetail = async (taskId) => {
+  if (!taskId) {
+    task.value = null
+    predecessorTasks.value = []
+    successorTasks.value = []
+    return
   }
-})
+
+  task.value = await getTaskById(taskId)
+
+  if (!task.value) {
+    predecessorTasks.value = []
+    successorTasks.value = []
+    return
+  }
+
+  const predecessors = await getPredecessors(task.value.id)
+  predecessorTasks.value = predecessors.map(pred => ({
+    id: pred.id,
+    title: pred.title,
+    status: pred.status
+  }))
+
+  const successors = await getSuccessors(task.value.id)
+  successorTasks.value = successors.map(succ => ({
+    id: succ.id,
+    title: succ.title,
+    status: succ.status
+  }))
+}
+
+watch(
+  () => route.query.taskId,
+  (taskId) => loadTaskDetail(Number(taskId)),
+  { immediate: true }
+)
 
 const viewDetail = (index) => {
   const predTask = predecessorTasks.value[index]
+  if (!predTask) return
   // 跳转到前置任务的详情页面
   router.push({
-    path: '/task/all/detail',
+    path: route.path,
     query: { taskId: predTask.id }
   })
 }
 
 const viewSuccessorDetail = (index) => {
   const succTask = successorTasks.value[index]
+  if (!succTask) return
   // 跳转到后继任务的详情页面
   router.push({
-    path: '/task/all/detail',
+    path: route.path,
     query: { taskId: succTask.id }
   })
 }
@@ -131,12 +150,25 @@ const formatDate = (dateStr) => {
             <span class="key">前置任务：</span>
             <div class="content">
               <p
-                  v-for="(item, index) in predecessor"
-                  :key="index"
+                  v-for="(item, index) in predecessorTasks"
+                  :key="item.id"
                   class="clickable"
                   @click="viewDetail(index)"
               >
-                {{item}}
+                {{ item.title }}（{{ item.status }}）
+              </p>
+            </div>
+          </div>
+          <div v-if="successorTasks.length > 0" class="item">
+            <span class="key">后继任务：</span>
+            <div class="content">
+              <p
+                  v-for="(item, index) in successorTasks"
+                  :key="item.id"
+                  class="clickable"
+                  @click="viewSuccessorDetail(index)"
+              >
+                {{ item.title }}（{{ item.status }}）
               </p>
             </div>
           </div>
