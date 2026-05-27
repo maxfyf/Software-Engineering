@@ -220,6 +220,10 @@ export const initTaskList = async (force = false) => {
             team: task.team || null,      // 团队名称
             assignee: task.assignee || []  // 被分配用户数组
         }))
+        await Promise.all(taskList.value.map(async (task) => {
+            const predRes = await api.getPredecessors(task.id)
+            task.predecessor = predRes.data.map(pred => pred.id)
+        }))
     } catch (error) {
         console.error('获取任务列表失败:', error)
     }
@@ -502,9 +506,7 @@ export const updatePredecessors = async (taskId, predecessorIds) => {
     // 更新本地任务列表中的前置任务信息
     const index = taskList.value.findIndex(t => t.id === taskId)
     if (index !== -1) {
-        taskList.value[index].predecessor = predecessorIds.map(id =>
-            taskList.value.find(t => t.id === id)?.title || id
-        )
+        taskList.value[index].predecessor = predecessorIds.slice()
     }
     return true
 }
