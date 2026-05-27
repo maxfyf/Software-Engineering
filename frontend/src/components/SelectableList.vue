@@ -34,15 +34,15 @@ watch(selectedIndices, (newVal) => {
 }, { deep: true })
 
 // 判断某项是否选中
-const isSelected = (index) => {
-  return selectedIndices.value.includes(index)
+const isSelected = (item) => {
+  return selectedIndices.value.includes(item)
 }
 
 // 切换某项的选中状态
-const toggleItem = (index) => {
-  const currentIndex = selectedIndices.value.indexOf(index)
+const toggleItem = (item) => {
+  const currentIndex = selectedIndices.value.indexOf(item)
   if (currentIndex === -1) {
-    selectedIndices.value.push(index)
+    selectedIndices.value.push(item)
   } else {
     selectedIndices.value.splice(currentIndex, 1)
   }
@@ -55,13 +55,13 @@ const toggleItem = (index) => {
         v-for="(item, index) in candidates"
         :key="index"
         class="list-item"
-        :class="{ 'is-selected': isSelected(index) }"
-        @click="toggleItem(index)"
+        :class="{ 'is-selected': isSelected(item) }"
+        @click="toggleItem(item)"
     >
       <el-checkbox
-          :model-value="isSelected(index)"
+          :model-value="isSelected(item)"
           @click.stop
-          @change="toggleItem(index)"
+          @change="toggleItem(item)"
       >
         {{ item }}
       </el-checkbox>

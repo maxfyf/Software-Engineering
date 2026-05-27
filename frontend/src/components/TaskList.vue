@@ -1,5 +1,5 @@
 <script setup lang="js">
-import { computed, ref, h } from 'vue';
+import { computed, ref, h, defineComponent } from 'vue';
 import { useRoute, useRouter } from 'vue-router'
 import {
   finishTask,
@@ -175,25 +175,47 @@ const isTaskTeamAdmin = (task) => {
   return team.owner === currentUser.username || team.admin?.includes(currentUser.username)
 }
 
+const DeleteConfirmContent = defineComponent({
+  props: {
+    title: {
+      type: String,
+      required: true
+    }
+  },
+  emits: ['change'],
+  setup(props, { emit }) {
+    const checked = ref(false)
+    const updateChecked = (val) => {
+      checked.value = val
+      emit('change', val)
+    }
+
+    return () => h('div', [
+      h('p', `确定要删除任务"${props.title}"吗？`),
+      h(ElCheckbox, {
+        modelValue: checked.value,
+        'onUpdate:modelValue': updateChecked,
+        style: {
+          position: 'absolute',
+          bottom: '13px',
+          left: '20px',
+          zIndex: 1
+        }
+      }, () => '级联删除')
+    ])
+  }
+})
+
 // 删除任务
-const cascade = ref(false)    // 级联标记
 const deleteTask = (row) => {
+  let cascade = false
   ElMessageBox.confirm(
-      h('div', [
-        h('p', `确定要删除任务"${row.title}"吗？`),
-        h(ElCheckbox, {
-          modelValue: cascade.value,
-          'onUpdate:modelValue': (val) => {
-            cascade.value = val
-          },
-          style: {
-            position: 'absolute',
-            bottom: '13px',
-            left: '20px',
-            zIndex: 1
-          }
-        }, () => '级联删除')
-      ]),
+      h(DeleteConfirmContent, {
+        title: row.title,
+        onChange: (val) => {
+          cascade = val
+        }
+      }),
       '',
       {
         confirmButtonText: '确定',
@@ -204,7 +226,7 @@ const deleteTask = (row) => {
   ).then(() => {
     highlightTaskId.value = null
     // 传递 cascade 参数给后端
-    removeTask(row.id, cascade.value)
+    removeTask(row.id, cascade)
     ElMessage.success('任务已删除')
   }).catch(() => {
     console.log('取消删除')
