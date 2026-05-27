@@ -92,7 +92,7 @@ const api = {
     // 前置任务依赖关系
     getPredecessors: (taskId) => request.get(`/task/${taskId}/predecessors`),
     getSuccessors: (taskId) => request.get(`/task/${taskId}/successors`),
-    updatePredecessors: (taskId, predecessorIds) => request.put(`/task/${taskId}/predecessors`, { predecessorIds }),
+    updatePredecessors: (taskId, predecessorIds) => request.put(`/task/${taskId}/predecessors`, { predecessor_ids: predecessorIds }),
 
     // 团队模块
     getTeamList: () => request.get('/team/list'),
@@ -101,7 +101,7 @@ const api = {
     addMember: (teamId, username, role) => request.post(`/team/${teamId}/member`, { username, role }),
     removeMember: (teamId, username) => request.delete(`/team/${teamId}/member`, { username }),
     setMemberRole: (teamId, username, role) => request.put(`/team/${teamId}/member/role`, { username, role }),
-    transferOwner: (teamId, newOwner) => request.put(`/team/${teamId}/owner`, { newOwner }),
+    transferOwner: (teamId, newOwner) => request.put(`/team/${teamId}/owner`, { new_owner_id: newOwner }),
     leaveTeam: (teamId) => request.post(`/team/${teamId}/leave`),
 
 }
