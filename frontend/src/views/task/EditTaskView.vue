@@ -65,6 +65,64 @@ const candidateTaskList = computed(() => {
   return scopeTaskList.value.filter(t => t.id !== taskId.value).map(task => task.title)
 })
 
+const findTaskByDependencyItem = (item) => {
+  if (typeof item === 'number') {
+    return taskList.value.find(t => t.id === item)
+  }
+  const numericId = Number(item)
+  if (!Number.isNaN(numericId)) {
+    const taskById = taskList.value.find(t => t.id === numericId)
+    if (taskById) return taskById
+  }
+  return scopeTaskList.value.find(t => t.title === item)
+}
+
+const findTopUnfinishedPredecessor = (predecessorTitles) => {
+  const visited = new Set()
+
+  const trace = (task) => {
+    if (!task || visited.has(task.id)) return null
+    visited.add(task.id)
+
+    const predecessors = task.predecessor || []
+    for (const predItem of predecessors) {
+      const upstream = findTaskByDependencyItem(predItem)
+      const blocker = trace(upstream)
+      if (blocker) return blocker
+    }
+
+    return task.status !== '已完成' ? task : null
+  }
+
+  for (const title of predecessorTitles) {
+    const predTask = scopeTaskList.value.find(t => t.title === title)
+    const blocker = trace(predTask)
+    if (blocker) return blocker
+  }
+  return null
+}
+
+const findNearestDoneSuccessor = (targetId) => {
+  const visited = new Set([targetId])
+  let queue = taskList.value.filter(t =>
+      (t.predecessor || []).some(predItem => findTaskByDependencyItem(predItem)?.id === targetId)
+  )
+
+  while (queue.length > 0) {
+    const current = queue.shift()
+    if (!current || visited.has(current.id)) continue
+    visited.add(current.id)
+
+    if (current.status === '已完成') return current
+
+    const next = taskList.value.filter(t =>
+        (t.predecessor || []).some(predItem => findTaskByDependencyItem(predItem)?.id === current.id)
+    )
+    queue.push(...next)
+  }
+  return null
+}
+
 const showPredecessor = ref(false)
 const tempPredecessor = ref([])
 const showPredecessorDialog = () => {
@@ -78,20 +136,17 @@ const closePredecessorDialog = () => {
 const updateNewPredecessor = () => {
   // 检查非法状态：已完成的任务不能添加未完成的前置任务
   if (newStatus.value === '已完成') {
-    const hasUnfinishedPredecessor = tempPredecessor.value.some(title => {
-      const task = scopeTaskList.value.find(t => t.title === title)
-      return task && task.status !== '已完成'
-    })
-    if (hasUnfinishedPredecessor) {
-      ElMessage.error('已完成的任务不能添加未完成的前置任务')
+    const blocker = findTopUnfinishedPredecessor(tempPredecessor.value)
+    if (blocker) {
+      ElMessage.error(`任务「${newTitle.value}」已完成，无法添加未完成的前置任务「${blocker.title}」`)
       return
     }
   }
 
   // 检查环路
-  const hasCycle = checkCycleInPredecessors(tempPredecessor.value)
-  if (hasCycle) {
-    ElMessage.error('新增前置任务将导致依赖关系出现环路，请重新选择')
+  const cycleTask = findCycleCausingPredecessor(tempPredecessor.value)
+  if (cycleTask) {
+    ElMessage.error(`新增前置任务「${cycleTask.title}」将导致依赖关系出现环路，请重新选择`)
     return
   }
 
@@ -101,8 +156,8 @@ const updateNewPredecessor = () => {
 }
 
 // 检查新增前置任务是否会形成环路
-const checkCycleInPredecessors = (selectedPredecessors) => {
-  if (isNew.value || !taskId.value) return false
+const findCycleCausingPredecessor = (selectedPredecessors) => {
+  if (isNew.value || !taskId.value) return null
 
   // 获取当前任务ID
   const currentId = taskId.value
@@ -113,15 +168,15 @@ const checkCycleInPredecessors = (selectedPredecessors) => {
     if (!predTask) continue
 
     // 直接自引用检查
-    if (predTask.id === currentId) return true
+    if (predTask.id === currentId) return predTask
 
     // 递归追溯前置任务链
     const visited = new Set()
     if (tracePredecessorChain(predTask.id, currentId, visited)) {
-      return true
+      return predTask
     }
   }
-  return false
+  return null
 }
 
 // 递归追溯任务的前置任务链，检查是否包含目标任务
@@ -163,8 +218,12 @@ const hasChanges = () => {
       : (originalTask.value.assignee || '')
 
   // 比较前置任务列表
-  const originalPredecessorStr = (originalTask.value.predecessor || []).sort().join(',')
-  const newPredecessorStr = newPredecessor.value.slice().sort().join(',')
+  const originalPredecessorStr = (originalTask.value.predecessor || []).map(String).sort().join(',')
+  const newPredecessorIds = newPredecessor.value.map(title => {
+    const task = scopeTaskList.value.find(t => t.title === title)
+    return task?.id
+  }).filter(id => id !== undefined)
+  const newPredecessorStr = newPredecessorIds.map(String).sort().join(',')
 
   return newTitle.value !== originalTask.value.title ||
          (isTeamTask.value && newAssignee.value !== originalAssignee) ||
@@ -215,10 +274,11 @@ const loadTaskData = async (id) => {
     try {
       const predecessors = await getPredecessors(id)
       const predTitles = predecessors.map(pred => pred.title)
+      const predIds = predecessors.map(pred => pred.id)
       newPredecessor.value = predTitles
       originalTask.value = {
         ...task,
-        predecessor: predTitles
+        predecessor: predIds
       }
     } catch (error) {
       console.error('获取前置任务失败:', error)
@@ -251,12 +311,21 @@ const saveChanges = async () => {
 
   // 检查已完成任务是否存在未完成的前置任务
   if (newStatus.value === '已完成') {
-    const hasUnfinished = newPredecessor.value.some(title => {
-      const task = scopeTaskList.value.find(t => t.title === title)
-      return task && task.status !== '已完成'
-    })
-    if (hasUnfinished) {
-      ElMessage.error('存在未完成的前置任务，无法将状态设为已完成')
+    const blocker = findTopUnfinishedPredecessor(newPredecessor.value)
+    if (blocker) {
+      if (!isNew.value && originalTask.value?.status === '已完成') {
+        ElMessage.error(`任务「${newTitle.value}」已完成，无法添加未完成的前置任务「${blocker.title}」`)
+      } else {
+        ElMessage.error(`前置任务「${blocker.title}」未完成，无法完成当前任务`)
+      }
+      return
+    }
+  }
+
+  if (!isNew.value && originalTask.value?.status === '已完成' && newStatus.value !== '已完成') {
+    const blocker = findNearestDoneSuccessor(taskId.value)
+    if (blocker) {
+      ElMessage.error(`后继任务「${blocker.title}」已完成，无法将当前任务改为未完成状态`)
       return
     }
   }
