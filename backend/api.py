@@ -1,13 +1,12 @@
 # backend/api.py - 统一的 FastAPI 后端入口
 
-from fastapi import FastAPI, Depends, HTTPException, status, Header
+from fastapi import FastAPI, Depends, HTTPException, status, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from pydantic import BaseModel, Field
 
-from fastapi import Query
-from models import TaskStatus, Task #补充
+from models import TaskStatus, TaskDependency #补充
 from typing import Optional
 from datetime import datetime
 
@@ -55,6 +54,10 @@ class TaskUpdateRequest(BaseModel):
     deadline: Optional[str] = None
     team: Optional[str] = None
     assignee: Optional[str] = None
+
+class DependencyCreateRequest(BaseModel):
+    predecessor_id: int = Field(..., description="前置任务ID")
+    successor_id: int = Field(..., description="后继任务ID")   
 
 # ===================== 统一响应格式 =====================
 
@@ -288,6 +291,19 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
     
+
+    # ------------------ Lab3 新增：状态一致性防御检查 ------------------
+    if task_update.status is not None and task_update.status == TaskStatus.DONE.value:
+        unfinished_predecessors = db.query(TaskDependency).join(
+            Task, TaskDependency.predecessor_id == Task.id
+        ).filter(
+            TaskDependency.successor_id == task_id,
+            Task.status != TaskStatus.DONE.value
+        ).count()
+        if unfinished_predecessors > 0:
+            raise HTTPException(status_code=400, detail="编辑后将产生非法状态：当前任务存在未完成的前置任务")
+    # -------------------------------------------------------------------
+
     # 个人任务：仅 owner 可编辑
     if not task.team_id:
         if task.owner_username != current_user.username:
@@ -653,9 +669,11 @@ def update_task_status(
         updated_task = crud.update_task_status_only(db, task_id, task_status)
         if not updated_task:
             raise HTTPException(status_code=500, detail="任务状态更新失败")
-
-    #服务器内部异常包装
+    except HTTPException:
+        # 【新增】：如果是我们主动抛出的 HTTP 异常（400/403/404等），直接原样抛出，不要拦截
+        raise
     except Exception as e:
+        # 只有真正的代码崩溃（比如数据库断连、空指针），才会被这里捕获转为 500
         raise HTTPException(
             status_code=500,
             detail=f"服务器内部异常,任务状态更新失败: {str(e)}"
