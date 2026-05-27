@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from models import TaskStatus, TaskDependency #补充
 from typing import Optional
 from datetime import datetime
+from collections import deque
 
 from database import get_db, Base, engine
 from models import User, Task, Team, TaskDependency
@@ -81,7 +82,7 @@ def serialize_task(task):
         "owner": task.owner_username,
         "team": task.team.name if task.team else None,
         "assignee": [task.assignee_username] if task.assignee_username else [],
-        "predecessor": [pred.title for pred in task.predecessors]
+        "predecessor": [pred.id for pred in task.predecessors]
     }
 
 def get_team_id_by_name(db: Session, name: str) -> int | None:
@@ -90,6 +91,75 @@ def get_team_id_by_name(db: Session, name: str) -> int | None:
         return None
     team = db.query(Team).filter(Team.name == name).first()
     return team.id if team else None
+
+def find_top_unfinished_predecessor(db: Session, task_id: int, predecessor_ids: list[int] | None = None):
+    """查找阻塞任务完成的最上游未完成前置任务。"""
+    if predecessor_ids is None:
+        predecessor_ids = [task.id for task in crud.get_predecessors(db, task_id)]
+
+    visited = set()
+
+    def trace(pred_id: int):
+        if pred_id in visited:
+            return None
+        visited.add(pred_id)
+
+        pred_task = db.query(Task).filter(Task.id == pred_id).first()
+        if not pred_task:
+            return None
+
+        for upstream in crud.get_predecessors(db, pred_task.id):
+            blocker = trace(upstream.id)
+            if blocker:
+                return blocker
+
+        if pred_task.status != TaskStatus.DONE.value:
+            return pred_task
+        return None
+
+    for pred_id in predecessor_ids:
+        blocker = trace(pred_id)
+        if blocker:
+            return blocker
+    return None
+
+def find_nearest_done_successor(db: Session, task_id: int):
+    """查找阻塞任务回退为未完成状态的最近已完成后继任务。"""
+    visited = {task_id}
+    queue = deque(crud.get_successors(db, task_id))
+
+    while queue:
+        successor = queue.popleft()
+        if successor.id in visited:
+            continue
+        visited.add(successor.id)
+
+        if successor.status == TaskStatus.DONE.value:
+            return successor
+
+        queue.extend(crud.get_successors(db, successor.id))
+    return None
+
+def validate_status_transition(db: Session, task: Task, new_status: str | None):
+    """校验任务状态变化不会破坏依赖状态一致性。"""
+    if new_status is None or new_status == task.status:
+        return
+
+    if new_status == TaskStatus.DONE.value:
+        blocker = find_top_unfinished_predecessor(db, task.id)
+        if blocker:
+            raise HTTPException(
+                status_code=400,
+                detail=f"前置任务「{blocker.title}」未完成，无法完成当前任务"
+            )
+
+    if task.status == TaskStatus.DONE.value and new_status != TaskStatus.DONE.value:
+        blocker = find_nearest_done_successor(db, task.id)
+        if blocker:
+            raise HTTPException(
+                status_code=400,
+                detail=f"后继任务「{blocker.title}」已完成，无法将当前任务改为未完成状态"
+            )
 
 # ===================== 依赖：获取当前用户 =====================
 
@@ -293,17 +363,7 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
         raise HTTPException(status_code=404, detail="任务不存在")
     
 
-    # ------------------ Lab3 新增：状态一致性防御检查 ------------------
-    if task_update.status is not None and task_update.status == TaskStatus.DONE.value:
-        unfinished_predecessors = db.query(TaskDependency).join(
-            Task, TaskDependency.predecessor_id == Task.id
-        ).filter(
-            TaskDependency.successor_id == task_id,
-            Task.status != TaskStatus.DONE.value
-        ).count()
-        if unfinished_predecessors > 0:
-            raise HTTPException(status_code=400, detail="编辑后将产生非法状态：当前任务存在未完成的前置任务")
-    # -------------------------------------------------------------------
+    validate_status_transition(db, task, task_update.status)
 
     # 个人任务：仅 owner 可编辑
     if not task.team_id:
@@ -321,12 +381,6 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
             raise HTTPException(status_code=400, detail="个人任务中已存在同名任务")
         # 个人任务允许修改所有字段
         if task_update.title is not None:
-            # 如果要把状态改为“已完成”，先检查所有前置任务是否已完成
-            if task_update.status == "已完成":
-                preds = crud.get_predecessors(db, task_id)
-                for pred in preds:
-                    if pred.status != "已完成":
-                        raise HTTPException(status_code=400,detail=f"前置任务「{pred.title}」未完成，无法完成当前任务")
             task.title = task_update.title
         if task_update.description is not None:
             task.description = task_update.description
@@ -363,12 +417,6 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
                 raise HTTPException(status_code=400, detail="该团队中已存在同名任务")
             # Admin/Owner 可修改所有字段
             if task_update.title is not None:
-               # 如果要把状态改为“已完成”，先检查所有前置任务是否已完成
-               if task_update.status == "已完成":
-                preds = crud.get_predecessors(db, task_id)
-                for pred in preds:
-                    if pred.status != "已完成":
-                        raise HTTPException(status_code=400,detail=f"前置任务「{pred.title}」未完成，无法完成当前任务")
                 task.title = task_update.title
             if task_update.description is not None:
                 task.description = task_update.description
@@ -661,12 +709,7 @@ def update_task_status(
         
         if task.assignee_username != current_user.username:
             raise HTTPException(status_code=403, detail="只能修改分配给自己的任务状态")
-        # 如果要修改为已完成，检查前置任务
-        if task_status == "已完成":
-            preds = crud.get_predecessors(db, task_id)
-            for pred in preds:
-                if pred.status != "已完成":
-                    raise HTTPException(status_code=400, detail=f"前置任务「{pred.title}」未完成，无法完成当前任务")
+        validate_status_transition(db, task, task_status)
         updated_task = crud.update_task_status_only(db, task_id, task_status)
         if not updated_task:
             raise HTTPException(status_code=500, detail="任务状态更新失败")
@@ -734,11 +777,11 @@ def update_predecessors(
 
     # 校验所有前置任务
     for pred_id in req.predecessor_ids:
+        if pred_id == task_id:
+            raise HTTPException(status_code=400, detail="任务不能依赖自身")
         pred_task = db.query(Task).filter(Task.id == pred_id).first()
         if not pred_task:
             raise HTTPException(status_code=400, detail=f"前置任务 {pred_id} 不存在")
-        if task.status == TaskStatus.DONE.value and pred_task.status != TaskStatus.DONE.value:
-            raise HTTPException(status_code=400, detail=f"已完成任务不能添加未完成的前置任务「{pred_task.title}」")
         # 作用域限制：团队任务只能依赖同团队任务，个人任务只能依赖自己的个人任务
         if task.team_id is None:
             # 个人任务：前置任务必须是该用户自己的个人任务
@@ -754,6 +797,11 @@ def update_predecessors(
         # 循环依赖检查
         if crud.check_circular_dependency(db, pred_id, task_id):
             raise HTTPException(status_code=400, detail="不允许添加循环依赖")
+
+    if task.status == TaskStatus.DONE.value:
+        blocker = find_top_unfinished_predecessor(db, task_id, req.predecessor_ids)
+        if blocker:
+            raise HTTPException(status_code=400, detail=f"前置任务「{blocker.title}」未完成，无法完成当前任务")
 
     crud.update_predecessors(db, task_id, req.predecessor_ids)
     return success_response("更新成功")
