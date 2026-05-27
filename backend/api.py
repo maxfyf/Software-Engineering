@@ -406,7 +406,7 @@ def delete_task(
     db: Session = Depends(get_db)
 ):
     """删除任务 - 支持级联删除参数 cascade=true"""
-    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
 
@@ -694,7 +694,7 @@ def get_predecessors(
     db: Session = Depends(get_db)
 ):
     """获取任务的前置任务列表"""
-    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
     if not crud.can_access_task(db, current_user.username, task):
@@ -709,7 +709,7 @@ def get_successors(
     db: Session = Depends(get_db)
 ):
     """获取依赖当前任务的后继任务列表"""
-    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
     if not crud.can_access_task(db, current_user.username, task):
@@ -725,7 +725,7 @@ def update_predecessors(
     db: Session = Depends(get_db)
 ):
     """更新任务的前置依赖（全量替换）"""
-    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
     if not crud.can_manage_task(db, current_user.username, task):
@@ -733,7 +733,7 @@ def update_predecessors(
 
     # 校验所有前置任务
     for pred_id in req.predecessor_ids:
-        pred_task = db.query(models.Task).filter(models.Task.id == pred_id).first()
+        pred_task = db.query(Task).filter(Task.id == pred_id).first()
         if not pred_task:
             raise HTTPException(status_code=400, detail=f"前置任务 {pred_id} 不存在")
         # 作用域限制：团队任务只能依赖同团队任务，个人任务只能依赖自己的个人任务
