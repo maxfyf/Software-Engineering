@@ -108,3 +108,30 @@ class BaseResponse(BaseModel):
     code: int
     msg: str
     data: Optional[dict | list | None] = None
+
+
+# ---------- 任务依赖相关 ----------
+class TaskDependencyBase(BaseModel):
+    predecessor_id: int
+    successor_id: int
+
+class TaskDependencyCreate(TaskDependencyBase):
+    pass
+
+class TaskDependencyOut(TaskDependencyBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+class UpdatePredecessorsRequest(BaseModel):
+    """更新前置任务列表"""
+    predecessor_ids: list[int]
+
+# ---------- 团队管理扩展 ----------
+class TransferOwnerRequest(BaseModel):
+    """转让团队所有权"""
+    new_owner_id: str
+
+class LeaveTeamRequest(BaseModel):
+    """主动离开团队"""
+    pass

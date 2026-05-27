@@ -12,7 +12,7 @@ from typing import Optional
 from datetime import datetime
 
 from database import get_db, Base, engine
-from models import User, Task, Team
+from models import User, Task, Team, TaskDependency
 import schemas
 from security import verify_password, get_password_hash, create_access_token
 import crud
@@ -304,6 +304,12 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
             raise HTTPException(status_code=400, detail="个人任务中已存在同名任务")
         # 个人任务允许修改所有字段
         if task_update.title is not None:
+            # 如果要把状态改为“已完成”，先检查所有前置任务是否已完成
+            if task_update.status == "已完成":
+                preds = crud.get_predecessors(db, task_id)
+                for pred in preds:
+                    if pred.status != "已完成":
+                        raise HTTPException(status_code=400,detail=f"前置任务「{pred.title}」未完成，无法完成当前任务")
             task.title = task_update.title
         if task_update.description is not None:
             task.description = task_update.description
@@ -340,6 +346,12 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
                 raise HTTPException(status_code=400, detail="该团队中已存在同名任务")
             # Admin/Owner 可修改所有字段
             if task_update.title is not None:
+               # 如果要把状态改为“已完成”，先检查所有前置任务是否已完成
+               if task_update.status == "已完成":
+                preds = crud.get_predecessors(db, task_id)
+                for pred in preds:
+                    if pred.status != "已完成":
+                        raise HTTPException(status_code=400,detail=f"前置任务「{pred.title}」未完成，无法完成当前任务")
                 task.title = task_update.title
             if task_update.description is not None:
                 task.description = task_update.description
@@ -371,25 +383,27 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
     return success_response("更新成功", serialize_task(task))
 
 @app.delete("/api/task/{task_id}")
-def delete_task(task_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """删除任务 - 个人任务仅owner可删除，团队任务仅Admin/Owner可删除"""
-    task = db.query(Task).filter(Task.id == task_id).first()
-    
+def delete_task(
+    task_id: int,
+    cascade: bool = Query(False, description="是否级联删除所有后继任务"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """删除任务 - 支持级联删除参数 cascade=true"""
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
-    
-    # 个人任务：仅 owner 可删除
+
+    # 权限检查
     if not task.team_id:
         if task.owner_username != current_user.username:
             raise HTTPException(status_code=403, detail="无权删除该任务")
     else:
-        # 团队任务：仅 Admin/Owner 可删除
         if not crud.require_team_role(db, task.team_id, current_user.username, {crud.ROLE_ADMIN, crud.ROLE_OWNER}):
             raise HTTPException(status_code=403, detail="无权删除该团队任务")
-    
-    db.delete(task)
-    db.commit()
-    
+
+    # 调用 crud 中的级联删除函数
+    crud.delete_task_with_deps(db, task_id, cascade)
     return success_response("删除成功")
 
 # ===================== 团队管理模块 =====================
@@ -630,7 +644,12 @@ def update_task_status(
         
         if task.assignee_username != current_user.username:
             raise HTTPException(status_code=403, detail="只能修改分配给自己的任务状态")
-
+        # 如果要修改为已完成，检查前置任务
+        if task_status == "已完成":
+            preds = crud.get_predecessors(db, task_id)
+            for pred in preds:
+                if pred.status != "已完成":
+                    raise HTTPException(status_code=400, detail=f"前置任务「{pred.title}」未完成，无法完成当前任务")
         updated_task = crud.update_task_status_only(db, task_id, task_status)
         if not updated_task:
             raise HTTPException(status_code=500, detail="任务状态更新失败")
@@ -645,3 +664,102 @@ def update_task_status(
         "id": updated_task.id,
         "status": updated_task.status
     })
+
+
+
+# ===================== 任务依赖模块 =====================
+
+@app.get("/api/task/{task_id}/predecessors")
+def get_predecessors(
+    task_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """获取任务的前置任务列表"""
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if not crud.can_access_task(db, current_user.username, task):
+        raise HTTPException(status_code=403, detail="无权访问该任务")
+    preds = crud.get_predecessors(db, task_id)
+    return success_response("获取成功", [serialize_task(t) for t in preds])
+
+@app.get("/api/task/{task_id}/successors")
+def get_successors(
+    task_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """获取依赖当前任务的后继任务列表"""
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if not crud.can_access_task(db, current_user.username, task):
+        raise HTTPException(status_code=403, detail="无权访问该任务")
+    succs = crud.get_successors(db, task_id)
+    return success_response("获取成功", [serialize_task(t) for t in succs])
+
+@app.put("/api/task/{task_id}/predecessors")
+def update_predecessors(
+    task_id: int,
+    req: schemas.UpdatePredecessorsRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """更新任务的前置依赖（全量替换）"""
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if not crud.can_manage_task(db, current_user.username, task):
+        raise HTTPException(status_code=403, detail="无权修改该任务的依赖")
+
+    # 校验所有前置任务
+    for pred_id in req.predecessor_ids:
+        pred_task = db.query(models.Task).filter(models.Task.id == pred_id).first()
+        if not pred_task:
+            raise HTTPException(status_code=400, detail=f"前置任务 {pred_id} 不存在")
+        # 作用域限制：团队任务只能依赖同团队任务，个人任务只能依赖自己的个人任务
+        if task.team_id is None:
+            # 个人任务：前置任务必须是该用户自己的个人任务
+            if pred_task.team_id is not None:
+                raise HTTPException(status_code=400, detail="个人任务不能依赖团队任务")
+            if pred_task.owner_username != current_user.username:
+                raise HTTPException(status_code=400, detail="只能依赖自己的个人任务")
+        else:
+            # 团队任务：前置任务必须是同一团队的任务
+            if pred_task.team_id != task.team_id:
+                raise HTTPException(status_code=400, detail="前置任务与当前任务不在同一团队")
+
+        # 循环依赖检查
+        if crud.check_circular_dependency(db, pred_id, task_id):
+            raise HTTPException(status_code=400, detail="不允许添加循环依赖")
+
+    crud.update_predecessors(db, task_id, req.predecessor_ids)
+    return success_response("更新成功")
+
+@app.put("/api/team/{team_id}/owner")
+def transfer_owner(
+    team_id: int,
+    req: schemas.TransferOwnerRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """转让团队所有权（仅 Owner 可操作）"""
+    success, error = crud.transfer_team_ownership(
+        db, team_id, req.new_owner_id, current_user.username
+    )
+    if not success:
+        raise HTTPException(status_code=400, detail=error)
+    return success_response("转让成功")
+
+@app.post("/api/team/{team_id}/leave")
+def leave_team(
+    team_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """当前用户主动离开团队"""
+    success, error = crud.leave_team(db, team_id, current_user.username)
+    if not success:
+        raise HTTPException(status_code=400, detail=error)
+    return success_response("已离开团队")

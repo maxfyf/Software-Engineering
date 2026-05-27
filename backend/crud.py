@@ -399,3 +399,188 @@ def update_task_status_only(db: Session, task_id: int, status: str):
     db.commit()
     db.refresh(task)
     return task
+
+
+
+# ---------- 任务依赖 ----------
+def get_predecessors(db: Session, task_id: int) -> list[models.Task]:
+    """获取任务的前置任务列表"""
+    deps = db.query(models.TaskDependency).filter(
+        models.TaskDependency.successor_id == task_id
+    ).all()
+    return [dep.predecessor for dep in deps]
+
+def get_successors(db: Session, task_id: int) -> list[models.Task]:
+    """获取任务的后继任务列表"""
+    deps = db.query(models.TaskDependency).filter(
+        models.TaskDependency.predecessor_id == task_id
+    ).all()
+    return [dep.successor for dep in deps]
+
+def update_predecessors(db: Session, task_id: int, pred_ids: list[int]) -> bool:
+    """全量更新前置任务依赖（先删后增）"""
+    # 删除原有依赖
+    db.query(models.TaskDependency).filter(
+        models.TaskDependency.successor_id == task_id
+    ).delete()
+    # 添加新依赖
+    for pred_id in pred_ids:
+        dep = models.TaskDependency(
+            predecessor_id=pred_id,
+            successor_id=task_id
+        )
+        db.add(dep)
+    db.commit()
+    return True
+
+def check_circular_dependency(db: Session, pred_id: int, succ_id: int) -> bool:
+    """
+    检测添加依赖 (pred_id -> succ_id) 是否会产生循环依赖。
+    使用 DFS 从 succ_id 出发，看是否能回到 pred_id。
+    """
+    visited = set()
+    stack = [succ_id]
+    while stack:
+        cur = stack.pop()
+        if cur == pred_id:
+            return True
+        if cur in visited:
+            continue
+        visited.add(cur)
+        # 取当前任务的后继任务
+        next_tasks = db.query(models.TaskDependency.successor_id).filter(
+            models.TaskDependency.predecessor_id == cur
+        ).all()
+        stack.extend([nt[0] for nt in next_tasks])
+    return False
+
+def can_access_task(db: Session, user_id: str, task: models.Task) -> bool:
+    """检查用户是否有权查看该任务（个人任务本人，团队任务成员）"""
+    if task.team_id is None:
+        return task.owner_username == user_id or task.assignee_username == user_id
+    else:
+        return get_team_membership(db, task.team_id, user_id) is not None
+
+def can_manage_task(db: Session, user_id: str, task: models.Task) -> bool:
+    """检查用户是否有权修改任务依赖/删除任务（个人任务本人，团队任务Owner/Admin）"""
+    if task.team_id is None:
+        return task.owner_username == user_id
+    else:
+        membership = get_team_membership(db, task.team_id, user_id)
+        return membership is not None and membership.role in (ROLE_OWNER, ROLE_ADMIN)
+    
+def delete_task_with_deps(db: Session, task_id: int, cascade: bool = False) -> None:
+    """删除任务，根据 cascade 决定是否级联删除所有后继任务"""
+    # 获取要删除的任务对象（用于后续判断）
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        return
+
+    if cascade:
+        # 级联删除：递归获取所有后继任务 ID（包括间接后继）
+        to_delete = set()
+        stack = [task_id]
+        while stack:
+            cur = stack.pop()
+            if cur in to_delete:
+                continue
+            to_delete.add(cur)
+            # 查找当前任务的所有后继
+            successors = db.query(models.TaskDependency.successor_id).filter(
+                models.TaskDependency.predecessor_id == cur
+            ).all()
+            for (sid,) in successors:
+                if sid not in to_delete:
+                    stack.append(sid)
+
+        # 删除所有涉及到的依赖关系（避免外键约束）
+        db.query(models.TaskDependency).filter(
+            models.TaskDependency.predecessor_id.in_(to_delete) |
+            models.TaskDependency.successor_id.in_(to_delete)
+        ).delete(synchronize_session=False)
+        # 删除任务
+        db.query(models.Task).filter(models.Task.id.in_(to_delete)).delete(synchronize_session=False)
+    else:
+        # 非级联：只删除当前任务，并清理所有与它相关的依赖（作为前置或后继）
+        db.query(models.TaskDependency).filter(
+            (models.TaskDependency.predecessor_id == task_id) |
+            (models.TaskDependency.successor_id == task_id)
+        ).delete()
+        db.delete(task)
+
+    db.commit()
+
+def transfer_team_ownership(db: Session, team_id: int, new_owner_username: str, current_owner_username: str) -> tuple[bool, str | None]:
+    """转让团队所有权。当前用户必须是 Owner，新用户必须在团队中。转让后原 Owner 降为 Admin。返回 (成功与否, 错误信息)"""
+    team = get_team_by_id(db, team_id)
+    if not team:
+        return False, "团队不存在"
+    if team.owner_username != current_owner_username:
+        return False, "只有团队所有者可以转让所有权"
+    if new_owner_username == current_owner_username:
+        return False, "不能转让给自己"
+
+    new_membership = get_team_membership(db, team_id, new_owner_username)
+    if not new_membership:
+        return False, "新所有者不在团队中"
+
+    # 更新团队 owner
+    team.owner_username = new_owner_username
+
+    # 原 owner 降为 Admin
+    old_membership = get_team_membership(db, team_id, current_owner_username)
+    if old_membership:
+        old_membership.role = ROLE_ADMIN
+
+    # 新 owner 角色提升为 Owner（如果原来是 Admin/Member）
+    new_membership.role = ROLE_OWNER
+
+    db.commit()
+    return True, None
+
+def leave_team(
+    db: Session, team_id: int, username: str) -> tuple[bool, str | None]:
+    """用户主动离开团队。如果是 Owner 且团队内还有其他人，则自动选择新 Owner（优先 Admin，否则 Member），并将原 Owner 降为 Admin 后移除（或直接移除并转让所有权）。离开前，将该用户负责的未完成任务转交给团队当前 Owner。"""
+    team = get_team_by_id(db, team_id)
+    if not team:
+        return False, "团队不存在"
+    membership = get_team_membership(db, team_id, username)
+    if not membership:
+        return False, "您不是该团队成员"
+
+    # 处理任务转交：将该用户负责的未完成任务转给团队 Owner
+    assigned_tasks = db.query(models.Task).filter(
+        models.Task.team_id == team_id,
+        models.Task.assignee_username == username,
+        models.Task.status != "已完成"
+    ).all()
+    for task in assigned_tasks:
+        task.assignee_username = team.owner_username
+
+    # 如果是 Owner 离开
+    if team.owner_username == username:
+        # 检查是否还有其他成员
+        other_members = db.query(models.TeamMember).filter(
+            models.TeamMember.team_id == team_id,
+            models.TeamMember.username != username
+        ).all()
+        if not other_members:
+            return False, "团队仅剩您一人，请直接解散团队"
+        # 选择新 Owner：优先 Admin，否则取第一个 Member
+        new_owner_candidate = None
+        for m in other_members:
+            if m.role == ROLE_ADMIN:
+                new_owner_candidate = m
+                break
+        if not new_owner_candidate:
+            new_owner_candidate = other_members[0]
+
+        # 转让所有权
+        team.owner_username = new_owner_candidate.username
+        # 新 owner 角色提升为 Owner
+        new_owner_candidate.role = ROLE_OWNER
+
+    # 删除该用户的成员记录
+    db.delete(membership)
+    db.commit()
+    return True, None
