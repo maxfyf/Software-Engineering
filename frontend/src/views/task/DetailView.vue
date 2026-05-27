@@ -6,8 +6,9 @@ import { getTaskById, getPredecessors, getSuccessors } from "@/store/user.js";
 import Route from "@/components/Route.vue";
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
 
-const route = useRoute();
-const router = useRouter();
+const route = useRoute()
+const router = useRouter()
+const routeRef = ref(null)
 
 const task = ref(null)
 const predecessorTasks = ref([])
@@ -50,24 +51,26 @@ watch(
   { immediate: true }
 )
 
-const viewDetail = (index) => {
+const viewPredecessorDetail = async (index) => {
   const predTask = predecessorTasks.value[index]
   if (!predTask) return
   // 跳转到前置任务的详情页面
-  router.push({
+  await router.push({
     path: route.path,
     query: { taskId: predTask.id }
   })
+  await routeRef.value?.refreshRoute()
 }
 
-const viewSuccessorDetail = (index) => {
+const viewSuccessorDetail = async (index) => {
   const succTask = successorTasks.value[index]
   if (!succTask) return
   // 跳转到后继任务的详情页面
-  router.push({
+  await router.push({
     path: route.path,
     query: { taskId: succTask.id }
   })
+  await routeRef.value?.refreshRoute()
 }
 
 const formatDate = (dateStr) => {
@@ -85,7 +88,7 @@ const formatDate = (dateStr) => {
   <HeaderWrapper>
     <template #header>
       <div class="inner-header">
-        <Route :route="route" :router="router"/>
+        <Route ref="routeRef" :route="route" :router="router"/>
       </div>
     </template>
 
@@ -153,7 +156,7 @@ const formatDate = (dateStr) => {
                   v-for="(item, index) in predecessorTasks"
                   :key="item.id"
                   class="clickable"
-                  @click="viewDetail(index)"
+                  @click="viewPredecessorDetail(index)"
               >
                 {{ item.title }}（{{ item.status }}）
               </p>

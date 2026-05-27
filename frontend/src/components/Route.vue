@@ -21,7 +21,7 @@ const props = defineProps({
   }
 })
 
-const innerRoute = translate(props.route)
+const innerRoute = ref(translate(props.route))
 const collapse = ref(false)
 const routeWidths = ref([])
 const separatorWidth = ref(undefined)
@@ -34,8 +34,8 @@ const visibleRoute = ref([]);
 // 计算可见的路由
 const computeVisibleRoute = async () => {
   await nextTick()
-  visibleRoute.value = [...innerRoute]
-  if(innerRoute.length <= 1) return false
+  visibleRoute.value = [...innerRoute.value]
+  if(innerRoute.value.length <= 1) return false
 
   const tempDiv = document.createElement('div')
   tempDiv.style.position = 'absolute'
@@ -46,11 +46,11 @@ const computeVisibleRoute = async () => {
   tempDiv.style.top = '-9999px'
   document.body.appendChild(tempDiv)
 
-  for (let i = 0; i < innerRoute.length; i++) {
+  for (let i = 0; i < innerRoute.value.length; i++) {
     const span = document.createElement('span')
-    span.innerText = innerRoute[i]
+    span.innerText = innerRoute.value[i]
     span.style.display = 'inline-flex'
-    if (i === innerRoute.length - 1) {
+    if (i === innerRoute.value.length - 1) {
       span.style.fontWeight = 'bold'
     }
     tempDiv.appendChild(span)
@@ -67,19 +67,25 @@ const computeVisibleRoute = async () => {
   separatorWidth.value = sep.offsetWidth
   tempDiv.removeChild(sep)
 
+  console.log(innerRoute.value)
+  console.log(routeWidths.value)
+  console.log(prefixWidth.value)
+  console.log(separatorWidth.value)
+  console.log(maxWidth.value)
+
   let sum = routeWidths.value.reduce((acc, cur) => acc + cur, 0)
-  sum = sum + prefixWidth.value + (innerRoute.length - 1) * separatorWidth.value
+  sum = sum + prefixWidth.value + (innerRoute.value.length - 1) * separatorWidth.value
   if(sum <= maxWidth.value)
     return false
 
-  invisibleRoute.value.push(innerRoute[0])
-  visibleRoute.value = [...innerRoute.slice(1)]
+  invisibleRoute.value.push(innerRoute.value[0])
+  visibleRoute.value = [...innerRoute.value.slice(1)]
   sum = sum - routeWidths.value[0] + iconWidth.value
 
   let cnt = 1
   while(visibleRoute.value.length > 1 && sum > maxWidth.value) {
-    invisibleRoute.value.push(innerRoute[cnt])
-    visibleRoute.value = [...innerRoute.slice(cnt + 1)]
+    invisibleRoute.value.push(innerRoute.value[cnt])
+    visibleRoute.value = [...innerRoute.value.slice(cnt + 1)]
     sum = sum - routeWidths.value[cnt] - separatorWidth.value
     cnt = cnt + 1
   }
@@ -90,8 +96,18 @@ onMounted(async () => {
   collapse.value = await computeVisibleRoute()
 })
 
+const refreshRoute = async () => {
+  innerRoute.value = translate(props.route)
+  routeWidths.value = []
+  separatorWidth.value = undefined
+  invisibleRoute.value = []
+  visibleRoute.value = []
+  collapse.value = await computeVisibleRoute()
+}
+defineExpose({ refreshRoute })
+
 const handleCommand = (index) => {
-  handleBack(props.route, props.router, innerRoute.length - index - 1)
+  handleBack(props.route, props.router, innerRoute.value.length - index - 1)
 }
 </script>
 
