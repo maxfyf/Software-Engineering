@@ -117,3 +117,26 @@ class Task(Base):
     #映射任务关系
     team = relationship("Team", back_populates="tasks")
     assignee = relationship("User", foreign_keys=[assignee_username])
+
+    @property
+    def predecessors(self):
+        """获取所有前置任务（直接依赖）"""
+        return [dep.predecessor for dep in self.predecessors_rel]
+
+    @property
+    def successors(self):
+        """获取所有后继任务（依赖本任务的任务）"""
+        return [dep.successor for dep in self.successors_rel]
+
+class TaskDependency(Base):
+    __tablename__ = "task_dependencies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    predecessor_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
+    successor_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
+
+    # 关系（便于 ORM 查询）
+    predecessor = relationship("Task", foreign_keys=[predecessor_id], backref="successors_rel")
+    successor = relationship("Task", foreign_keys=[successor_id], backref="predecessors_rel")
+
+    __table_args__ = (UniqueConstraint("predecessor_id", "successor_id", name="unique_dep"),)
