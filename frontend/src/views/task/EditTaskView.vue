@@ -8,7 +8,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { taskList, addTask, getTaskById, updateTask, teamList, getPredecessors, updatePredecessors }
   from '@/store/user.js';
 import { handleBack } from "@/utils/routeManager.js"
-import {Check, Edit} from "@element-plus/icons-vue";
+import { Edit } from "@element-plus/icons-vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -58,6 +58,16 @@ const scopeTaskList = computed(() => {
   } else {
     // 个人任务：只检查个人任务（team 为 null）
     return taskList.value.filter(t => !t.team)
+  }
+})
+
+// 前置任务列表的空白文本
+const emptyText = computed(() => {
+  if(currentTeam.value) {
+    return currentTeam.value.title + "中暂无其它团队任务"
+  }
+  else {
+    return "暂无其它个人任务"
   }
 })
 
@@ -490,7 +500,7 @@ onBeforeRouteLeave((to, from, next) => {
       <SelectableList
           v-model="tempPredecessor"
           :candidates="candidateTaskList"
-          emptyText="暂无其它任务"
+          :emptyText="emptyText"
       />
     </div>
     <template #footer>

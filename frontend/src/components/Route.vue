@@ -67,12 +67,6 @@ const computeVisibleRoute = async () => {
   separatorWidth.value = sep.offsetWidth
   tempDiv.removeChild(sep)
 
-  console.log(innerRoute.value)
-  console.log(routeWidths.value)
-  console.log(prefixWidth.value)
-  console.log(separatorWidth.value)
-  console.log(maxWidth.value)
-
   let sum = routeWidths.value.reduce((acc, cur) => acc + cur, 0)
   sum = sum + prefixWidth.value + (innerRoute.value.length - 1) * separatorWidth.value
   if(sum <= maxWidth.value)
