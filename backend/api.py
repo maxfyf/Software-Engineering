@@ -80,7 +80,8 @@ def serialize_task(task):
         "updatedAt": task.updated_at.strftime("%Y-%m-%d %H:%M:%S") if task.updated_at else None,
         "owner": task.owner_username,
         "team": task.team.name if task.team else None,
-        "assignee": [task.assignee_username] if task.assignee_username else []
+        "assignee": [task.assignee_username] if task.assignee_username else [],
+        "predecessor": [pred.title for pred in task.predecessors]
     }
 
 def get_team_id_by_name(db: Session, name: str) -> int | None:
@@ -736,6 +737,8 @@ def update_predecessors(
         pred_task = db.query(Task).filter(Task.id == pred_id).first()
         if not pred_task:
             raise HTTPException(status_code=400, detail=f"前置任务 {pred_id} 不存在")
+        if task.status == TaskStatus.DONE.value and pred_task.status != TaskStatus.DONE.value:
+            raise HTTPException(status_code=400, detail=f"已完成任务不能添加未完成的前置任务「{pred_task.title}」")
         # 作用域限制：团队任务只能依赖同团队任务，个人任务只能依赖自己的个人任务
         if task.team_id is None:
             # 个人任务：前置任务必须是该用户自己的个人任务
