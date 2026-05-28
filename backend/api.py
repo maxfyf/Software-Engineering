@@ -405,6 +405,7 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
         is_assignee = task.assignee_username == current_user.username
         
         if is_admin_or_owner:
+            old_status = task.status
             new_title = task_update.title if task_update.title is not None else task.title
             conflict = crud.find_task_title_conflict(
                 db,
@@ -433,6 +434,13 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
                 task.team_id = target_team_id
             if task_update.assignee is not None:
                 task.assignee_username = task_update.assignee
+            if (
+                old_status == TaskStatus.DONE.value
+                and task.status != TaskStatus.DONE.value
+                and task.assignee_username
+                and not crud.get_team_membership(db, task.team_id, task.assignee_username)
+            ):
+                task.assignee_username = task.team.owner_username
         elif is_assignee:
             # Member 只能修改分配给自己的任务状态
             if task_update.status is not None:

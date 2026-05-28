@@ -232,10 +232,11 @@ def remove_team_member(
     else:
         task_assignee_username = team.owner_username
 
-    # 移除成员前，将其负责的团队任务转交给当前 Owner；Owner 离队时转交给新 Owner。
+    # 移除成员前，将其负责的未完成团队任务转交给当前 Owner；已完成任务保留历史负责人。
     assigned_tasks = db.query(models.Task).filter(
         models.Task.team_id == team_id,
-        models.Task.assignee_username == member_username
+        models.Task.assignee_username == member_username,
+        models.Task.status != models.TaskStatus.DONE.value
     ).all()
     for task in assigned_tasks:
         task.assignee_username = task_assignee_username
