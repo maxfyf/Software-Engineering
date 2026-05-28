@@ -173,6 +173,24 @@ const isTaskTeamAdmin = (task) => {
   return team.owner === currentUser.username || team.admin?.includes(currentUser.username)
 }
 
+const isCurrentTeamMember = (task, username) => {
+  if (!task.team || !username) return true
+  const team = teamList.value.find(t => t.title === task.team)
+  if (!team) return true
+  return team.owner === username || team.admin?.includes(username) || team.member?.includes(username)
+}
+
+const formatAssignee = (task) => {
+  const assignees = Array.isArray(task.assignee) ? task.assignee : (task.assignee ? [task.assignee] : [])
+  if (assignees.length === 0) return '未分配'
+  return assignees.map(username => {
+    if (props.isTeamSpace && task.status === '已完成' && !isCurrentTeamMember(task, username)) {
+      return `${username}（已离队）`
+    }
+    return username
+  }).join(', ')
+}
+
 const DeleteConfirmContent = defineComponent({
   props: {
     title: {
@@ -251,11 +269,14 @@ const deleteTask = (row) => {
         />
         <el-table-column
             v-if="showAssignee"
-            prop="assignee"
             label="负责人"
             min-width="25%"
             align="center"
-        />
+        >
+          <template v-slot:default="scope">
+            {{ formatAssignee(scope.row) }}
+          </template>
+        </el-table-column>
         <el-table-column
             prop="status"
             label="状态"

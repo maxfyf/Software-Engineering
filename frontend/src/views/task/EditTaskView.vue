@@ -355,9 +355,15 @@ const saveChanges = async () => {
       ElMessage.error(isTeamTask.value ? '该团队中已存在同名任务' : '个人任务中已存在同名任务')
       return
     }
-    await updateTask(taskId.value, taskData)
-    // 更新前置任务依赖关系
-    await updatePredecessors(taskId.value, predecessorIds)
+    if (newStatus.value === '已完成') {
+      // 先保存最终前置列表，再置为已完成；否则后端会按旧前置任务误判。
+      await updatePredecessors(taskId.value, predecessorIds)
+      await updateTask(taskId.value, taskData)
+    } else {
+      // 先退出已完成状态，再允许添加未完成前置任务。
+      await updateTask(taskId.value, taskData)
+      await updatePredecessors(taskId.value, predecessorIds)
+    }
     ElMessage.success('任务更新成功')
   }
 
