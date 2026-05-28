@@ -19,11 +19,11 @@ export function useTaskView(filterFn = null) {
   const dataset = computed(() => {
     return tasks.value.map(task => {
       if (task.team) {
-        // 团队任务：显示 "任务名 (团队名)"
-        return `${task.title} (${task.team})`
+        // 团队任务
+        return { data: `${task.title}`, aux: `${task.team}` }
       } else {
-        // 个人任务：显示 "任务名 (个人)"
-        return `${task.title} (个人)`
+        // 个人任务
+        return { data: `${task.title}`, aux: `个人` }
       }
     })
   })
@@ -32,23 +32,18 @@ export function useTaskView(filterFn = null) {
   const currentPage = ref(1)
   const pageSize = ref(10)
 
-  // 详情弹窗状态
-  const viewDialogVisible = ref(false)
-  const currentTask = ref(null)
-
-  // TODO:初始化
+  // 初始化任务列表
   onMounted(async () => {
     await initTaskList(false)
   })
 
   // 搜索选中任务
-  const handleSelect = (displayText) => {
-    // 解析显示文本：格式为 "任务名 (团队名)" 或 "任务名 (个人)"
-    const match = displayText.match(/^(.+) \((.+)\)$/)
-    if (!match) return
+  const handleSelect = (selectedItem) => {
+    // selectedItem 格式为 { data: 任务标题, aux: 团队名或'个人' }
+    const title = selectedItem?.data
+    const teamInfo = selectedItem?.aux
 
-    const title = match[1]
-    const teamInfo = match[2]
+    if (!title) return null
 
     // 根据团队信息匹配正确的任务
     const task = tasks.value.find(t => {
@@ -63,9 +58,9 @@ export function useTaskView(filterFn = null) {
       const index = tasks.value.findIndex(t => t.id === task.id)
       currentPage.value = Math.floor(index / pageSize.value) + 1
       highlightTaskId.value = task.id
-      currentTask.value = task
-      viewDialogVisible.value = true
     }
+
+    return task
   }
 
   // 新建任务
@@ -87,22 +82,13 @@ export function useTaskView(filterFn = null) {
     currentPage.value = page
   }
 
-  // 查看详情
-  const handleViewDetail = (task) => {
-    currentTask.value = task
-    viewDialogVisible.value = true
-  }
-
   return {
     tasks,
     dataset,
     currentPage,
     pageSize,
-    viewDialogVisible,
-    currentTask,
     handleSelect,
     handleNew,
-    handlePageChange,
-    handleViewDetail
+    handlePageChange
   }
 }

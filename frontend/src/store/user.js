@@ -14,25 +14,26 @@ export const userInfo = {
 // 任务数据结构
 export const taskInfo = {
     id: null,
-    title: '',
-    description: '',
-    status: '',
-    priority: '',
-    deadline: '',
-    createdAt: '',
-    updatedAt: '',
-    team: null,
-    assignee: []
+    title: '',         //标题
+    description: '',   // 描述
+    status: '',        // 状态
+    priority: '',      // 优先级
+    deadline: '',      // 截止日期
+    createdAt: '',     // 创建时间
+    updatedAt: '',     // 更新时间
+    team: null,        // 所属团队
+    assignee: [],      // 负责人
+    predecessor: []    // 直接前置任务
 }
 
 // 团队数据结构
 export const teamInfo = {
     id: null,
-    title: '',
-    tasks: [],
-    owner: '',
-    admin: [],
-    member: []
+    title: '',         // 标题
+    tasks: [],         // 团队任务
+    owner: '',         // 拥有者
+    admin: [],         // 管理者
+    member: []         // 参与者
 }
 
 // 当前登录用户信息
@@ -147,12 +148,17 @@ export const finishTask = async (taskId) => {
     return true
 }
 
-// 删除任务
-export const removeTask = async (taskId) => {
-    await api.deleteTask(taskId)
-    const index = taskList.value.findIndex(t => t.id === taskId)
-    if (index !== -1) {
-        taskList.value.splice(index, 1)
+// 删除任务（支持级联删除参数）
+export const removeTask = async (taskId, cascade = false) => {
+    await api.deleteTask(taskId, cascade)
+    // 级联删除时刷新整个任务列表，普通删除只移除当前任务
+    if (cascade) {
+        await initTaskList(true)
+    } else {
+        const index = taskList.value.findIndex(t => t.id === taskId)
+        if (index !== -1) {
+            taskList.value.splice(index, 1)
+        }
     }
     return true
 }
@@ -213,6 +219,10 @@ export const initTaskList = async (force = false) => {
             ...task,
             team: task.team || null,      // 团队名称
             assignee: task.assignee || []  // 被分配用户数组
+        }))
+        await Promise.all(taskList.value.map(async (task) => {
+            const predRes = await api.getPredecessors(task.id)
+            task.predecessor = predRes.data.map(pred => pred.id)
         }))
     } catch (error) {
         console.error('获取任务列表失败:', error)
@@ -476,4 +486,27 @@ export const handleLogout = () => {
             resolve({ success: false })
         })
     })
+}
+
+// 获取任务的前置任务列表
+export const getPredecessors = async (taskId) => {
+    const res = await api.getPredecessors(taskId)
+    return res.data
+}
+
+// 获取任务的后继任务列表
+export const getSuccessors = async (taskId) => {
+    const res = await api.getSuccessors(taskId)
+    return res.data
+}
+
+// 更新任务的前置任务列表
+export const updatePredecessors = async (taskId, predecessorIds) => {
+    await api.updatePredecessors(taskId, predecessorIds)
+    // 更新本地任务列表中的前置任务信息
+    const index = taskList.value.findIndex(t => t.id === taskId)
+    if (index !== -1) {
+        taskList.value[index].predecessor = predecessorIds.slice()
+    }
+    return true
 }

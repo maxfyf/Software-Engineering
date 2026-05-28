@@ -3,10 +3,10 @@ import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import Route from "@/components/Route.vue";
 import Search from "@/components/Search.vue";
 import TaskList from "@/components/TaskList.vue";
-import TaskDetail from "@/components/TaskDetail.vue";
 import { useTaskView } from '@/utils/useTaskView.js';
 import { useRoute, useRouter } from "vue-router";
 import { Plus } from "@element-plus/icons-vue";
+import { handleEnter } from "@/utils/routeManager.js";
 
 const props = defineProps({
   filterFn: {
@@ -28,6 +28,10 @@ const props = defineProps({
   isAdmin: {
     type: Boolean,
     default: false
+  },
+  showAux: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -39,13 +43,27 @@ const {
   dataset,
   currentPage,
   pageSize,
-  viewDialogVisible,
-  currentTask,
   handleSelect,
   handleNew,
-  handlePageChange,
-  handleViewDetail
+  handlePageChange
 } = useTaskView(props.filterFn)
+
+const handleSelectTask = (selectedItem) => {
+  const task = handleSelect(selectedItem)
+  // 跳转到选中任务的详情页面
+  if (task) {
+    const newPage = {
+      path: 'detail',
+      params: [
+        {
+          key: 'taskId',
+          value: task.id
+        }
+      ]
+    }
+    handleEnter(route, router, newPage)
+  }
+}
 </script>
 
 <template>
@@ -57,7 +75,7 @@ const {
         </div>
 
         <div class="search-wrapper">
-          <Search :data="dataset" :onSelect="handleSelect" />
+          <Search :dataset="dataset" :onSelect="handleSelectTask" :showAux="showAux" />
         </div>
       </div>
     </template>
@@ -84,15 +102,8 @@ const {
           :current-page="currentPage"
           :page-size="pageSize"
           @page-change="handlePageChange"
-          @view-detail="handleViewDetail"
       />
     </div>
-
-    <TaskDetail
-        :current-task="currentTask"
-        :show-assignee="showAssignee"
-        v-model:visible="viewDialogVisible"
-    />
   </HeaderWrapper>
 </template>
 

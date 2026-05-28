@@ -3,9 +3,12 @@ import { ref, computed, onMounted} from "vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import Route from "@/components/Route.vue";
+import SelectableList from "@/components/SelectableList.vue";
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { taskList, addTask, getTaskById, updateTask, teamList } from '@/store/user.js';
+import { taskList, addTask, getTaskById, updateTask, teamList, getPredecessors, updatePredecessors }
+  from '@/store/user.js';
 import { handleBack } from "@/utils/routeManager.js"
+import { Edit } from "@element-plus/icons-vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -19,6 +22,7 @@ const newTitle = ref('')
 const newAssignee = ref('')
 const newDescription = ref('')
 const newStatus = ref('待办')
+const newPredecessor = ref([])
 const newPriority = ref('中')
 const newDate = ref('')
 
@@ -57,26 +61,160 @@ const scopeTaskList = computed(() => {
   }
 })
 
+// 前置任务列表的空白文本
+const emptyText = computed(() => {
+  if(currentTeam.value) {
+    return currentTeam.value.title + "中暂无其它团队任务"
+  }
+  else {
+    return "暂无其它个人任务"
+  }
+})
+
+const candidateTaskList = computed(() => {
+  return scopeTaskList.value.filter(t => t.id !== taskId.value).map(task => task.title)
+})
+
+const findTaskByDependencyItem = (item) => {
+  if (typeof item === 'number') {
+    return taskList.value.find(t => t.id === item)
+  }
+  const numericId = Number(item)
+  if (!Number.isNaN(numericId)) {
+    const taskById = taskList.value.find(t => t.id === numericId)
+    if (taskById) return taskById
+  }
+  return scopeTaskList.value.find(t => t.title === item)
+}
+
+// 寻找未完成的前置任务
+const findUnfinishedPredecessor = (predecessors) => {
+  for (const predItem of predecessors) {
+    const predTask = findTaskByDependencyItem(predItem)
+    if(predTask.status !== '已完成') return predTask
+  }
+  return null
+}
+
+const findFinishedSuccessor = (targetId) => {
+  const successors = taskList.value.filter(t =>
+      (t.predecessor || []).some(predItem => findTaskByDependencyItem(predItem)?.id === targetId)
+  )
+  for(let task of successors) {
+    if(task.status === '已完成') return task
+  }
+  return null
+}
+
+const showPredecessor = ref(false)
+const tempPredecessor = ref([])
+const showPredecessorDialog = () => {
+  // 打开窗口时，将当前已有的前置任务复制到 tempPredecessor
+  tempPredecessor.value = newPredecessor.value.slice()
+  showPredecessor.value = true
+}
+const closePredecessorDialog = () => {
+  showPredecessor.value = false
+}
+const updateNewPredecessor = () => {
+  // 检查非法状态：已完成的任务不能添加未完成的前置任务
+  if (newStatus.value === '已完成') {
+    const blocker = findUnfinishedPredecessor(tempPredecessor.value)
+    if (blocker) {
+      ElMessage.error(`任务「${newTitle.value}」已完成，无法添加未完成的前置任务「${blocker.title}」`)
+      return
+    }
+  }
+
+  // 检查环路
+  const cycleTask = findCycleCausingPredecessor(tempPredecessor.value)
+  if (cycleTask) {
+    ElMessage.error(`新增前置任务「${cycleTask.title}」将导致依赖关系出现环路，请重新选择`)
+    return
+  }
+
+  // 更新 newPredecessor
+  newPredecessor.value = tempPredecessor.value.slice()
+  closePredecessorDialog()
+}
+
+// 检查新增前置任务是否会形成环路
+const findCycleCausingPredecessor = (selectedPredecessors) => {
+  if (isNew.value || !taskId.value) return null
+
+  // 获取当前任务ID
+  const currentId = taskId.value
+
+  // 对于每个选中的前置任务，追溯其前置任务链
+  for (const predTitle of selectedPredecessors) {
+    const predTask = scopeTaskList.value.find(t => t.title === predTitle)
+    if (!predTask) continue
+
+    // 直接自引用检查
+    if (predTask.id === currentId) return predTask
+
+    // 递归追溯前置任务链
+    const visited = new Set()
+    if (tracePredecessorChain(predTask.id, currentId, visited)) {
+      return predTask
+    }
+  }
+  return null
+}
+
+// 递归追溯任务的前置任务链，检查是否包含目标任务
+const tracePredecessorChain = (taskId, targetId, visited) => {
+  if (visited.has(taskId)) return false
+  visited.add(taskId)
+
+  const task = taskList.value.find(t => t.id === taskId)
+  if (!task || !task.predecessor) return false
+
+  for (const predItem of task.predecessor) {
+    // predecessor 可能是标题或ID
+    let predTask
+    if (typeof predItem === 'number') {
+      predTask = taskList.value.find(t => t.id === predItem)
+    } else {
+      predTask = taskList.value.find(t => t.title === predItem || t.id === predItem)
+    }
+    if (!predTask) continue
+
+    if (predTask.id === targetId) return true
+    if (tracePredecessorChain(predTask.id, targetId, visited)) return true
+  }
+  return false
+}
+
 // 检查是否有修改
 const hasChanges = () => {
   if (isNew.value) {
     // 新建模式：任何输入都算有修改
-    return newTitle.value || newDescription.value || newDate.value
+    return newTitle.value || newDescription.value || newDate.value || newPredecessor.value.length > 0
   }
-  
+
   // 编辑模式：和原始任务比较
   if (!originalTask.value) return false
 
   const originalAssignee = Array.isArray(originalTask.value.assignee)
       ? (originalTask.value.assignee[0] || '')
       : (originalTask.value.assignee || '')
-  
+
+  // 比较前置任务列表
+  const originalPredecessorStr = (originalTask.value.predecessor || []).map(String).sort().join(',')
+  const newPredecessorIds = newPredecessor.value.map(title => {
+    const task = scopeTaskList.value.find(t => t.title === title)
+    return task?.id
+  }).filter(id => id !== undefined)
+  const newPredecessorStr = newPredecessorIds.map(String).sort().join(',')
+
   return newTitle.value !== originalTask.value.title ||
          (isTeamTask.value && newAssignee.value !== originalAssignee) ||
          newDescription.value !== (originalTask.value.description || '') ||
          newStatus.value !== originalTask.value.status ||
          newPriority.value !== originalTask.value.priority ||
-         newDate.value !== (originalTask.value.deadline || '')
+         newDate.value !== (originalTask.value.deadline || '') ||
+         originalPredecessorStr !== newPredecessorStr
 }
 
 // 页面加载时，根据路由参数初始化数据
@@ -103,7 +241,7 @@ const loadTaskData = async (id) => {
   const task = await getTaskById(id)
   if (task) {
     originalTask.value = task
-    
+
     // 设置表单值
     newTitle.value = task.title
     if (isTeamTask.value) {
@@ -114,6 +252,21 @@ const loadTaskData = async (id) => {
     newStatus.value = task.status
     newPriority.value = task.priority
     newDate.value = task.deadline || ''
+
+    // 编辑页必须从依赖接口读取最新关系，避免 task.predecessor 为空数组时跳过真实数据。
+    try {
+      const predecessors = await getPredecessors(id)
+      const predTitles = predecessors.map(pred => pred.title)
+      const predIds = predecessors.map(pred => pred.id)
+      newPredecessor.value = predTitles
+      originalTask.value = {
+        ...task,
+        predecessor: predIds
+      }
+    } catch (error) {
+      console.error('获取前置任务失败:', error)
+      newPredecessor.value = []
+    }
   }
 }
 
@@ -128,6 +281,7 @@ const resetForm = () => {
   newStatus.value = '待办'
   newPriority.value = '中'
   newDate.value = ''
+  newPredecessor.value = []
 }
 
 // 保存所有更改并回退到来源页面
@@ -137,18 +291,45 @@ const saveChanges = async () => {
     ElMessage.error('任务标题不能为空')
     return
   }
-  
+
+  // 检查已完成任务是否存在未完成的前置任务
+  if (newStatus.value === '已完成') {
+    const blocker = findUnfinishedPredecessor(newPredecessor.value)
+    if (blocker) {
+      if (!isNew.value && originalTask.value?.status === '已完成') {
+        ElMessage.error(`任务「${newTitle.value}」已完成，无法添加未完成的前置任务「${blocker.title}」`)
+      } else {
+        ElMessage.error(`前置任务「${blocker.title}」未完成，无法完成当前任务`)
+      }
+      return
+    }
+  }
+
+  if (!isNew.value && originalTask.value?.status === '已完成' && newStatus.value !== '已完成') {
+    const blocker = findFinishedSuccessor(taskId.value)
+    if (blocker) {
+      ElMessage.error(`后继任务「${blocker.title}」已完成，无法将当前任务改为未完成状态`)
+      return
+    }
+  }
+
   const taskData = {
     title: newTitle.value,
-    ...(isTeamTask.value && { 
+    ...(isTeamTask.value && {
       assignee: newAssignee.value,
       team: currentTeam.value?.title || null }),
     description: newDescription.value,
     status: newStatus.value,
     priority: newPriority.value,
-    deadline: newDate.value
+    deadline: newDate.value || null 
   }
-  
+
+  // 将前置任务标题转换为ID数组
+  const predecessorIds = newPredecessor.value.map(title => {
+    const task = scopeTaskList.value.find(t => t.title === title)
+    return task?.id
+  }).filter(id => id !== undefined)
+
   if (isNew.value) {
     // 新建任务
     const idx = scopeTaskList.value.findIndex(t => t.title === newTitle.value)
@@ -156,7 +337,16 @@ const saveChanges = async () => {
       ElMessage.error(isTeamTask.value ? '该团队中已存在同名任务' : '个人任务中已存在同名任务')
       return
     }
-    await addTask(taskData)
+    // 创建任务时包含前置任务信息
+    const newTask = await addTask({
+      ...taskData,
+      predecessor: predecessorIds
+    })
+    // 如果有前置任务，调用后端API设置依赖关系
+    if (predecessorIds.length > 0 && newTask.id) {
+      await updatePredecessors(newTask.id, predecessorIds)
+    }
+    newTask.predecessor = newPredecessor.value.slice()
     ElMessage.success('任务创建成功')
   } else {
     // 更新任务
@@ -165,10 +355,18 @@ const saveChanges = async () => {
       ElMessage.error(isTeamTask.value ? '该团队中已存在同名任务' : '个人任务中已存在同名任务')
       return
     }
-    await updateTask(taskId.value, taskData)
+    if (newStatus.value === '已完成') {
+      // 先保存最终前置列表，再置为已完成；否则后端会按旧前置任务误判。
+      await updatePredecessors(taskId.value, predecessorIds)
+      await updateTask(taskId.value, taskData)
+    } else {
+      // 先退出已完成状态，再允许添加未完成前置任务。
+      await updateTask(taskId.value, taskData)
+      await updatePredecessors(taskId.value, predecessorIds)
+    }
     ElMessage.success('任务更新成功')
   }
-  
+
   // 返回来源页面
   resetForm()
   isLeaving.value = true  // 标记正在离开，跳过守卫
@@ -219,7 +417,7 @@ onBeforeRouteLeave((to, from, next) => {
               class="title"
               v-model="newTitle"
               type="textarea"
-              maxlength="18"
+              maxlength="20"
               show-word-limit
               :rows="1"
           />
@@ -244,7 +442,7 @@ onBeforeRouteLeave((to, from, next) => {
               class="description"
               v-model="newDescription"
               type="textarea"
-              :rows="isTeamTask ? 8 : 10"
+              :rows="isTeamTask ? 6 : 8"
           />
         </div>
 
@@ -255,6 +453,32 @@ onBeforeRouteLeave((to, from, next) => {
             <el-option label="进行中" value="进行中"/>
             <el-option label="已完成" value="已完成"/>
           </el-select>
+        </div>
+
+        <div class="item">
+          <span class="key">前置任务：{{newPredecessor.length}}个</span>
+          <el-button
+              link
+              type="text"
+              class="edit-button"
+              @click="showPredecessorDialog"
+          >
+            <el-popover
+                placement="bottom"
+                :offset="0"
+                trigger="hover"
+                popper-style="min-width: 0; width: auto;"
+            >
+              <template #reference>
+                <el-icon>
+                  <Edit/>
+                </el-icon>
+              </template>
+              <div>
+                编辑前置任务
+              </div>
+            </el-popover>
+          </el-button>
         </div>
 
         <div class="item">
@@ -310,6 +534,43 @@ onBeforeRouteLeave((to, from, next) => {
       </el-card>
     </div>
   </HeaderWrapper>
+
+  <el-dialog
+      v-model="showPredecessor"
+      width="600px"
+      center
+      :beforeClose="closePredecessorDialog"
+  >
+    <template #header>
+      <span class="dialog-title">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;编辑前置任务</span>
+    </template>
+    <div class="dialog-body">
+      <SelectableList
+          v-model="tempPredecessor"
+          :candidates="candidateTaskList"
+          :emptyText="emptyText"
+      />
+    </div>
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button
+            type="default"
+            class="cancel-button"
+            @click="closePredecessorDialog"
+        >
+          取消
+        </el-button>
+
+        <el-button
+            type="primary"
+            class="check-button"
+            @click="updateNewPredecessor"
+        >
+          确认
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped>
@@ -376,6 +637,11 @@ onBeforeRouteLeave((to, from, next) => {
   font-size: 15px;
 }
 
+.edit-button {
+  margin-left: 15px;
+  font-size: 24px;
+}
+
 .priority {
   width: 70px;
   font-size: 15px;
@@ -390,6 +656,42 @@ onBeforeRouteLeave((to, from, next) => {
   height: 35px;
   display: flex;
   flex-direction: row;
+}
+
+.dialog-title {
+  color: black;
+  font-weight: bold;
+  font-size: 20px;
+}
+
+.dialog-body {
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
+  margin: 0 15px 0 15px;
+}
+
+.dialog-footer {
+  width: 100%;
+  height: 30px;
+  display: flex;
+  flex-direction: row;
+}
+
+.cancel-button {
+  margin-left: 20%;
+  margin-right: auto;
+  width: 70px;
+  height: 100%;
+  font-size: 18px;
+}
+
+.check-button {
+  margin-left: auto;
+  margin-right: 20%;
+  width: 70px;
+  height: 100%;
+  font-size: 18px;
 }
 
 .cancel {

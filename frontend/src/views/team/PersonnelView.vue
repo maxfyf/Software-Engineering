@@ -163,7 +163,7 @@ const handleTrashAdd = async (evt) => {
   try {
     await ElMessageBox.confirm(
       `确定要移除成员"${name}"吗？`,
-      '移除成员',
+      '',
       {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
@@ -172,7 +172,6 @@ const handleTrashAdd = async (evt) => {
     )
     await doRemoveMember(name)
   } catch (error) {
-    ElMessage.info('已取消移除')
     await initTeamList()
   }
 }
@@ -512,6 +511,10 @@ const handleAddMember = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.delete-button-wrapper:hover {
+  color: #f56c6c !important;
 }
 
 .trash-drop-zone {
