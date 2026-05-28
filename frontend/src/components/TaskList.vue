@@ -98,42 +98,12 @@ const startTask = async (row) => {
   }
 }
 
-const findTaskByDependencyItem = (item, scopeTask = null) => {
-  if (typeof item === 'number') {
-    return taskList.value.find(t => t.id === item)
-  }
-  const numericId = Number(item)
-  if (!Number.isNaN(numericId)) {
-    const taskById = taskList.value.find(t => t.id === numericId)
-    if (taskById) return taskById
-  }
-  return taskList.value.find(t =>
-      t.title === item &&
-      (!scopeTask || t.team === scopeTask.team)
-  )
-}
-
-const findTopUnfinishedPredecessor = (task) => {
-  const visited = new Set()
-
-  const trace = (current) => {
-    if (!current || visited.has(current.id)) return null
-    visited.add(current.id)
-
-    const predecessors = current.predecessor || []
-    for (const predItem of predecessors) {
-      const upstream = findTaskByDependencyItem(predItem, current)
-      const blocker = trace(upstream)
-      if (blocker) return blocker
-    }
-
-    return current.status !== '已完成' ? current : null
-  }
-
-  for (const predItem of task.predecessor || []) {
-    const predTask = findTaskByDependencyItem(predItem, task)
-    const blocker = trace(predTask)
-    if (blocker) return blocker
+// 寻找未完成的前置任务
+const findUnfinishedPredecessor = (task) => {
+  const predecessors = task.predecessor || []
+  for (const predItem of predecessors) {
+    const predTask = taskList.value.find(t => t.id === predItem)
+    if(predTask.status !== '已完成') return predTask
   }
   return null
 }
@@ -141,7 +111,7 @@ const findTopUnfinishedPredecessor = (task) => {
 // 完成任务
 const checkTask = async (row) => {
   // 检查是否存在未完成的前置任务
-  const blocker = findTopUnfinishedPredecessor(row)
+  const blocker = findUnfinishedPredecessor(row)
   if (blocker) {
     ElMessage.error(`前置任务「${blocker.title}」未完成，无法完成当前任务`)
     return
