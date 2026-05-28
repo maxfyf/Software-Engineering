@@ -13,36 +13,51 @@ const routeRef = ref(null)
 const task = ref(null)
 const predecessorTasks = ref([])
 const successorTasks = ref([])
+const loading = ref(false)
 
 const loadTaskDetail = async (taskId) => {
+  loading.value = true
   if (!taskId) {
     task.value = null
     predecessorTasks.value = []
     successorTasks.value = []
+    loading.value = false
     return
   }
 
-  task.value = await getTaskById(taskId)
+  try {
+    const currentTask = await getTaskById(taskId)
 
-  if (!task.value) {
+    if (!currentTask) {
+      task.value = null
+      predecessorTasks.value = []
+      successorTasks.value = []
+      return
+    }
+
+    const [predecessors, successors] = await Promise.all([
+      getPredecessors(currentTask.id),
+      getSuccessors(currentTask.id)
+    ])
+
+    task.value = currentTask
+    predecessorTasks.value = predecessors.map(pred => ({
+      id: pred.id,
+      title: pred.title,
+      status: pred.status
+    }))
+    successorTasks.value = successors.map(succ => ({
+      id: succ.id,
+      title: succ.title,
+      status: succ.status
+    }))
+  } catch (error) {
+    task.value = null
     predecessorTasks.value = []
     successorTasks.value = []
-    return
+  } finally {
+    loading.value = false
   }
-
-  const predecessors = await getPredecessors(task.value.id)
-  predecessorTasks.value = predecessors.map(pred => ({
-    id: pred.id,
-    title: pred.title,
-    status: pred.status
-  }))
-
-  const successors = await getSuccessors(task.value.id)
-  successorTasks.value = successors.map(succ => ({
-    id: succ.id,
-    title: succ.title,
-    status: succ.status
-  }))
 }
 
 watch(
@@ -100,7 +115,10 @@ const formatDate = (dateStr) => {
 
     <div class="main-content-wrapper">
       <el-card class="box-card">
-        <div class="item-wrapper">
+        <div v-if="loading" class="loading-wrapper">
+          <span>加载中...</span>
+        </div>
+        <div v-else class="item-wrapper">
           <p class="item">
             <span class="key">任务标题：</span>
             <span class="content">
@@ -219,6 +237,15 @@ const formatDate = (dateStr) => {
 .item-wrapper {
   padding: 0 20px;
   overflow-x: visible;
+}
+
+.loading-wrapper {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #606266;
 }
 
 .item {
