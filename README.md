@@ -66,6 +66,7 @@ project_root/                                    # 项目根目录
 │   │   │       └── main.css                     # 网页样式与其他全局样式
 │   │   ├── components/                          # 可复用的组件
 │   │   │   ├── HeaderWrapper.vue                # 顶栏
+│   │   │   ├── OperationList.vue                # 操作列表
 │   │   │   ├── Route.vue                        # 二级以上的内部路由
 │   │   │   ├── Search.vue                       # 搜索框
 │   │   │   ├── SelectableList.vue               # 多选框
@@ -103,8 +104,10 @@ project_root/                                    # 项目根目录
 │   │   │   │   ├── PersonnelView.vue            # 团队人员界面
 │   │   │   │   └── TeamSpaceView.vue            # 团队空间界面
 │   │   │   ├── LoginView.vue                    # 登录界面
+│   │   │   ├── OperationView.vue                # 操作日志界面
 │   │   │   ├── SettingsView.vue                 # 设置界面
-│   │   │   └── TaskView.vue                     # 任务界面
+│   │   │   ├── TaskView.vue                     # 任务界面
+│   │   │   └── TeamView.vue                     # 团队界面
 │   │   ├── App.vue                              # 应用程序主界面
 │   │   └── main.js                              # 应用程序入口
 │   ├── index.html                               # HTML入口，作为应用程序的容器
