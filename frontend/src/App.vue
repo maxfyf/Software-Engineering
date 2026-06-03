@@ -201,6 +201,12 @@ const onHandleLogout = async () => {
   cursor: pointer;
 }
 
+.username:hover {
+  font-size: large;
+  color: #409eff;
+  text-shadow: 0 0 5px #fff, 0 0 10px #0080ff, 0 0 15px #0080ff;
+}
+
 .top-layer-popover {
   z-index: 200;
 }

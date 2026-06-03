@@ -274,7 +274,37 @@ const deleteTask = (row) => {
             align="center"
         >
           <template v-slot:default="scope">
-            {{ formatAssignee(scope.row) }}
+            <el-popover
+                placement="bottom"
+                :width="350"
+                :height="250"
+                :offset="0"
+                trigger="hover"
+                :append-to-body="true"
+                popper-class="top-layer-popover"
+            >
+              <template #reference>
+                <span class="assignee">
+                  {{ formatAssignee(scope.row) }}
+                </span>
+              </template><div>
+              <h2 class="popover-title">
+                {{ formatAssignee(scope.row) }}
+              </h2>
+              <p class="popover-info" v-if="currentUser.lastName && currentUser.firstName">
+                <span class="key">全名：</span>
+                {{ TODO }}{{ TODO }}
+              </p>
+              <p class="popover-info" v-if="currentUser.phone">
+                <span class="key">电话号码：</span>
+                {{ TODO }}
+              </p>
+              <p class="popover-info" v-if="currentUser.email">
+                <span class="key">电子邮箱：</span>
+                {{ TODO }}
+              </p>
+            </div>
+            </el-popover>
           </template>
         </el-table-column>
         <el-table-column
@@ -378,6 +408,7 @@ const deleteTask = (row) => {
                   :offset="0"
                   trigger="hover"
                   popper-style="min-width: 0; width: auto;"
+                  :fallback-placements="['bottom', 'top']">
               >
                 <template #reference>
                   <el-icon>
@@ -435,6 +466,32 @@ const deleteTask = (row) => {
 .task-table {
   width: 100%;
   box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
+}
+
+.top-layer-popover {
+  z-index: 200;
+}
+
+.top-layer-popover .popover-content {
+  position: relative;
+  z-index: 200;
+}
+
+.assignee:hover {
+  color: #409eff;
+}
+
+.popover-title {
+  font-weight: bold;
+  text-align: center;
+}
+
+.popover-info {
+  padding: 3px 10px;
+}
+
+.key {
+  font-weight: bold;
 }
 
 .pagination {
