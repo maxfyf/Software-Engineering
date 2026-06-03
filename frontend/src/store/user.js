@@ -8,7 +8,8 @@ export const userInfo = {
     firstName: '',     // 名
     lastName: '',      // 姓
     phone: '',         // 电话号码
-    email: ''          // 电子邮箱
+    email: '',         // 电子邮箱
+    operations: []     // 个人任务操作记录
 }
 
 // 任务数据结构
@@ -33,7 +34,19 @@ export const teamInfo = {
     tasks: [],         // 团队任务
     owner: '',         // 拥有者
     admin: [],         // 管理者
-    member: []         // 参与者
+    member: [],        // 参与者
+    operations: []     // 团队任务操作记录
+}
+
+// 操作记录结构
+export const operation = {
+    id: null,
+    operator: '',      // 操作人
+    type: undefined,   // 操作类型(create/edit/delete)
+    object: undefined, // 操作对象(团队成员/任务)
+    operatedAt: '',    // 操作时间
+    description: '',   // 简要变更内容
+    scope: null        // 所属范围(个人/某个团队)
 }
 
 // 当前登录用户信息

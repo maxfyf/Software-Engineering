@@ -13,6 +13,7 @@ const isPersonalTask = (task) => {
       v-if="!route.path.includes('/detail') && !route.path.includes('/edit')"
       :filter-fn="isPersonalTask"
       :show-new-button="true"
+      :is-personal="true"
   />
   <router-view v-else />
 </template>

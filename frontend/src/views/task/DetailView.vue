@@ -1,5 +1,5 @@
 <script setup lang="js">
-import { ref, watch } from "vue";
+import { ref, watch, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { handleBack } from "@/utils/routeManager.js";
 import { getTaskById, getPredecessors, getSuccessors } from "@/store/user.js";
@@ -103,6 +103,25 @@ const formatDate = (dateStr) => {
     day: '2-digit'
   }).replace(/\//g, '-')
 }
+
+// TODO: 以该任务为对象的操作（按时间戳倒序排列）
+const operations = ref([])
+
+// TODO: 显示的操作数目
+const shownOperationCnt = ref(0)
+
+// 单次点击“更多”展开的任务数
+const extraOperationCnt = ref(10)
+
+// 显示更多操作
+const showMoreOperations = () => {
+  
+}
+
+onMounted(() => {
+  shownOperationCnt.value = operations.value.length > extraOperationCnt.value ?
+      operations.value.length : extraOperationCnt.value
+})
 </script>
 
 <template>
@@ -199,6 +218,26 @@ const formatDate = (dateStr) => {
               </p>
             </div>
           </div>
+          <div v-if="shownOperationCnt.length > 0" class="item">
+            <span class="key">操作日志：</span>
+            <div class="content">
+              <p
+                  v-for="(item, index) in operations.slice(0, shownOperationCnt.value - 1)"
+                  :key="item.id"
+              >
+                {{ item.operator }}&nbsp;{{ item.description }}
+              </p>
+              <el-button
+                  v-if="shownOperationCnt < operations.length"
+                  link
+                  type="primary"
+                  class="more-operations"
+                  @click="showMoreOperations"
+              >
+                更多
+              </el-button>
+            </div>
+          </div>
         </div>
 
         <template #footer>
@@ -277,6 +316,15 @@ const formatDate = (dateStr) => {
 
 .clickable:hover {
   text-decoration: underline;
+}
+
+.more-operations {
+  color: black;
+  font-size: 15px;
+}
+
+.more-operations:hover {
+  color: #409eff;
 }
 
 .footer {
