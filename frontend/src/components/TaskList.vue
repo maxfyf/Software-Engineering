@@ -276,6 +276,7 @@ const deleteTask = (row) => {
           <template v-slot:default="scope">
             <el-popover
                 placement="bottom"
+                :fallback-placements="['bottom', 'top']"
                 :width="350"
                 :height="250"
                 :offset="0"
@@ -408,7 +409,6 @@ const deleteTask = (row) => {
                   :offset="0"
                   trigger="hover"
                   popper-style="min-width: 0; width: auto;"
-                  :fallback-placements="['bottom', 'top']">
               >
                 <template #reference>
                   <el-icon>
