@@ -81,6 +81,7 @@ const api = {
     login: (data) => request.post('/user/login', data),
     logout: () => request.post('/user/logout'),
     getUserInfo: () => request.get('/user/info'),
+    getUserProfile: (username) => request.get('/user/profile', { username }),
     cancelAccount: () => request.delete('/user/cancel'),
 
     // 任务模块
@@ -93,6 +94,8 @@ const api = {
     getPredecessors: (taskId) => request.get(`/task/${taskId}/predecessors`),
     getSuccessors: (taskId) => request.get(`/task/${taskId}/successors`),
     updatePredecessors: (taskId, predecessorIds) => request.put(`/task/${taskId}/predecessors`, { predecessor_ids: predecessorIds }),
+    getTaskOperations: (taskId) => request.get(`/task/${taskId}/operations`),
+    getPersonalOperations: () => request.get('/operation/personal'),
 
     // 团队模块
     getTeamList: () => request.get('/team/list'),
@@ -103,6 +106,7 @@ const api = {
     setMemberRole: (teamId, username, role) => request.put(`/team/${teamId}/member/role`, { username, role }),
     transferOwner: (teamId, newOwner) => request.put(`/team/${teamId}/owner`, { new_owner_id: newOwner }),
     leaveTeam: (teamId) => request.post(`/team/${teamId}/leave`),
+    getTeamOperations: (teamId) => request.get(`/team/${teamId}/operations`),
 
 }
 
