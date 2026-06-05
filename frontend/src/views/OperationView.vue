@@ -40,6 +40,7 @@ const {
     </template>
 
     <div class="main-content-wrapper">
+      <div class="header-spacer"/>
       <OperationList
           :operations="operations"
           :current-page="currentPage"
@@ -67,5 +68,20 @@ const {
 
 .main-content-wrapper {
   margin: 20px;
+}
+
+.header-spacer {
+  width: 100%;
+  height: 30px;
+}
+
+:deep(.el-pagination .el-pager li) {
+  background-color: transparent !important;
+}
+
+:deep(.el-pagination .btn-prev),
+:deep(.el-pagination .btn-next) {
+  background-color: transparent !important;
+  color: black !important;
 }
 </style>

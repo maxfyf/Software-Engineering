@@ -47,7 +47,7 @@ const getObjectText = (object) => {
           :data="pageData"
           empty-text="暂无操作记录"
           stripe
-          class="task-table"
+          class="operation-table"
           :row-class-name="todo"
           :key="todo"
       >
@@ -93,5 +93,14 @@ const getObjectText = (object) => {
 </template>
 
 <style scoped>
+.operation-table {
+  width: 100%;
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
+}
 
+.pagination {
+  margin-top: 15px;
+  display: flex;
+  justify-content: flex-end;
+}
 </style>
