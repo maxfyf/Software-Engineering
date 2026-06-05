@@ -19,6 +19,8 @@ const props = defineProps({
   }
 })
 
+const emit = defineEmits(['page-change'])
+
 const total = computed(() => props.operations.length)
 const pageData = computed(() => {
   const start = (props.currentPage - 1) * props.pageSize
@@ -26,8 +28,15 @@ const pageData = computed(() => {
   return props.operations.slice(start, end)
 })
 // 切换页面
-const handleCurrentChange = () => {
-  // TODO
+const handleCurrentChange = (page) => {
+  emit('page-change', page)
+}
+
+const getObjectText = (object) => {
+  if (object && typeof object === 'object') {
+    return object.title ?? object.name ?? object.label ?? object.id ?? ''
+  }
+  return object ?? ''
 }
 </script>
 
@@ -43,11 +52,14 @@ const handleCurrentChange = () => {
           :key="todo"
       >
         <el-table-column
-            prop="object"
             label="操作对象"
             min-width="25%"
             align="left"
-        />
+        >
+          <template #default="{ row }">
+            {{ getObjectText(row.object) }}
+          </template>
+        </el-table-column>
         <el-table-column
             prop="operator"
             label="操作人"
@@ -59,6 +71,12 @@ const handleCurrentChange = () => {
             label="描述"
             min-width="50%"
             align="left"
+        />
+        <el-table-column
+            prop="operatedAt"
+            label="操作时间"
+            min-width="25%"
+            align="center"
         />
       </el-table>
     </el-col>

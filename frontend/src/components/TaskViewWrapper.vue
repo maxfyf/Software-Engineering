@@ -71,7 +71,10 @@ const handleSelectTask = (selectedItem) => {
 
 // 查看个人任务相关的操作日志
 const handleViewOperations = () => {
-  // TODO
+  handleEnter(route, router, {
+    path: 'operations',
+    params: []
+  })
 }
 </script>
 

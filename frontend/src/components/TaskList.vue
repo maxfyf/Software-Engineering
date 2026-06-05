@@ -7,6 +7,8 @@ import {
   highlightTaskId,
   removeTask,
   currentUser,
+  getUserProfile,
+  userProfileMap,
   teamList,
   taskList
 } from "@/store/user.js";
@@ -191,6 +193,27 @@ const formatAssignee = (task) => {
   }).join(', ')
 }
 
+const getPrimaryAssignee = (task) => {
+  const assignees = Array.isArray(task.assignee) ? task.assignee : (task.assignee ? [task.assignee] : [])
+  return assignees[0] || ''
+}
+
+const loadAssigneeProfile = async (task) => {
+  const username = getPrimaryAssignee(task)
+  if (!username || userProfileMap[username]) return
+
+  try {
+    await getUserProfile(username)
+  } catch (error) {
+    console.error('获取负责人信息失败:', error)
+  }
+}
+
+const getAssigneeProfile = (task) => {
+  const username = getPrimaryAssignee(task)
+  return username ? userProfileMap[username] : null
+}
+
 const DeleteConfirmContent = defineComponent({
   props: {
     title: {
@@ -283,6 +306,7 @@ const deleteTask = (row) => {
                 trigger="hover"
                 :append-to-body="true"
                 popper-class="top-layer-popover"
+                @show="loadAssigneeProfile(scope.row)"
             >
               <template #reference>
                 <span class="assignee">
@@ -292,17 +316,17 @@ const deleteTask = (row) => {
               <h2 class="popover-title">
                 {{ formatAssignee(scope.row) }}
               </h2>
-              <p class="popover-info" v-if="currentUser.lastName && currentUser.firstName">
+              <p class="popover-info" v-if="getAssigneeProfile(scope.row)?.lastName && getAssigneeProfile(scope.row)?.firstName">
                 <span class="key">全名：</span>
-                {{ TODO }}{{ TODO }}
+                {{ getAssigneeProfile(scope.row).lastName }}{{ getAssigneeProfile(scope.row).firstName }}
               </p>
-              <p class="popover-info" v-if="currentUser.phone">
+              <p class="popover-info" v-if="getAssigneeProfile(scope.row)?.phone">
                 <span class="key">电话号码：</span>
-                {{ TODO }}
+                {{ getAssigneeProfile(scope.row).phone }}
               </p>
-              <p class="popover-info" v-if="currentUser.email">
+              <p class="popover-info" v-if="getAssigneeProfile(scope.row)?.email">
                 <span class="key">电子邮箱：</span>
-                {{ TODO }}
+                {{ getAssigneeProfile(scope.row).email }}
               </p>
             </div>
             </el-popover>
