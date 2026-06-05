@@ -27,6 +27,16 @@ const pageData = computed(() => {
   const end = start + props.pageSize
   return props.operations.slice(start, end)
 })
+
+// 表格行样式回调
+const tableRowClassName = () => {
+  return ''
+}
+
+const tableKey = computed(() => {
+  return pageData.value.map(item => item.id).join('-')
+})
+
 // 切换页面
 const handleCurrentChange = (page) => {
   emit('page-change', page)
@@ -48,8 +58,8 @@ const getObjectText = (object) => {
           empty-text="暂无操作记录"
           stripe
           class="operation-table"
-          :row-class-name="todo"
-          :key="todo"
+          :row-class-name="tableRowClassName"
+          :key="tableKey"
       >
         <el-table-column
             label="操作对象"
