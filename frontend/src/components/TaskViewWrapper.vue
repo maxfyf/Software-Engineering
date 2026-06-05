@@ -32,6 +32,10 @@ const props = defineProps({
   showAux: {
     type: Boolean,
     default: false
+  },
+  isPersonal: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -63,6 +67,14 @@ const handleSelectTask = (selectedItem) => {
     }
     handleEnter(route, router, newPage)
   }
+}
+
+// 查看个人任务相关的操作日志
+const handleViewOperations = () => {
+  handleEnter(route, router, {
+    path: 'operations',
+    params: []
+  })
 }
 </script>
 
@@ -103,6 +115,12 @@ const handleSelectTask = (selectedItem) => {
           :page-size="pageSize"
           @page-change="handlePageChange"
       />
+
+      <div v-if="isPersonal" class="footer">
+        <el-button type="primary" class="operation-button" @click="handleViewOperations">
+          查看操作日志
+        </el-button>
+      </div>
     </div>
   </HeaderWrapper>
 </template>
@@ -123,9 +141,8 @@ const handleSelectTask = (selectedItem) => {
 }
 
 .main-content-wrapper {
-  margin-top: 20px;
-  margin-left: 20px;
-  margin-right: 20px;
+  margin: 20px;
+  height: calc(100% - 40px);
   display: flex;
   flex-direction: column;
   gap: 15px;
@@ -155,5 +172,21 @@ const handleSelectTask = (selectedItem) => {
 :deep(.el-pagination .btn-next) {
   background-color: transparent !important;
   color: black !important;
+}
+
+.footer {
+  width: 100%;
+  height: 35px;
+  margin-top: auto;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+
+.operation-button {
+  width: 200px;
+  height: 100%;
+  font-size: 20px;
 }
 </style>

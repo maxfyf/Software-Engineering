@@ -71,6 +71,7 @@ export const handleBack = (route, router, num) => {
     if(newRoute.indexOf('detail') !== -1) keys.add('taskId')
     if(newRoute.indexOf('edit') !== -1) keys.add('isNew').add('taskId')
     if(newRoute.indexOf('space') !== -1) keys.add('teamId')
+    if(newRoute.indexOf('operations') !== -1 && newRoute.indexOf('space') !== -1) keys.add('teamId')
 
     const params = res.params.filter(param => keys.has(param.key));
     const queryObj = {}
@@ -145,6 +146,11 @@ export const translate = (route) => {
                     }
                     if(res.path.length > 4) return ''
                     return innerRoute
+                case 'operations':
+                    if(innerRoute[0] !== '个人任务') return ''
+                    innerRoute.push('个人任务操作日志')
+                    if(res.path.length > 4) return ''
+                    return innerRoute
                 default:
                     return ''
             }
@@ -207,6 +213,10 @@ export const translate = (route) => {
                             if(team.owner === currentUser.username) innerRoute.push('编辑成员信息')
                             else innerRoute.push('成员信息')
 
+                            if(res.path.length > 5) return ''
+                            return innerRoute
+                        case 'operations':
+                            innerRoute.push('团队操作日志')
                             if(res.path.length > 5) return ''
                             return innerRoute
                         default:

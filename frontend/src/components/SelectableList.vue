@@ -27,25 +27,27 @@ watch(() => props.modelValue, (newVal) => {
   selectedIndices.value = [...newVal]
 }, { deep: true })
 
-// 监听内部选中状态变化，向外发送事件
-watch(selectedIndices, (newVal) => {
-  emit('update:modelValue', newVal)
-  emit('change', newVal)
-}, { deep: true })
-
 // 判断某项是否选中
 const isSelected = (item) => {
   return selectedIndices.value.includes(item)
 }
 
+const updateSelection = (nextValue) => {
+  selectedIndices.value = nextValue
+  emit('update:modelValue', nextValue)
+  emit('change', nextValue)
+}
+
 // 切换某项的选中状态
 const toggleItem = (item) => {
   const currentIndex = selectedIndices.value.indexOf(item)
+  const nextValue = selectedIndices.value.slice()
   if (currentIndex === -1) {
-    selectedIndices.value.push(item)
+    nextValue.push(item)
   } else {
-    selectedIndices.value.splice(currentIndex, 1)
+    nextValue.splice(currentIndex, 1)
   }
+  updateSelection(nextValue)
 }
 </script>
 
@@ -61,7 +63,7 @@ const toggleItem = (item) => {
       <el-checkbox
           :model-value="isSelected(item)"
           @click.stop
-          @change="toggleItem(item)"
+          @update:model-value="toggleItem(item)"
       >
         {{ item }}
       </el-checkbox>

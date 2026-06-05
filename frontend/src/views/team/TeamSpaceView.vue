@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { currentUser, teamList } from '@/store/user.js'
-import { handleEnter, handleBack } from '@/utils/routeManager.js'
+import { handleEnter } from '@/utils/routeManager.js'
 import TaskViewWrapper from "@/components/TaskViewWrapper.vue";
 
 const route = useRoute()
@@ -18,12 +18,20 @@ const canManage = computed(() => isOwner.value || isAdmin.value)
 
 const filterByTeam = (task) => task.team === team.value?.title
 
+// 查看团队操作日志
+const handleViewOperations = () => {
+  handleEnter(route, router, {
+    path: 'operations',
+    params: []
+  })
+}
 </script>
 
 <template>
   <router-view v-if="route.path.includes('/detail') ||
                      route.path.includes('/edit') ||
-                     route.path.includes('/personnel')" />
+                     route.path.includes('/personnel') ||
+                     route.path.includes('/operations')" />
   <template v-else>
     <TaskViewWrapper
         :filter-fn="filterByTeam"
@@ -37,9 +45,9 @@ const filterByTeam = (task) => task.team === team.value?.title
       <el-button
           type="primary"
           class="back"
-          @click="handleBack(route, router, 1)"
+          @click="handleViewOperations"
       >
-        返回团队列表
+        查看操作日志
       </el-button>
 
       <el-button

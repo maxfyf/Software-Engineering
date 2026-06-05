@@ -66,6 +66,7 @@ project_root/                                    # 项目根目录
 │   │   │       └── main.css                     # 网页样式与其他全局样式
 │   │   ├── components/                          # 可复用的组件
 │   │   │   ├── HeaderWrapper.vue                # 顶栏
+│   │   │   ├── OperationList.vue                # 操作列表
 │   │   │   ├── Route.vue                        # 二级以上的内部路由
 │   │   │   ├── Search.vue                       # 搜索框
 │   │   │   ├── SelectableList.vue               # 多选框
@@ -103,8 +104,10 @@ project_root/                                    # 项目根目录
 │   │   │   │   ├── PersonnelView.vue            # 团队人员界面
 │   │   │   │   └── TeamSpaceView.vue            # 团队空间界面
 │   │   │   ├── LoginView.vue                    # 登录界面
+│   │   │   ├── OperationView.vue                # 操作日志界面
 │   │   │   ├── SettingsView.vue                 # 设置界面
-│   │   │   └── TaskView.vue                     # 任务界面
+│   │   │   ├── TaskView.vue                     # 任务界面
+│   │   │   └── TeamView.vue                     # 团队界面
 │   │   ├── App.vue                              # 应用程序主界面
 │   │   └── main.js                              # 应用程序入口
 │   ├── index.html                               # HTML入口，作为应用程序的容器
@@ -201,12 +204,19 @@ project_root/                                    # 项目根目录
 
 ##### 4.1 当前测试覆盖范围
 
-- `backend/tests/test_crud.py` 主要覆盖后端业务逻辑层 `backend/crud.py` 中的核心方法。
-- 已覆盖的重点场景包括：删除团队 `delete_team()`、注销账号 `cancel_account()`、添加团队成员 `add_team_member()`。
-- 测试重点验证团队删除时的任务清理、账号注销时的数据迁移与清理，以及团队成员权限控制是否符合预期。
+- `backend/tests/test_crud.py` 主要覆盖后端业务逻辑层 `backend/crud.py` 中的核心方法，在原有基础上重点增加了针对有向无环图（DAG）任务依赖算法的深度验证。
+- 业务逻辑层已覆盖的重点场景包括：删除团队 `delete_team()`、注销账号 `cancel_account()`、添加团队成员 `add_team_member()`。
+- 业务逻辑层已覆盖的重点场景包括：删除团队 `delete_team()`、注销账号 `cancel_account()`、添加团队成员 `add_team_member()`，以及新增的级联删除 `delete_task_with_deps()` 和成环防御算法 `check_circular_dependency()`。
+- 图算法测试重点验证了开启或关闭级联时，能否精准定位并清理后继任务及依赖边；同时验证了团队解散或成员离队时的外键级联清理机制，防止产生幽灵依赖。
+- `backend/tests/test_api.py` 主要覆盖 API 端点的防御性编程机制，重点测试了 `validate_status_transition()` 状态机拦截机制与依赖域安全隔离规则。
+- 状态机测试重点验证了试图完成/回退任务时，若通过 `find_top_unfinished_predecessor()` 发现未完成的前置任务，或通过 `find_nearest_done_successor()` 发现已完成的后继任务，接口能否准确拒绝非法状态扭转。
 
 ##### 4.2 测试设计说明
 
 - 每个测试用例都会独立创建临时数据库、初始化表结构，并在用例结束后自动清理，避免测试之间相互污染。
 - 单元测试直接调用业务逻辑层方法，不经过 FastAPI 路由，目的是更快定位 `crud.py` 内部业务规则是否正确。
+- 针对复杂的依赖规则，测试用例在内存中构建了包含多层深度、分叉分支以及闭环趋势的任务图拓扑（桩数据），以此验证图算法在极端边界条件下的健壮性。
+- 测试确保了前后台双防验证，即使绕过前端页面，后端的业务控制层与数据校验层依然具备足够的健壮性对非法状态进行兜底拦截。
 - 如需补充更多测试，建议按“一个业务方法对应一组场景”的方式继续在 `backend/tests/` 下扩展。
+
+

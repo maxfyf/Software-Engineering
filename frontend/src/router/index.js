@@ -51,6 +51,11 @@ const router = createRouter({
                             path: 'edit',
                             name: 'personalTasksEdit',
                             component: () => import('@/views/task/EditTaskView.vue')
+                        },
+                        {
+                            path: 'operations',
+                            name: 'personalTaskOperations',
+                            component: () => import('@/views/OperationView.vue')
                         }
                     ]
                 },
@@ -104,6 +109,11 @@ const router = createRouter({
                                     path: 'edit',
                                     name: 'allTeamsEdit',
                                     component: () => import('@/views/task/EditTaskView.vue')
+                                },
+                                {
+                                    path: 'operations',
+                                    name: 'allTeamsOperations',
+                                    component: () => import('@/views/OperationView.vue')
                                 }
                             ]
                         }
@@ -133,6 +143,11 @@ const router = createRouter({
                                     path: 'edit',
                                     name: 'ownerTeamsEdit',
                                     component: () => import('@/views/task/EditTaskView.vue')
+                                },
+                                {
+                                    path: 'operations',
+                                    name: 'ownerTeamsOperations',
+                                    component: () => import('@/views/OperationView.vue')
                                 }
                             ]
                         }
@@ -162,6 +177,11 @@ const router = createRouter({
                                     path: 'edit',
                                     name: 'adminTeamsEdit',
                                     component: () => import('@/views/task/EditTaskView.vue')
+                                },
+                                {
+                                    path: 'operations',
+                                    name: 'adminTeamsOperations',
+                                    component: () => import('@/views/OperationView.vue')
                                 }
                             ]
                         }
@@ -191,6 +211,11 @@ const router = createRouter({
                                     path: 'edit',
                                     name: 'memberTeamsEdit',
                                     component: () => import('@/views/task/EditTaskView.vue')
+                                },
+                                {
+                                    path: 'operations',
+                                    name: 'memberTeamsOperations',
+                                    component: () => import('@/views/OperationView.vue')
                                 }
                             ]
                         }
