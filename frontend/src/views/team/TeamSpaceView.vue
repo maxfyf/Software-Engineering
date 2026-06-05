@@ -20,14 +20,18 @@ const filterByTeam = (task) => task.team === team.value?.title
 
 // 查看团队操作日志
 const handleViewOperations = () => {
-  // TODO
+  handleEnter(route, router, {
+    path: 'operations',
+    params: []
+  })
 }
 </script>
 
 <template>
   <router-view v-if="route.path.includes('/detail') ||
                      route.path.includes('/edit') ||
-                     route.path.includes('/personnel')" />
+                     route.path.includes('/personnel') ||
+                     route.path.includes('/operations')" />
   <template v-else>
     <TaskViewWrapper
         :filter-fn="filterByTeam"

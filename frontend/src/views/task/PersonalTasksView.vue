@@ -10,7 +10,9 @@ const isPersonalTask = (task) => {
 
 <template>
   <TaskViewWrapper
-      v-if="!route.path.includes('/detail') && !route.path.includes('/edit')"
+      v-if="!route.path.includes('/detail') &&
+            !route.path.includes('/edit') &&
+            !route.path.includes('/operations')"
       :filter-fn="isPersonalTask"
       :show-new-button="true"
       :is-personal="true"
