@@ -119,6 +119,53 @@ def _log_task_assignee_change(
         description=f"{reason}，任务负责人由 {old_assignee or '未分配'} 变更为 {new_assignee or '未分配'}"
     )
 
+
+def _log_task_owner_change(
+    db: Session,
+    *,
+    operator_username: str,
+    task: models.Task,
+    old_owner: str,
+    new_owner: str,
+    reason: str
+) -> None:
+    scope_type, scope_id, scope_title = _task_log_scope(task)
+    log_operation(
+        db,
+        operator=operator_username,
+        action_type="edit",
+        object_id=task.id,
+        object_type="task",
+        object_title=task.title,
+        scope_type=scope_type,
+        scope_id=scope_id,
+        scope_title=scope_title,
+        description=f"{reason}，任务创建者由 {old_owner} 变更为 {new_owner}"
+    )
+
+
+def _log_task_deleted(
+    db: Session,
+    *,
+    operator_username: str,
+    task: models.Task,
+    reason: str
+) -> None:
+    scope_type, scope_id, scope_title = _task_log_scope(task)
+    log_operation(
+        db,
+        operator=operator_username,
+        action_type="delete",
+        object_id=task.id,
+        object_type="task",
+        object_title=task.title,
+        scope_type=scope_type,
+        scope_id=scope_id,
+        scope_title=scope_title,
+        description=reason,
+        object_deleted=True
+    )
+
 def create_team(db: Session, team: schemas.TeamCreate, username: str) -> models.Team:
     """创建团队，创建者自动成为 Owner"""
     db_team = models.Team(name=team.name, owner_username=username)
@@ -286,7 +333,13 @@ def remove_team_member(
     return True, None
 
 
-def delete_team(db: Session, team_id: int, *, commit: bool = True) -> bool:
+def delete_team(
+    db: Session,
+    team_id: int,
+    *,
+    commit: bool = True,
+    operator_username: str | None = None
+) -> bool:
     """删除团队、成员关系和团队任务；团队任务不迁移为个人任务。
 
     团队任务被删除时，相关任务依赖关系也会被同步清理。
@@ -295,9 +348,19 @@ def delete_team(db: Session, team_id: int, *, commit: bool = True) -> bool:
     if not team:
         return False
 
+    operator = operator_username or team.owner_username
+    team_tasks = db.query(models.Task).filter(models.Task.team_id == team_id).all()
+    for task in team_tasks:
+        _log_task_deleted(
+            db,
+            operator_username=operator,
+            task=task,
+            reason=f"团队 {team.name} 解散，团队任务被删除"
+        )
+
     # 先显式删除任务依赖和团队任务，确保现有数据库也不会把团队任务退化成个人任务。
     team_task_ids = [
-        task_id for (task_id,) in db.query(models.Task.id).filter(models.Task.team_id == team_id).all()
+        task.id for task in team_tasks
     ]
     if team_task_ids:
         db.query(models.TaskDependency).filter(
@@ -319,16 +382,27 @@ def cancel_account(db: Session, username: str) -> bool:
         return False
 
     # 1. 删除该用户的所有个人任务。
-    db.query(models.Task).filter(
+    personal_tasks = db.query(models.Task).filter(
         models.Task.owner_username == username,
         models.Task.team_id.is_(None)
-    ).delete(synchronize_session=False)
+    ).all()
+    for task in personal_tasks:
+        _log_task_deleted(
+            db,
+            operator_username=username,
+            task=task,
+            reason=f"用户 {username} 注销账号，个人任务被删除"
+        )
+    if personal_tasks:
+        db.query(models.Task).filter(
+            models.Task.id.in_([task.id for task in personal_tasks])
+        ).delete(synchronize_session=False)
 
     # 2. 解散该用户拥有的所有团队，并删除这些团队下的全部任务。
     owned_teams = db.query(models.Team).filter(models.Team.owner_username == username).all()
     owned_team_ids = [team.id for team in owned_teams]
     for team in owned_teams:
-        delete_team(db, team.id, commit=False)
+        delete_team(db, team.id, commit=False, operator_username=username)
 
     # 3. 将该用户负责的所有剩余团队任务转交给各自团队拥有者。
     assigned_team_tasks = db.query(models.Task).join(
@@ -338,7 +412,16 @@ def cancel_account(db: Session, username: str) -> bool:
         models.Task.assignee_username == username
     ).all()
     for task in assigned_team_tasks:
+        old_assignee = task.assignee_username
         task.assignee_username = task.team.owner_username
+        _log_task_assignee_change(
+            db,
+            operator_username=username,
+            task=task,
+            old_assignee=old_assignee,
+            new_assignee=task.team.owner_username,
+            reason=f"用户 {username} 注销账号"
+        )
 
     # 4. 对仍然保留的团队任务，如果该用户是创建者，则同步改为团队拥有者，
     #    避免删除用户时留下 owner 外键引用。
@@ -349,7 +432,16 @@ def cancel_account(db: Session, username: str) -> bool:
         models.Task.owner_username == username
     ).all()
     for task in owned_team_tasks:
+        old_owner = task.owner_username
         task.owner_username = task.team.owner_username
+        _log_task_owner_change(
+            db,
+            operator_username=username,
+            task=task,
+            old_owner=old_owner,
+            new_owner=task.team.owner_username,
+            reason=f"用户 {username} 注销账号"
+        )
 
     # 5. 清理其他用户个人任务里指向该用户的负责人引用。
     personal_assigned_tasks = db.query(models.Task).filter(
@@ -357,7 +449,16 @@ def cancel_account(db: Session, username: str) -> bool:
         models.Task.assignee_username == username
     ).all()
     for task in personal_assigned_tasks:
+        old_assignee = task.assignee_username
         task.assignee_username = None
+        _log_task_assignee_change(
+            db,
+            operator_username=username,
+            task=task,
+            old_assignee=old_assignee,
+            new_assignee=None,
+            reason=f"用户 {username} 注销账号"
+        )
 
     # 6. 将该用户从所有参与或管理的团队中移除。
     membership_cleanup_query = db.query(models.TeamMember).filter(
