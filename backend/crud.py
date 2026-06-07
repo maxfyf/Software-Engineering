@@ -722,3 +722,24 @@ def leave_team(
     db.delete(membership)
     db.commit()
     return True, None
+
+#=============写入操作日志公有函数================
+#供各个业务操作调用，用以生成一条记录。注意本身不执行db.commit()，由调用方根据业务流程决定是否提交事务。
+def log_operation(db: Session, operator: str, action_type: str, 
+                  object_id: int, object_type: str, object_title: str, 
+                  scope_type: str, scope_id: int, scope_title: str, 
+                  description: str):
+    """通用日志记录器"""
+    from models import OperationLog
+    log = OperationLog(
+        operator_username=operator,
+        action_type=action_type,
+        object_id=object_id,
+        object_type=object_type,
+        object_title=object_title,
+        scope_type=scope_type,
+        scope_id=scope_id,
+        scope_title=scope_title,
+        description=description
+    )
+    db.add(log)

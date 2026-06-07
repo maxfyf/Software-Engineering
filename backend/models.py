@@ -140,3 +140,27 @@ class TaskDependency(Base):
     successor = relationship("Task", foreign_keys=[successor_id], backref="predecessors_rel")
 
     __table_args__ = (UniqueConstraint("predecessor_id", "successor_id", name="unique_dep"),)
+
+
+#===============新增日志=================
+#该表用于记录用户的操作日志，方便后续审计和问题排查
+#采用平铺快照形式记录操作对象的关键信息，避免后续数据变更导致日志失效
+class OperationLog(Base):
+    """操作日志记录表"""
+    __tablename__ = "operation_logs"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    operator_username = Column(String(20), nullable=False)    
+    action_type = Column(String(20), nullable=False)          # create/edit/delete
+    
+    object_id = Column(Integer, nullable=False)
+    object_type = Column(String(20), nullable=False)          
+    object_title = Column(String(100), nullable=True)         
+    object_deleted = Column(Integer, default=0)               
+    
+    scope_type = Column(String(20), nullable=False)           
+    scope_id = Column(Integer, nullable=True)                 
+    scope_title = Column(String(100), nullable=True)          
+    
+    description = Column(String(255), nullable=True)          # 简要变更内容
+    operated_at = Column(DateTime, default=func.now())
