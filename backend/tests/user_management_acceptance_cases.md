@@ -23,6 +23,23 @@
 | TC-UM-17 | 验证任务日志按时间倒序返回 | 某任务已有多条由用户或团队变更产生的日志 | 调用 `crud.get_task_operation_logs(db, task_id, username)` | 返回日志按操作时间倒序排列；最近日志在最前 | 待执行 |
 | TC-UM-18 | 验证无权限用户不能查看团队任务日志 | 团队任务已有日志；`outsider` 不是当前团队成员 | `outsider` 调用任务日志查询函数 | 返回 403；不返回日志内容 | 待执行 |
 
+## 测试运行方式
+
+以下命令均在项目根目录 `/Users/jasonzhao/Documents/Code/Software-Engineering` 下执行。后端单元测试使用临时 SQLite 数据库，不应污染项目已有数据库文件。
+
+```bash
+python3 -m compileall -q backend
+python3 -m unittest discover -s backend/tests -v
+```
+
+若后续将本验收用例生成独立 unittest 文件，可单独运行：
+
+```bash
+python3 -m unittest backend.tests.test_user_management_acceptance -v
+```
+
+自动化测试通过后，可将对应用例的“实际结果”填写为“通过”；若某条失败，则填写“不通过”并记录失败原因。
+
 ## 覆盖说明
 
 - Lab1 核心回归：TC-UM-01 至 TC-UM-04。
