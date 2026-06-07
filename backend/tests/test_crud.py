@@ -665,5 +665,211 @@ class TaskTitleConflictTests(CrudTestCase):
         self.assertIsNone(conflict)
 
 
+class OperationLogTests(CrudTestCase):
+    def assert_http_error(self, status_code: int, func, *args, **kwargs):
+        with self.assertRaises(api.HTTPException) as ctx:
+            func(*args, **kwargs)
+        self.assertEqual(ctx.exception.status_code, status_code)
+
+    def test_remove_member_records_assignee_change_log(self):
+        self.add_user("owner")
+        self.add_user("member")
+        team = self.add_team("Core Team", "owner")
+        self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
+        task = self.add_task("member task", "owner", team_id=team.id, assignee_username="member")
+
+        success, error = crud.remove_team_member(self.db, team.id, "member", "owner")
+
+        self.assertTrue(success)
+        self.assertIsNone(error)
+        logs = crud.get_task_operation_logs(self.db, task.id, "owner")
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(logs[0]["operator"], "owner")
+        self.assertEqual(logs[0]["type"], "edit")
+        self.assertEqual(logs[0]["object"]["id"], task.id)
+        self.assertFalse(logs[0]["object"]["deleted"])
+        self.assertIn("成员 member 被移出团队", logs[0]["description"])
+        self.assertIn("member", logs[0]["description"])
+        self.assertIn("owner", logs[0]["description"])
+
+    def test_leave_team_records_assignee_change_log(self):
+        self.add_user("owner")
+        self.add_user("member")
+        team = self.add_team("Core Team", "owner")
+        self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
+        task = self.add_task("member task", "owner", team_id=team.id, assignee_username="member")
+
+        success, error = crud.leave_team(self.db, team.id, "member")
+
+        self.assertTrue(success)
+        self.assertIsNone(error)
+        logs = crud.get_task_operation_logs(self.db, task.id, "owner")
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(logs[0]["operator"], "member")
+        self.assertIn("成员 member 主动离开团队", logs[0]["description"])
+        self.assertIn("owner", logs[0]["description"])
+
+    def test_cancel_account_preserves_related_task_logs(self):
+        for username in ["alice", "bob", "carol"]:
+            self.add_user(username)
+        alice_personal = self.add_task("alice personal", "alice")
+        bob_personal = self.add_task("bob personal", "bob", assignee_username="alice")
+        team = self.add_team("Shared Team", "bob")
+        self.add_team_member(team.id, "alice", crud.ROLE_ADMIN)
+        self.add_team_member(team.id, "carol", crud.ROLE_MEMBER)
+        team_assigned = self.add_task(
+            "team assigned",
+            "bob",
+            team_id=team.id,
+            assignee_username="alice",
+        )
+        team_owned = self.add_task(
+            "team owned",
+            "alice",
+            team_id=team.id,
+            assignee_username="carol",
+        )
+        alice_personal_id = alice_personal.id
+
+        cancelled = crud.cancel_account(self.db, "alice")
+
+        self.assertTrue(cancelled)
+        deleted_log = self.db.query(models.OperationLog).filter(
+            models.OperationLog.object_id == alice_personal_id,
+            models.OperationLog.object_type == "task",
+        ).one()
+        self.assertEqual(deleted_log.operator_username, "alice")
+        self.assertEqual(deleted_log.action_type, "delete")
+        self.assertEqual(deleted_log.scope_type, "personal")
+        self.assertEqual(deleted_log.scope_title, "alice")
+        self.assertEqual(deleted_log.object_deleted, 1)
+
+        bob_logs = crud.get_task_operation_logs(self.db, bob_personal.id, "bob")
+        self.assertEqual(len(bob_logs), 1)
+        self.assertEqual(bob_logs[0]["operator"], "alice")
+        self.assertIn("负责人由 alice 变更为 未分配", bob_logs[0]["description"])
+
+        team_assigned_logs = crud.get_task_operation_logs(self.db, team_assigned.id, "bob")
+        self.assertIn("负责人由 alice 变更为 bob", team_assigned_logs[0]["description"])
+
+        team_owned_logs = crud.get_task_operation_logs(self.db, team_owned.id, "bob")
+        self.assertIn("任务创建者由 alice 变更为 bob", team_owned_logs[0]["description"])
+
+    def test_delete_team_preserves_deleted_task_log_snapshot(self):
+        self.add_user("owner")
+        self.add_user("member")
+        team = self.add_team("Core Team", "owner")
+        self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
+        task = self.add_task("team task", "owner", team_id=team.id, assignee_username="member")
+        task_id = task.id
+        team_id = team.id
+
+        deleted = crud.delete_team(self.db, team.id, operator_username="owner")
+
+        self.assertTrue(deleted)
+        self.assertIsNone(self.db.query(models.Task).filter(models.Task.id == task_id).first())
+        log = self.db.query(models.OperationLog).filter(
+            models.OperationLog.object_id == task_id,
+            models.OperationLog.object_type == "task",
+        ).one()
+        self.assertEqual(log.operator_username, "owner")
+        self.assertEqual(log.object_title, "team task")
+        self.assertEqual(log.scope_type, "team")
+        self.assertEqual(log.scope_id, team_id)
+        self.assertEqual(log.scope_title, "Core Team")
+        self.assertEqual(log.object_deleted, 1)
+
+    def test_task_logs_are_returned_newest_first(self):
+        self.add_user("alice")
+        task = self.add_task("personal", "alice")
+        crud.log_operation(
+            self.db,
+            "alice",
+            "edit",
+            task.id,
+            "task",
+            task.title,
+            "personal",
+            None,
+            "alice",
+            "第一条日志"
+        )
+        crud.log_operation(
+            self.db,
+            "alice",
+            "edit",
+            task.id,
+            "task",
+            task.title,
+            "personal",
+            None,
+            "alice",
+            "第二条日志"
+        )
+        self.db.commit()
+
+        logs = crud.get_task_operation_logs(self.db, task.id, "alice")
+
+        self.assertEqual([log["description"] for log in logs], ["第二条日志", "第一条日志"])
+
+    def test_personal_task_logs_are_owner_only(self):
+        self.add_user("alice")
+        self.add_user("bob")
+        task = self.add_task("personal", "alice", assignee_username="bob")
+        crud.log_operation(
+            self.db,
+            "alice",
+            "edit",
+            task.id,
+            "task",
+            task.title,
+            "personal",
+            None,
+            "alice",
+            "个人任务日志"
+        )
+        self.db.commit()
+
+        self.assertEqual(len(crud.get_task_operation_logs(self.db, task.id, "alice")), 1)
+        self.assert_http_error(403, crud.get_task_operation_logs, self.db, task.id, "bob")
+
+    def test_team_task_logs_require_current_team_member(self):
+        for username in ["owner", "member", "outsider"]:
+            self.add_user(username)
+        team = self.add_team("Core Team", "owner")
+        self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
+        task = self.add_task("team task", "owner", team_id=team.id)
+        crud.log_operation(
+            self.db,
+            "owner",
+            "edit",
+            task.id,
+            "task",
+            task.title,
+            "team",
+            team.id,
+            team.name,
+            "团队任务日志"
+        )
+        self.db.commit()
+
+        self.assertEqual(len(crud.get_task_operation_logs(self.db, task.id, "member")), 1)
+        self.assert_http_error(403, crud.get_task_operation_logs, self.db, task.id, "outsider")
+
+    def test_failed_member_change_does_not_record_success_log(self):
+        for username in ["owner", "member", "other"]:
+            self.add_user(username)
+        team = self.add_team("Core Team", "owner")
+        self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
+        self.add_team_member(team.id, "other", crud.ROLE_MEMBER)
+        self.add_task("other task", "owner", team_id=team.id, assignee_username="other")
+
+        success, error = crud.remove_team_member(self.db, team.id, "other", "member")
+
+        self.assertFalse(success)
+        self.assertEqual(error, "团队权限不足")
+        self.assertEqual(self.db.query(models.OperationLog).count(), 0)
+
+
 if __name__ == "__main__":
     unittest.main()
