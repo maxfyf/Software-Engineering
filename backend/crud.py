@@ -696,6 +696,34 @@ def get_successors(db: Session, task_id: int) -> list[models.Task]:
     ).all()
     return [dep.successor for dep in deps]
 
+
+def create_task_dependency(db: Session, predecessor_id: int, successor_id: int) -> tuple[bool, str | None]:
+    """创建一条任务依赖关系，兼容旧测试和内部调用。"""
+    if predecessor_id == successor_id:
+        return False, "任务不能依赖自身"
+
+    predecessor = db.query(models.Task).filter(models.Task.id == predecessor_id).first()
+    successor = db.query(models.Task).filter(models.Task.id == successor_id).first()
+    if not predecessor or not successor:
+        return False, "任务不存在"
+
+    existing = db.query(models.TaskDependency).filter(
+        models.TaskDependency.predecessor_id == predecessor_id,
+        models.TaskDependency.successor_id == successor_id
+    ).first()
+    if existing:
+        return False, "依赖关系已存在"
+
+    if check_circular_dependency(db, predecessor_id, successor_id):
+        return False, "不允许添加循环依赖"
+
+    db.add(models.TaskDependency(
+        predecessor_id=predecessor_id,
+        successor_id=successor_id
+    ))
+    db.commit()
+    return True, None
+
 def update_predecessors(db: Session, task_id: int, pred_ids: list[int]) -> bool:
     """全量更新前置任务依赖（先删后增）"""
     # 删除原有依赖
