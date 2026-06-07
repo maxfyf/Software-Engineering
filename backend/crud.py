@@ -89,6 +89,36 @@ def validate_team_task_assignee(
         return "团队任务负责人必须是团队成员"
     return None
 
+
+def _task_log_scope(task: models.Task) -> tuple[str, int | None, str]:
+    if task.team_id is None:
+        return "personal", None, task.owner_username
+    return "team", task.team_id, task.team.name if task.team else ""
+
+
+def _log_task_assignee_change(
+    db: Session,
+    *,
+    operator_username: str,
+    task: models.Task,
+    old_assignee: str | None,
+    new_assignee: str | None,
+    reason: str
+) -> None:
+    scope_type, scope_id, scope_title = _task_log_scope(task)
+    log_operation(
+        db,
+        operator=operator_username,
+        action_type="edit",
+        object_id=task.id,
+        object_type="task",
+        object_title=task.title,
+        scope_type=scope_type,
+        scope_id=scope_id,
+        scope_title=scope_title,
+        description=f"{reason}，任务负责人由 {old_assignee or '未分配'} 变更为 {new_assignee or '未分配'}"
+    )
+
 def create_team(db: Session, team: schemas.TeamCreate, username: str) -> models.Team:
     """创建团队，创建者自动成为 Owner"""
     db_team = models.Team(name=team.name, owner_username=username)
@@ -239,7 +269,17 @@ def remove_team_member(
         models.Task.status != models.TaskStatus.DONE.value
     ).all()
     for task in assigned_tasks:
+        old_assignee = task.assignee_username
         task.assignee_username = task_assignee_username
+        reason = f"成员 {member_username} 主动离开团队" if is_self_leave else f"成员 {member_username} 被移出团队"
+        _log_task_assignee_change(
+            db,
+            operator_username=operator_username,
+            task=task,
+            old_assignee=old_assignee,
+            new_assignee=task_assignee_username,
+            reason=reason
+        )
 
     db.delete(membership)
     db.commit()
@@ -686,14 +726,7 @@ def leave_team(
     if not membership:
         return False, "您不是该团队成员"
 
-    # 处理任务转交：将该用户负责的未完成任务转给团队 Owner
-    assigned_tasks = db.query(models.Task).filter(
-        models.Task.team_id == team_id,
-        models.Task.assignee_username == username,
-        models.Task.status != "已完成"
-    ).all()
-    for task in assigned_tasks:
-        task.assignee_username = team.owner_username
+    task_assignee_username = team.owner_username
 
     # 如果是 Owner 离开
     if team.owner_username == username:
@@ -717,6 +750,25 @@ def leave_team(
         team.owner_username = new_owner_candidate.username
         # 新 owner 角色提升为 Owner
         new_owner_candidate.role = ROLE_OWNER
+        task_assignee_username = new_owner_candidate.username
+
+    # 处理任务转交：将该用户负责的未完成任务转给团队 Owner
+    assigned_tasks = db.query(models.Task).filter(
+        models.Task.team_id == team_id,
+        models.Task.assignee_username == username,
+        models.Task.status != "已完成"
+    ).all()
+    for task in assigned_tasks:
+        old_assignee = task.assignee_username
+        task.assignee_username = task_assignee_username
+        _log_task_assignee_change(
+            db,
+            operator_username=username,
+            task=task,
+            old_assignee=old_assignee,
+            new_assignee=task_assignee_username,
+            reason=f"成员 {username} 主动离开团队"
+        )
 
     # 删除该用户的成员记录
     db.delete(membership)
