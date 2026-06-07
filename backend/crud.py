@@ -725,21 +725,125 @@ def leave_team(
 
 #=============写入操作日志公有函数================
 #供各个业务操作调用，用以生成一条记录。注意本身不执行db.commit()，由调用方根据业务流程决定是否提交事务。
-def log_operation(db: Session, operator: str, action_type: str, 
-                  object_id: int, object_type: str, object_title: str, 
-                  scope_type: str, scope_id: int, scope_title: str, 
-                  description: str):
-    """通用日志记录器"""
-    from models import OperationLog
-    log = OperationLog(
+def log_operation(db: Session, operator: str, action_type: str,
+                  object_id: int, object_type: str, object_title: str,
+                  scope_type: str, scope_id: int | None, scope_title: str,
+                  description: str, object_deleted: bool = False) -> models.OperationLog:
+    """通用日志记录器。"""
+    log = models.OperationLog(
         operator_username=operator,
         action_type=action_type,
         object_id=object_id,
         object_type=object_type,
         object_title=object_title,
+        object_deleted=1 if object_deleted else 0,
         scope_type=scope_type,
         scope_id=scope_id,
         scope_title=scope_title,
         description=description
     )
     db.add(log)
+    return log
+
+
+def serialize_operation_log(log: models.OperationLog) -> dict:
+    """将操作日志序列化为前端可直接展示的结构。"""
+    return {
+        "id": log.id,
+        "operator": log.operator_username,
+        "type": log.action_type,
+        "object": {
+            "id": log.object_id,
+            "title": log.object_title,
+            "type": log.object_type,
+            "deleted": bool(log.object_deleted),
+        },
+        "operatedAt": log.operated_at.strftime("%Y-%m-%d %H:%M:%S") if log.operated_at else None,
+        "description": log.description,
+        "scope": {
+            "type": log.scope_type,
+            "id": log.scope_id,
+            "title": log.scope_title,
+        },
+    }
+
+
+def _limit_operation_log_count(limit: int | None) -> int:
+    """限制日志查询条数，避免接口误用一次取太多。"""
+    if limit is None:
+        return 10
+    return max(1, min(limit, 100))
+
+
+def _query_operation_logs(db: Session):
+    return db.query(models.OperationLog).order_by(
+        models.OperationLog.operated_at.desc(),
+        models.OperationLog.id.desc(),
+    )
+
+
+def _can_read_log_scope(db: Session, scope_type: str, scope_id: int | None, username: str) -> bool:
+    if scope_type == "personal":
+        return True
+    if scope_type == "team" and scope_id is not None:
+        return get_team_membership(db, scope_id, username) is not None
+    return False
+
+
+def get_task_operation_logs(db: Session, task_id: int, username: str, limit: int = 10) -> list[dict]:
+    """获取任务最近操作日志，个人任务仅所属用户可见，团队任务仅当前成员可见。"""
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if task:
+        if task.team_id is None:
+            if task.owner_username != username:
+                raise HTTPException(status_code=403, detail="无权访问该任务日志")
+        elif not get_team_membership(db, task.team_id, username):
+            raise HTTPException(status_code=403, detail="无权访问该团队任务日志")
+    else:
+        latest_log = db.query(models.OperationLog).filter(
+            models.OperationLog.object_type == "task",
+            models.OperationLog.object_id == task_id,
+        ).order_by(
+            models.OperationLog.operated_at.desc(),
+            models.OperationLog.id.desc(),
+        ).first()
+        if not latest_log:
+            raise HTTPException(status_code=404, detail="任务日志不存在")
+        if latest_log.scope_type == "personal":
+            if latest_log.scope_title != username and latest_log.operator_username != username:
+                raise HTTPException(status_code=403, detail="无权访问该任务日志")
+        elif not _can_read_log_scope(db, latest_log.scope_type, latest_log.scope_id, username):
+            raise HTTPException(status_code=403, detail="无权访问该团队任务日志")
+
+    logs = _query_operation_logs(db).filter(
+        models.OperationLog.object_type == "task",
+        models.OperationLog.object_id == task_id,
+    ).limit(_limit_operation_log_count(limit)).all()
+    return [serialize_operation_log(log) for log in logs]
+
+
+def get_scope_operation_logs(
+    db: Session,
+    scope_type: str,
+    scope_id: int | None,
+    username: str,
+    limit: int = 50
+) -> list[dict]:
+    """获取个人或团队范围内的操作日志。"""
+    if scope_type == "personal":
+        scope_filter = (
+            (models.OperationLog.scope_type == "personal") &
+            (models.OperationLog.scope_title == username)
+        )
+    elif scope_type == "team" and scope_id is not None:
+        if not get_team_membership(db, scope_id, username):
+            raise HTTPException(status_code=403, detail="无权访问该团队日志")
+        scope_filter = (
+            (models.OperationLog.scope_type == "team") &
+            (models.OperationLog.scope_id == scope_id)
+        )
+    else:
+        raise HTTPException(status_code=400, detail="日志范围参数无效")
+
+    logs = _query_operation_logs(db).filter(scope_filter).limit(_limit_operation_log_count(limit)).all()
+    return [serialize_operation_log(log) for log in logs]
