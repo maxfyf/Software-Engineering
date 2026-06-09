@@ -476,7 +476,7 @@ def delete_task(
             raise HTTPException(status_code=403, detail="无权删除该团队任务")
 
     # 调用 crud 中的级联删除函数
-    crud.delete_task_with_deps(db, task_id, cascade)
+    crud.delete_task_with_deps(db, task_id, cascade, current_user.username)
     return success_response("删除成功")
 
 # ===================== 团队管理模块 =====================

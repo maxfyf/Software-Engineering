@@ -580,6 +580,15 @@ def update_task(db: Session, task_id: int, task: schemas.TaskUpdate, username: s
     for key, value in updates.items():
         setattr(db_task, key, value)
     
+    # 【新增】：记录任务修改日志
+    scope_type = "team" if db_task.team_id else "personal"
+    log_operation(
+        db=db, operator=username, action_type="edit",
+        object_id=db_task.id, object_type="task", object_title=db_task.title,
+        scope_type=scope_type, scope_id=db_task.team_id, scope_title="团队任务" if db_task.team_id else "个人任务",
+        description="修改了任务详情"
+    )
+
     db.commit()
     db.refresh(db_task)
     return db_task
@@ -636,6 +645,13 @@ def create_team_task(db: Session, task: schemas.TaskCreate, username: str) -> mo
         assignee_username=task.assignee_username
     )
     db.add(db_task)
+    #记录创建团队任务日志
+    log_operation(
+        db=db, operator=username, action_type="create",
+        object_id=db_task.id, object_type="task", object_title=task.title,
+        scope_type="team", scope_id=task.team_id, scope_title="团队任务",
+        description="创建了团队任务"
+    )
     db.commit()
     db.refresh(db_task)
     return db_task
@@ -675,6 +691,15 @@ def update_task_status_only(db: Session, task_id: int, status: str):
         return None
 
     task.status = status
+    #记录修改状态日志
+    log_operation(
+        db=db, operator=task.assignee_username, action_type="edit",
+        object_id=task.id, object_type="task", object_title=task.title,
+        scope_type="team" if task.team_id else "personal", 
+        scope_id=task.team_id, scope_title="团队任务" if task.team_id else "个人任务",
+        description=f"将任务状态修改为【{status}】"
+    )
+
     db.commit()
     db.refresh(task)
     return task
@@ -776,12 +801,14 @@ def can_manage_task(db: Session, user_id: str, task: models.Task) -> bool:
         membership = get_team_membership(db, task.team_id, user_id)
         return membership is not None and membership.role in (ROLE_OWNER, ROLE_ADMIN)
     
-def delete_task_with_deps(db: Session, task_id: int, cascade: bool = False) -> None:
+def delete_task_with_deps(db: Session, task_id: int, cascade: bool = False, username: str = "未知用户") -> None:
     """删除任务，根据 cascade 决定是否级联删除所有后继任务"""
     # 获取要删除的任务对象（用于后续判断）
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task:
         return
+
+    scope_type = "team" if task.team_id else "personal"
 
     if cascade:
         # 级联删除：递归获取所有后继任务 ID（包括间接后继）
@@ -799,7 +826,15 @@ def delete_task_with_deps(db: Session, task_id: int, cascade: bool = False) -> N
             for (sid,) in successors:
                 if sid not in to_delete:
                     stack.append(sid)
-
+        
+        #循环遍历即将被删除的任务，记录级联删除日志
+        for del_id in to_delete:
+            log_operation(
+                db=db, operator=username, action_type="delete",
+                object_id=del_id, object_type="task", object_title=f"任务ID:{del_id}",
+                scope_type=scope_type, scope_id=task.team_id, scope_title="团队任务" if task.team_id else "个人任务",
+                description="级联删除了该任务及其依赖", object_deleted=True
+            )
         # 删除所有涉及到的依赖关系（避免外键约束）
         db.query(models.TaskDependency).filter(
             models.TaskDependency.predecessor_id.in_(to_delete) |
@@ -808,6 +843,13 @@ def delete_task_with_deps(db: Session, task_id: int, cascade: bool = False) -> N
         # 删除任务
         db.query(models.Task).filter(models.Task.id.in_(to_delete)).delete(synchronize_session=False)
     else:
+        # 【新增】：记录普通删除日志
+        log_operation(
+            db=db, operator=username, action_type="delete",
+            object_id=task.id, object_type="task", object_title=task.title,
+            scope_type=scope_type, scope_id=task.team_id, scope_title="团队任务" if task.team_id else "个人任务",
+            description="删除了该任务", object_deleted=True
+        )
         # 非级联：只删除当前任务，并清理所有与它相关的依赖（作为前置或后继）
         db.query(models.TaskDependency).filter(
             (models.TaskDependency.predecessor_id == task_id) |
