@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, String, Integer, Text, DateTime, JSON, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -142,25 +142,19 @@ class TaskDependency(Base):
     __table_args__ = (UniqueConstraint("predecessor_id", "successor_id", name="unique_dep"),)
 
 
-#===============新增日志=================
-#该表用于记录用户的操作日志，方便后续审计和问题排查
-#采用平铺快照形式记录操作对象的关键信息，避免后续数据变更导致日志失效
+
 class OperationLog(Base):
-    """操作日志记录表"""
     __tablename__ = "operation_logs"
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    operator_username = Column(String(20), nullable=False)    
-    action_type = Column(String(20), nullable=False)          # create/edit/delete
-    
-    object_id = Column(Integer, nullable=False)
-    object_type = Column(String(20), nullable=False)          
-    object_title = Column(String(100), nullable=True)         
-    object_deleted = Column(Integer, default=0)               
-    
-    scope_type = Column(String(20), nullable=False)           
-    scope_id = Column(Integer, nullable=True)                 
-    scope_title = Column(String(100), nullable=True)          
-    
-    description = Column(String(255), nullable=True)          # 简要变更内容
-    operated_at = Column(DateTime, default=func.now())
+    id = Column(Integer, primary_key=True, index=True)
+    operator = Column(String(50), nullable=False)                # 操作人用户名
+    type = Column(String(50), nullable=False)                    # 操作类型: create_task, update_status, ...
+    object = Column(JSON, nullable=False)                        # {"id":任务id,"title":"任务名","type":"task","deleted":bool}
+    operated_at = Column(DateTime(timezone=True), server_default=func.now())
+    description = Column(String(500), nullable=False)            # 可读变更描述
+    scope = Column(JSON, nullable=False)                         # {"type":"personal"/"team","id":团队id或null,"title":"个人任务"/团队名}
+
+    # 冗余索引字段，提升查询性能
+    task_id = Column(Integer, nullable=True, index=True)         # 关联的任务ID
+    team_id = Column(Integer, nullable=True, index=True)         # 关联的团队ID（若为团队任务）
+    personal_user = Column(String(50), nullable=True, index=True) # 关联的个人用户名（若为个人任务）

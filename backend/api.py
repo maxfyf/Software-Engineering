@@ -16,6 +16,8 @@ from models import User, Task, Team, TaskDependency
 import schemas
 from security import verify_password, get_password_hash, create_access_token
 import crud
+from models import OperationLog
+from log_service import log_task_operation
 
 # ===================== 初始化数据库 =====================
 Base.metadata.create_all(bind=engine)
@@ -351,14 +353,36 @@ def create_task(task: TaskCreateRequest, current_user: User = Depends(get_curren
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
-    
+
+    if db_task.team_id is None:
+        scope_type = "personal"
+        team_id = None
+        team_title = None
+    else:
+        scope_type = "team"
+        team_id = db_task.team_id
+        team_obj = db.query(Team).filter(Team.id == team_id).first()
+        team_title = team_obj.name if team_obj else None
+
+    log_task_operation(
+        db=db,
+        operator=current_user.username,
+        operation_type="create_task",
+        task=db_task,
+        description=f"创建任务: {db_task.title}",
+        scope_type=scope_type,
+        team_id=team_id,
+        team_title=team_title,
+        deleted=False
+    )
+
     return success_response("创建成功", serialize_task(db_task))
 
 @app.put("/api/task/{task_id}")
 def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """更新任务 - 个人任务仅owner可编辑；团队任务Admin/Owner可全量编辑，Member仅能修改分配给自己的任务状态"""
     task = db.query(Task).filter(Task.id == task_id).first()
-    
+    old_status = task.status
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
     
@@ -452,7 +476,29 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
     
     db.commit()
     db.refresh(task)
-    
+
+    if task.status != old_status:
+        if task.team_id is None:
+            scope_type = "personal"
+            team_id = None
+            team_title = None
+        else:
+            scope_type = "team"
+            team_id = task.team_id
+            team_obj = db.query(Team).filter(Team.id == team_id).first()
+            team_title = team_obj.name if team_obj else None
+        log_task_operation(
+            db=db,
+            operator=current_user.username,
+            operation_type="update_status",
+            task=task,
+            description=f"修改状态: {old_status} -> {task.status}",
+            scope_type=scope_type,
+            team_id=team_id,
+            team_title=team_title,
+            deleted=False
+        )
+
     return success_response("更新成功", serialize_task(task))
 
 @app.delete("/api/task/{task_id}")
@@ -466,6 +512,7 @@ def delete_task(
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
+    old_status = task.status
 
     # 权限检查
     if not task.team_id:
@@ -840,3 +887,95 @@ def leave_team(
     if not success:
         raise HTTPException(status_code=400, detail=error)
     return success_response("已离开团队")
+
+# ===================== 操作日志查询 =====================
+
+@app.get("/api/task/{task_id}/operations")
+def get_task_operations(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    # 权限校验
+    if task.team_id is None:
+        if task.owner_username != current_user.username and task.assignee_username != current_user.username:
+            raise HTTPException(status_code=403, detail="无权查看该任务日志")
+    else:
+        if not crud.require_team_member(db, task.team_id, current_user.username):
+            raise HTTPException(status_code=403, detail="无权查看该任务日志")
+    logs = db.query(OperationLog).filter(OperationLog.task_id == task_id).order_by(OperationLog.operated_at.desc()).all()
+    data = []
+    for log in logs:
+        data.append({
+            "id": log.id,
+            "operator": log.operator,
+            "type": log.type,
+            "object": log.object,
+            "operatedAt": log.operated_at.isoformat(),
+            "description": log.description,
+            "scope": log.scope
+        })
+    return {"success": True, "data": data}
+
+@app.get("/api/operation/personal")
+def get_personal_operations(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    logs = db.query(OperationLog).filter(OperationLog.personal_user == current_user.username).order_by(OperationLog.operated_at.desc()).all()
+    data = []
+    for log in logs:
+        data.append({
+            "id": log.id,
+            "operator": log.operator,
+            "type": log.type,
+            "object": log.object,
+            "operatedAt": log.operated_at.isoformat(),
+            "description": log.description,
+            "scope": log.scope
+        })
+    return {"success": True, "data": data}
+
+@app.get("/api/team/{team_id}/operations")
+def get_team_operations(
+    team_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if not crud.require_team_member(db, team_id, current_user.username):
+        raise HTTPException(status_code=403, detail="无权查看该团队日志")
+    logs = db.query(OperationLog).filter(OperationLog.team_id == team_id).order_by(OperationLog.operated_at.desc()).all()
+    data = []
+    for log in logs:
+        data.append({
+            "id": log.id,
+            "operator": log.operator,
+            "type": log.type,
+            "object": log.object,
+            "operatedAt": log.operated_at.isoformat(),
+            "description": log.description,
+            "scope": log.scope
+        })
+    return {"success": True, "data": data}
+
+@app.get("/api/user/profile")
+def get_user_profile(
+    username: str = Query(..., description="用户名"),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    return {
+        "success": True,
+        "data": {
+            "username": user.username,
+            "firstName": user.first_name,
+            "lastName": user.last_name,
+            "phone": user.phone_number,
+            "email": user.email
+        }
+    }

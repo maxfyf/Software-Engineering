@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 import models, schemas, security
 from fastapi import HTTPException
+from log_service import log_task_operation
 
 ROLE_OWNER = models.TeamRole.OWNER.value
 ROLE_ADMIN = models.TeamRole.ADMIN.value
@@ -529,6 +530,28 @@ def create_task(db: Session, task: schemas.TaskCreate, username: str) -> models.
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
+    if db_task.team_id is None:
+        scope_type = "personal"
+        team_id = None
+        team_title = None
+    else:
+        scope_type = "team"
+        team_id = db_task.team_id
+        team = db.query(models.Team).filter(models.Team.id == team_id).first()
+        team_title = team.name if team else None
+
+    log_task_operation(
+        db=db,
+        operator=username,
+        operation_type="create_task",
+        task=db_task,
+        description=f"创建任务: {db_task.title}",
+        scope_type=scope_type,
+        team_id=team_id,
+        team_title=team_title,
+        deleted=False
+    )
+
     return db_task
 
 def get_tasks(db: Session, username: str) -> list[models.Task]:
@@ -703,7 +726,6 @@ def update_task_status_only(db: Session, task_id: int, status: str):
     db.commit()
     db.refresh(task)
     return task
-
 
 
 # ---------- 任务依赖 ----------
@@ -952,6 +974,7 @@ def log_operation(db: Session, operator: str, action_type: str,
                   object_id: int, object_type: str, object_title: str,
                   scope_type: str, scope_id: int | None, scope_title: str,
                   description: str, object_deleted: bool = False) -> models.OperationLog:
+<<<<<<< HEAD
     """通用日志记录器。"""
     log = models.OperationLog(
         operator_username=operator,
@@ -964,6 +987,27 @@ def log_operation(db: Session, operator: str, action_type: str,
         scope_id=scope_id,
         scope_title=scope_title,
         description=description
+=======
+    """通用日志记录器 (已适配 API 同学最新的 JSON 模型结构)"""
+    log = models.OperationLog(
+        operator=operator,
+        type=action_type,
+        object={
+            "id": object_id,
+            "title": object_title,
+            "type": object_type,
+            "deleted": object_deleted
+        },
+        description=description,
+        scope={
+            "type": scope_type,
+            "id": scope_id,
+            "title": scope_title
+        },
+        task_id=object_id if object_type == "task" else None,
+        team_id=scope_id if scope_type == "team" else None,
+        personal_user=operator if scope_type == "personal" else None
+>>>>>>> af99d2c2c84d941c2c3045c0a71082dd986d85eb
     )
     db.add(log)
     return log
@@ -973,8 +1017,13 @@ def serialize_operation_log(log: models.OperationLog) -> dict:
     """将操作日志序列化为前端可直接展示的结构。"""
     return {
         "id": log.id,
+<<<<<<< HEAD
         "operator": log.operator_username,
         "type": log.action_type,
+=======
+        "operator": log.operator,
+        "type": log.type,
+>>>>>>> af99d2c2c84d941c2c3045c0a71082dd986d85eb
         "object": {
             "id": log.object_id,
             "title": log.object_title,

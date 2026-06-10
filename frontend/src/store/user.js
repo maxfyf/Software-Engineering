@@ -8,7 +8,8 @@ export const userInfo = {
     firstName: '',     // 名
     lastName: '',      // 姓
     phone: '',         // 电话号码
-    email: ''          // 电子邮箱
+    email: '',         // 电子邮箱
+    operations: []     // 个人任务操作记录
 }
 
 // 任务数据结构
@@ -33,11 +34,34 @@ export const teamInfo = {
     tasks: [],         // 团队任务
     owner: '',         // 拥有者
     admin: [],         // 管理者
-    member: []         // 参与者
+    member: [],        // 参与者
+    operations: []     // 团队任务操作记录
+}
+
+// 操作记录结构
+export const operation = {
+    id: null,
+    operator: '',      // 操作人
+    type: undefined,   // 操作类型(create/edit/delete)
+    object: undefined, // 操作对象(团队成员/任务)
+    operatedAt: '',    // 操作时间
+    description: '',   // 简要变更内容
+    scope: null        // 所属范围(个人/某个团队)
+}
+
+const sortOperationsByTimeDesc = (operations) => {
+    return [...operations].sort((a, b) => {
+        const left = new Date(a?.operatedAt || 0).getTime()
+        const right = new Date(b?.operatedAt || 0).getTime()
+        return right - left
+    })
 }
 
 // 当前登录用户信息
 export const currentUser = reactive({ ...userInfo })
+
+// 用户公开资料缓存，key 为 username
+export const userProfileMap = reactive({})
 
 // 登录状态
 export const isLoggedIn = ref(false)
@@ -46,6 +70,9 @@ export const isLoggedIn = ref(false)
 export const resetUserInfo = () => {
     Object.keys(userInfo).forEach(key => {
         currentUser[key] = userInfo[key]
+    })
+    Object.keys(userProfileMap).forEach(key => {
+        delete userProfileMap[key]
     })
 }
 
@@ -262,6 +289,18 @@ export const initUserInfo = async () => {
     } else {
         isLoggedIn.value = false
     }
+}
+
+// 按用户名获取用户公开资料
+export const getUserProfile = async (username) => {
+    if (!username) return null
+    if (userProfileMap[username]) {
+        return userProfileMap[username]
+    }
+
+    const res = await api.getUserProfile(username)
+    userProfileMap[username] = res.data
+    return userProfileMap[username]
 }
 
 /**
@@ -509,4 +548,28 @@ export const updatePredecessors = async (taskId, predecessorIds) => {
         taskList.value[index].predecessor = predecessorIds.slice()
     }
     return true
+}
+
+// 获取某个任务相关的操作记录
+export const getTaskOperations = async (taskId) => {
+    const res = await api.getTaskOperations(taskId)
+    return sortOperationsByTimeDesc(res.data || [])
+}
+
+// 获取当前用户个人任务范围内的操作记录
+export const getPersonalOperations = async () => {
+    const res = await api.getPersonalOperations()
+    currentUser.operations = sortOperationsByTimeDesc(res.data || [])
+    return currentUser.operations
+}
+
+// 获取某个团队范围内的操作记录
+export const getTeamOperations = async (teamId) => {
+    const res = await api.getTeamOperations(teamId)
+    const operations = sortOperationsByTimeDesc(res.data || [])
+    const index = teamList.value.findIndex(t => Number(t.id) === Number(teamId))
+    if (index !== -1) {
+        teamList.value[index].operations = operations
+    }
+    return operations
 }

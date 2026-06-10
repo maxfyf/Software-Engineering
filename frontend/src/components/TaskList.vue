@@ -7,6 +7,8 @@ import {
   highlightTaskId,
   removeTask,
   currentUser,
+  getUserProfile,
+  userProfileMap,
   teamList,
   taskList
 } from "@/store/user.js";
@@ -191,6 +193,27 @@ const formatAssignee = (task) => {
   }).join(', ')
 }
 
+const getPrimaryAssignee = (task) => {
+  const assignees = Array.isArray(task.assignee) ? task.assignee : (task.assignee ? [task.assignee] : [])
+  return assignees[0] || ''
+}
+
+const loadAssigneeProfile = async (task) => {
+  const username = getPrimaryAssignee(task)
+  if (!username || userProfileMap[username]) return
+
+  try {
+    await getUserProfile(username)
+  } catch (error) {
+    console.error('获取负责人信息失败:', error)
+  }
+}
+
+const getAssigneeProfile = (task) => {
+  const username = getPrimaryAssignee(task)
+  return username ? userProfileMap[username] : null
+}
+
 const DeleteConfirmContent = defineComponent({
   props: {
     title: {
@@ -274,7 +297,39 @@ const deleteTask = (row) => {
             align="center"
         >
           <template v-slot:default="scope">
-            {{ formatAssignee(scope.row) }}
+            <el-popover
+                placement="bottom"
+                :fallback-placements="['bottom', 'top']"
+                :width="350"
+                :height="250"
+                :offset="0"
+                trigger="hover"
+                :append-to-body="true"
+                popper-class="top-layer-popover"
+                @show="loadAssigneeProfile(scope.row)"
+            >
+              <template #reference>
+                <span class="assignee">
+                  {{ formatAssignee(scope.row) }}
+                </span>
+              </template><div>
+              <h2 class="popover-title">
+                {{ formatAssignee(scope.row) }}
+              </h2>
+              <p class="popover-info" v-if="getAssigneeProfile(scope.row)?.lastName && getAssigneeProfile(scope.row)?.firstName">
+                <span class="key">全名：</span>
+                {{ getAssigneeProfile(scope.row).lastName }}{{ getAssigneeProfile(scope.row).firstName }}
+              </p>
+              <p class="popover-info" v-if="getAssigneeProfile(scope.row)?.phone">
+                <span class="key">电话号码：</span>
+                {{ getAssigneeProfile(scope.row).phone }}
+              </p>
+              <p class="popover-info" v-if="getAssigneeProfile(scope.row)?.email">
+                <span class="key">电子邮箱：</span>
+                {{ getAssigneeProfile(scope.row).email }}
+              </p>
+            </div>
+            </el-popover>
           </template>
         </el-table-column>
         <el-table-column
@@ -435,6 +490,32 @@ const deleteTask = (row) => {
 .task-table {
   width: 100%;
   box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
+}
+
+.top-layer-popover {
+  z-index: 200;
+}
+
+.top-layer-popover .popover-content {
+  position: relative;
+  z-index: 200;
+}
+
+.assignee:hover {
+  color: #409eff;
+}
+
+.popover-title {
+  font-weight: bold;
+  text-align: center;
+}
+
+.popover-info {
+  padding: 3px 10px;
+}
+
+.key {
+  font-weight: bold;
 }
 
 .pagination {
