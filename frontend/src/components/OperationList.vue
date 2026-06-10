@@ -80,7 +80,7 @@ const getObjectText = (object) => {
             prop="description"
             label="描述"
             min-width="50%"
-            align="left"
+            align="center"
         />
         <el-table-column
             prop="operatedAt"
