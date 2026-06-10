@@ -974,6 +974,20 @@ def log_operation(db: Session, operator: str, action_type: str,
                   object_id: int, object_type: str, object_title: str,
                   scope_type: str, scope_id: int | None, scope_title: str,
                   description: str, object_deleted: bool = False) -> models.OperationLog:
+<<<<<<< HEAD
+    """通用日志记录器。"""
+    log = models.OperationLog(
+        operator_username=operator,
+        action_type=action_type,
+        object_id=object_id,
+        object_type=object_type,
+        object_title=object_title,
+        object_deleted=1 if object_deleted else 0,
+        scope_type=scope_type,
+        scope_id=scope_id,
+        scope_title=scope_title,
+        description=description
+=======
     """通用日志记录器 (已适配 API 同学最新的 JSON 模型结构)"""
     log = models.OperationLog(
         operator=operator,
@@ -993,6 +1007,7 @@ def log_operation(db: Session, operator: str, action_type: str,
         task_id=object_id if object_type == "task" else None,
         team_id=scope_id if scope_type == "team" else None,
         personal_user=operator if scope_type == "personal" else None
+>>>>>>> af99d2c2c84d941c2c3045c0a71082dd986d85eb
     )
     db.add(log)
     return log
@@ -1002,8 +1017,13 @@ def serialize_operation_log(log: models.OperationLog) -> dict:
     """将操作日志序列化为前端可直接展示的结构。"""
     return {
         "id": log.id,
+<<<<<<< HEAD
+        "operator": log.operator_username,
+        "type": log.action_type,
+=======
         "operator": log.operator,
         "type": log.type,
+>>>>>>> af99d2c2c84d941c2c3045c0a71082dd986d85eb
         "object": {
             "id": log.object_id,
             "title": log.object_title,
