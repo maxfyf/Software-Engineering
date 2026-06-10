@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, String, Integer, Text, DateTime, JSON, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -140,3 +140,21 @@ class TaskDependency(Base):
     successor = relationship("Task", foreign_keys=[successor_id], backref="predecessors_rel")
 
     __table_args__ = (UniqueConstraint("predecessor_id", "successor_id", name="unique_dep"),)
+
+
+
+class OperationLog(Base):
+    __tablename__ = "operation_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    operator = Column(String(50), nullable=False)                # 操作人用户名
+    type = Column(String(50), nullable=False)                    # 操作类型: create_task, update_status, ...
+    object = Column(JSON, nullable=False)                        # {"id":任务id,"title":"任务名","type":"task","deleted":bool}
+    operated_at = Column(DateTime(timezone=True), server_default=func.now())
+    description = Column(String(500), nullable=False)            # 可读变更描述
+    scope = Column(JSON, nullable=False)                         # {"type":"personal"/"team","id":团队id或null,"title":"个人任务"/团队名}
+
+    # 冗余索引字段，提升查询性能
+    task_id = Column(Integer, nullable=True, index=True)         # 关联的任务ID
+    team_id = Column(Integer, nullable=True, index=True)         # 关联的团队ID（若为团队任务）
+    personal_user = Column(String(50), nullable=True, index=True) # 关联的个人用户名（若为个人任务）

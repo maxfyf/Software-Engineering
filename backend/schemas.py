@@ -135,3 +135,34 @@ class TransferOwnerRequest(BaseModel):
 class LeaveTeamRequest(BaseModel):
     """主动离开团队"""
     pass
+
+
+from typing import Optional, Dict, Any, List
+
+class OperationObject(BaseModel):
+    id: int
+    title: str
+    type: str          # 固定 "task"
+    deleted: bool
+
+class OperationScope(BaseModel):
+    type: str          # "personal" 或 "team"
+    id: Optional[int] = None
+    title: str
+
+class OperationLogOut(BaseModel):
+    id: int
+    operator: str
+    type: str
+    object: OperationObject
+    operatedAt: str    # ISO格式时间字符串
+    description: str
+    scope: OperationScope
+
+    class Config:
+        orm_mode = True
+
+# 用于通用API响应包装
+class OperationLogListResponse(BaseModel):
+    success: bool
+    data: List[OperationLogOut]
