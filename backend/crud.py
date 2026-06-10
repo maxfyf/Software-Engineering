@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 import models, schemas, security
 from fastapi import HTTPException
+from log_service import log_task_operation
 
 ROLE_OWNER = models.TeamRole.OWNER.value
 ROLE_ADMIN = models.TeamRole.ADMIN.value
@@ -388,6 +389,28 @@ def create_task(db: Session, task: schemas.TaskCreate, username: str) -> models.
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
+    if db_task.team_id is None:
+        scope_type = "personal"
+        team_id = None
+        team_title = None
+    else:
+        scope_type = "team"
+        team_id = db_task.team_id
+        team = db.query(models.Team).filter(models.Team.id == team_id).first()
+        team_title = team.name if team else None
+
+    log_task_operation(
+        db=db,
+        operator=owner_username,
+        operation_type="create_task",
+        task=db_task,
+        description=f"创建任务: {db_task.title}",
+        scope_type=scope_type,
+        team_id=team_id,
+        team_title=team_title,
+        deleted=False
+    )
+
     return db_task
 
 def get_tasks(db: Session, username: str) -> list[models.Task]:
@@ -536,6 +559,28 @@ def update_task_status_only(db: Session, task_id: int, status: str):
     task.status = status
     db.commit()
     db.refresh(task)
+    
+    if task.team_id is None:
+        scope_type = "personal"
+        team_id = None
+        team_title = None
+    else:
+        scope_type = "team"
+        team_id = task.team_id
+        team = db.query(models.Team).filter(models.Team.id == team_id).first()
+        team_title = team.name if team else None
+
+    log_task_operation(
+        db=db,
+        operator=current_user,
+        operation_type="update_status",
+        task=task,
+        description=f"修改状态: {old_status} -> {new_status}",
+        scope_type=scope_type,
+        team_id=team_id,
+        team_title=team_title,
+        deleted=False
+    )
     return task
 
 
