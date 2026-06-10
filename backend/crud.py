@@ -90,6 +90,83 @@ def validate_team_task_assignee(
         return "团队任务负责人必须是团队成员"
     return None
 
+
+def _task_log_scope(task: models.Task) -> tuple[str, int | None, str]:
+    if task.team_id is None:
+        return "personal", None, task.owner_username
+    return "team", task.team_id, task.team.name if task.team else ""
+
+
+def _log_task_assignee_change(
+    db: Session,
+    *,
+    operator_username: str,
+    task: models.Task,
+    old_assignee: str | None,
+    new_assignee: str | None,
+    reason: str
+) -> None:
+    scope_type, scope_id, scope_title = _task_log_scope(task)
+    log_operation(
+        db,
+        operator=operator_username,
+        action_type="edit",
+        object_id=task.id,
+        object_type="task",
+        object_title=task.title,
+        scope_type=scope_type,
+        scope_id=scope_id,
+        scope_title=scope_title,
+        description=f"{reason}，任务负责人由 {old_assignee or '未分配'} 变更为 {new_assignee or '未分配'}"
+    )
+
+
+def _log_task_owner_change(
+    db: Session,
+    *,
+    operator_username: str,
+    task: models.Task,
+    old_owner: str,
+    new_owner: str,
+    reason: str
+) -> None:
+    scope_type, scope_id, scope_title = _task_log_scope(task)
+    log_operation(
+        db,
+        operator=operator_username,
+        action_type="edit",
+        object_id=task.id,
+        object_type="task",
+        object_title=task.title,
+        scope_type=scope_type,
+        scope_id=scope_id,
+        scope_title=scope_title,
+        description=f"{reason}，任务创建者由 {old_owner} 变更为 {new_owner}"
+    )
+
+
+def _log_task_deleted(
+    db: Session,
+    *,
+    operator_username: str,
+    task: models.Task,
+    reason: str
+) -> None:
+    scope_type, scope_id, scope_title = _task_log_scope(task)
+    log_operation(
+        db,
+        operator=operator_username,
+        action_type="delete",
+        object_id=task.id,
+        object_type="task",
+        object_title=task.title,
+        scope_type=scope_type,
+        scope_id=scope_id,
+        scope_title=scope_title,
+        description=reason,
+        object_deleted=True
+    )
+
 def create_team(db: Session, team: schemas.TeamCreate, username: str) -> models.Team:
     """创建团队，创建者自动成为 Owner"""
     db_team = models.Team(name=team.name, owner_username=username)
@@ -240,14 +317,30 @@ def remove_team_member(
         models.Task.status != models.TaskStatus.DONE.value
     ).all()
     for task in assigned_tasks:
+        old_assignee = task.assignee_username
         task.assignee_username = task_assignee_username
+        reason = f"成员 {member_username} 主动离开团队" if is_self_leave else f"成员 {member_username} 被移出团队"
+        _log_task_assignee_change(
+            db,
+            operator_username=operator_username,
+            task=task,
+            old_assignee=old_assignee,
+            new_assignee=task_assignee_username,
+            reason=reason
+        )
 
     db.delete(membership)
     db.commit()
     return True, None
 
 
-def delete_team(db: Session, team_id: int, *, commit: bool = True) -> bool:
+def delete_team(
+    db: Session,
+    team_id: int,
+    *,
+    commit: bool = True,
+    operator_username: str | None = None
+) -> bool:
     """删除团队、成员关系和团队任务；团队任务不迁移为个人任务。
 
     团队任务被删除时，相关任务依赖关系也会被同步清理。
@@ -256,9 +349,19 @@ def delete_team(db: Session, team_id: int, *, commit: bool = True) -> bool:
     if not team:
         return False
 
+    operator = operator_username or team.owner_username
+    team_tasks = db.query(models.Task).filter(models.Task.team_id == team_id).all()
+    for task in team_tasks:
+        _log_task_deleted(
+            db,
+            operator_username=operator,
+            task=task,
+            reason=f"团队 {team.name} 解散，团队任务被删除"
+        )
+
     # 先显式删除任务依赖和团队任务，确保现有数据库也不会把团队任务退化成个人任务。
     team_task_ids = [
-        task_id for (task_id,) in db.query(models.Task.id).filter(models.Task.team_id == team_id).all()
+        task.id for task in team_tasks
     ]
     if team_task_ids:
         db.query(models.TaskDependency).filter(
@@ -280,16 +383,27 @@ def cancel_account(db: Session, username: str) -> bool:
         return False
 
     # 1. 删除该用户的所有个人任务。
-    db.query(models.Task).filter(
+    personal_tasks = db.query(models.Task).filter(
         models.Task.owner_username == username,
         models.Task.team_id.is_(None)
-    ).delete(synchronize_session=False)
+    ).all()
+    for task in personal_tasks:
+        _log_task_deleted(
+            db,
+            operator_username=username,
+            task=task,
+            reason=f"用户 {username} 注销账号，个人任务被删除"
+        )
+    if personal_tasks:
+        db.query(models.Task).filter(
+            models.Task.id.in_([task.id for task in personal_tasks])
+        ).delete(synchronize_session=False)
 
     # 2. 解散该用户拥有的所有团队，并删除这些团队下的全部任务。
     owned_teams = db.query(models.Team).filter(models.Team.owner_username == username).all()
     owned_team_ids = [team.id for team in owned_teams]
     for team in owned_teams:
-        delete_team(db, team.id, commit=False)
+        delete_team(db, team.id, commit=False, operator_username=username)
 
     # 3. 将该用户负责的所有剩余团队任务转交给各自团队拥有者。
     assigned_team_tasks = db.query(models.Task).join(
@@ -299,7 +413,16 @@ def cancel_account(db: Session, username: str) -> bool:
         models.Task.assignee_username == username
     ).all()
     for task in assigned_team_tasks:
+        old_assignee = task.assignee_username
         task.assignee_username = task.team.owner_username
+        _log_task_assignee_change(
+            db,
+            operator_username=username,
+            task=task,
+            old_assignee=old_assignee,
+            new_assignee=task.team.owner_username,
+            reason=f"用户 {username} 注销账号"
+        )
 
     # 4. 对仍然保留的团队任务，如果该用户是创建者，则同步改为团队拥有者，
     #    避免删除用户时留下 owner 外键引用。
@@ -310,7 +433,16 @@ def cancel_account(db: Session, username: str) -> bool:
         models.Task.owner_username == username
     ).all()
     for task in owned_team_tasks:
+        old_owner = task.owner_username
         task.owner_username = task.team.owner_username
+        _log_task_owner_change(
+            db,
+            operator_username=username,
+            task=task,
+            old_owner=old_owner,
+            new_owner=task.team.owner_username,
+            reason=f"用户 {username} 注销账号"
+        )
 
     # 5. 清理其他用户个人任务里指向该用户的负责人引用。
     personal_assigned_tasks = db.query(models.Task).filter(
@@ -318,7 +450,16 @@ def cancel_account(db: Session, username: str) -> bool:
         models.Task.assignee_username == username
     ).all()
     for task in personal_assigned_tasks:
+        old_assignee = task.assignee_username
         task.assignee_username = None
+        _log_task_assignee_change(
+            db,
+            operator_username=username,
+            task=task,
+            old_assignee=old_assignee,
+            new_assignee=None,
+            reason=f"用户 {username} 注销账号"
+        )
 
     # 6. 将该用户从所有参与或管理的团队中移除。
     membership_cleanup_query = db.query(models.TeamMember).filter(
@@ -401,7 +542,7 @@ def create_task(db: Session, task: schemas.TaskCreate, username: str) -> models.
 
     log_task_operation(
         db=db,
-        operator=owner_username,
+        operator=username,
         operation_type="create_task",
         task=db_task,
         description=f"创建任务: {db_task.title}",
@@ -462,6 +603,15 @@ def update_task(db: Session, task_id: int, task: schemas.TaskUpdate, username: s
     for key, value in updates.items():
         setattr(db_task, key, value)
     
+    # 【新增】：记录任务修改日志
+    scope_type = "team" if db_task.team_id else "personal"
+    log_operation(
+        db=db, operator=username, action_type="edit",
+        object_id=db_task.id, object_type="task", object_title=db_task.title,
+        scope_type=scope_type, scope_id=db_task.team_id, scope_title="团队任务" if db_task.team_id else "个人任务",
+        description="修改了任务详情"
+    )
+
     db.commit()
     db.refresh(db_task)
     return db_task
@@ -518,6 +668,13 @@ def create_team_task(db: Session, task: schemas.TaskCreate, username: str) -> mo
         assignee_username=task.assignee_username
     )
     db.add(db_task)
+    #记录创建团队任务日志
+    log_operation(
+        db=db, operator=username, action_type="create",
+        object_id=db_task.id, object_type="task", object_title=task.title,
+        scope_type="team", scope_id=task.team_id, scope_title="团队任务",
+        description="创建了团队任务"
+    )
     db.commit()
     db.refresh(db_task)
     return db_task
@@ -557,32 +714,18 @@ def update_task_status_only(db: Session, task_id: int, status: str):
         return None
 
     task.status = status
+    #记录修改状态日志
+    log_operation(
+        db=db, operator=task.assignee_username, action_type="edit",
+        object_id=task.id, object_type="task", object_title=task.title,
+        scope_type="team" if task.team_id else "personal", 
+        scope_id=task.team_id, scope_title="团队任务" if task.team_id else "个人任务",
+        description=f"将任务状态修改为【{status}】"
+    )
+
     db.commit()
     db.refresh(task)
-    
-    if task.team_id is None:
-        scope_type = "personal"
-        team_id = None
-        team_title = None
-    else:
-        scope_type = "team"
-        team_id = task.team_id
-        team = db.query(models.Team).filter(models.Team.id == team_id).first()
-        team_title = team.name if team else None
-
-    log_task_operation(
-        db=db,
-        operator=current_user,
-        operation_type="update_status",
-        task=task,
-        description=f"修改状态: {old_status} -> {new_status}",
-        scope_type=scope_type,
-        team_id=team_id,
-        team_title=team_title,
-        deleted=False
-    )
     return task
-
 
 
 # ---------- 任务依赖 ----------
@@ -599,6 +742,34 @@ def get_successors(db: Session, task_id: int) -> list[models.Task]:
         models.TaskDependency.predecessor_id == task_id
     ).all()
     return [dep.successor for dep in deps]
+
+
+def create_task_dependency(db: Session, predecessor_id: int, successor_id: int) -> tuple[bool, str | None]:
+    """创建一条任务依赖关系，兼容旧测试和内部调用。"""
+    if predecessor_id == successor_id:
+        return False, "任务不能依赖自身"
+
+    predecessor = db.query(models.Task).filter(models.Task.id == predecessor_id).first()
+    successor = db.query(models.Task).filter(models.Task.id == successor_id).first()
+    if not predecessor or not successor:
+        return False, "任务不存在"
+
+    existing = db.query(models.TaskDependency).filter(
+        models.TaskDependency.predecessor_id == predecessor_id,
+        models.TaskDependency.successor_id == successor_id
+    ).first()
+    if existing:
+        return False, "依赖关系已存在"
+
+    if check_circular_dependency(db, predecessor_id, successor_id):
+        return False, "不允许添加循环依赖"
+
+    db.add(models.TaskDependency(
+        predecessor_id=predecessor_id,
+        successor_id=successor_id
+    ))
+    db.commit()
+    return True, None
 
 def update_predecessors(db: Session, task_id: int, pred_ids: list[int]) -> bool:
     """全量更新前置任务依赖（先删后增）"""
@@ -652,12 +823,14 @@ def can_manage_task(db: Session, user_id: str, task: models.Task) -> bool:
         membership = get_team_membership(db, task.team_id, user_id)
         return membership is not None and membership.role in (ROLE_OWNER, ROLE_ADMIN)
     
-def delete_task_with_deps(db: Session, task_id: int, cascade: bool = False) -> None:
+def delete_task_with_deps(db: Session, task_id: int, cascade: bool = False, username: str = "未知用户") -> None:
     """删除任务，根据 cascade 决定是否级联删除所有后继任务"""
     # 获取要删除的任务对象（用于后续判断）
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task:
         return
+
+    scope_type = "team" if task.team_id else "personal"
 
     if cascade:
         # 级联删除：递归获取所有后继任务 ID（包括间接后继）
@@ -675,7 +848,15 @@ def delete_task_with_deps(db: Session, task_id: int, cascade: bool = False) -> N
             for (sid,) in successors:
                 if sid not in to_delete:
                     stack.append(sid)
-
+        
+        #循环遍历即将被删除的任务，记录级联删除日志
+        for del_id in to_delete:
+            log_operation(
+                db=db, operator=username, action_type="delete",
+                object_id=del_id, object_type="task", object_title=f"任务ID:{del_id}",
+                scope_type=scope_type, scope_id=task.team_id, scope_title="团队任务" if task.team_id else "个人任务",
+                description="级联删除了该任务及其依赖", object_deleted=True
+            )
         # 删除所有涉及到的依赖关系（避免外键约束）
         db.query(models.TaskDependency).filter(
             models.TaskDependency.predecessor_id.in_(to_delete) |
@@ -684,6 +865,13 @@ def delete_task_with_deps(db: Session, task_id: int, cascade: bool = False) -> N
         # 删除任务
         db.query(models.Task).filter(models.Task.id.in_(to_delete)).delete(synchronize_session=False)
     else:
+        # 【新增】：记录普通删除日志
+        log_operation(
+            db=db, operator=username, action_type="delete",
+            object_id=task.id, object_type="task", object_title=task.title,
+            scope_type=scope_type, scope_id=task.team_id, scope_title="团队任务" if task.team_id else "个人任务",
+            description="删除了该任务", object_deleted=True
+        )
         # 非级联：只删除当前任务，并清理所有与它相关的依赖（作为前置或后继）
         db.query(models.TaskDependency).filter(
             (models.TaskDependency.predecessor_id == task_id) |
@@ -731,14 +919,7 @@ def leave_team(
     if not membership:
         return False, "您不是该团队成员"
 
-    # 处理任务转交：将该用户负责的未完成任务转给团队 Owner
-    assigned_tasks = db.query(models.Task).filter(
-        models.Task.team_id == team_id,
-        models.Task.assignee_username == username,
-        models.Task.status != "已完成"
-    ).all()
-    for task in assigned_tasks:
-        task.assignee_username = team.owner_username
+    task_assignee_username = team.owner_username
 
     # 如果是 Owner 离开
     if team.owner_username == username:
@@ -762,8 +943,159 @@ def leave_team(
         team.owner_username = new_owner_candidate.username
         # 新 owner 角色提升为 Owner
         new_owner_candidate.role = ROLE_OWNER
+        task_assignee_username = new_owner_candidate.username
+
+    # 处理任务转交：将该用户负责的未完成任务转给团队 Owner
+    assigned_tasks = db.query(models.Task).filter(
+        models.Task.team_id == team_id,
+        models.Task.assignee_username == username,
+        models.Task.status != "已完成"
+    ).all()
+    for task in assigned_tasks:
+        old_assignee = task.assignee_username
+        task.assignee_username = task_assignee_username
+        _log_task_assignee_change(
+            db,
+            operator_username=username,
+            task=task,
+            old_assignee=old_assignee,
+            new_assignee=task_assignee_username,
+            reason=f"成员 {username} 主动离开团队"
+        )
 
     # 删除该用户的成员记录
     db.delete(membership)
     db.commit()
     return True, None
+
+#=============写入操作日志公有函数================
+#供各个业务操作调用，用以生成一条记录。注意本身不执行db.commit()，由调用方根据业务流程决定是否提交事务。
+def log_operation(db: Session, operator: str, action_type: str,
+                  object_id: int, object_type: str, object_title: str,
+                  scope_type: str, scope_id: int | None, scope_title: str,
+                  description: str, object_deleted: bool = False) -> models.OperationLog:
+    """通用日志记录器 (已适配 API 同学最新的 JSON 模型结构)"""
+    log = models.OperationLog(
+        operator=operator,
+        type=action_type,
+        object={
+            "id": object_id,
+            "title": object_title,
+            "type": object_type,
+            "deleted": object_deleted
+        },
+        description=description,
+        scope={
+            "type": scope_type,
+            "id": scope_id,
+            "title": scope_title
+        },
+        task_id=object_id if object_type == "task" else None,
+        team_id=scope_id if scope_type == "team" else None,
+        personal_user=operator if scope_type == "personal" else None
+    )
+    db.add(log)
+    return log
+
+
+def serialize_operation_log(log: models.OperationLog) -> dict:
+    """将操作日志序列化为前端可直接展示的结构。"""
+    return {
+        "id": log.id,
+        "operator": log.operator,
+        "type": log.type,
+        "object": {
+            "id": log.object_id,
+            "title": log.object_title,
+            "type": log.object_type,
+            "deleted": bool(log.object_deleted),
+        },
+        "operatedAt": log.operated_at.strftime("%Y-%m-%d %H:%M:%S") if log.operated_at else None,
+        "description": log.description,
+        "scope": {
+            "type": log.scope_type,
+            "id": log.scope_id,
+            "title": log.scope_title,
+        },
+    }
+
+
+def _limit_operation_log_count(limit: int | None) -> int:
+    """限制日志查询条数，避免接口误用一次取太多。"""
+    if limit is None:
+        return 10
+    return max(1, min(limit, 100))
+
+
+def _query_operation_logs(db: Session):
+    return db.query(models.OperationLog).order_by(
+        models.OperationLog.operated_at.desc(),
+        models.OperationLog.id.desc(),
+    )
+
+
+def _can_read_log_scope(db: Session, scope_type: str, scope_id: int | None, username: str) -> bool:
+    if scope_type == "personal":
+        return True
+    if scope_type == "team" and scope_id is not None:
+        return get_team_membership(db, scope_id, username) is not None
+    return False
+
+
+def get_task_operation_logs(db: Session, task_id: int, username: str, limit: int = 10) -> list[dict]:
+    """获取任务最近操作日志，个人任务仅所属用户可见，团队任务仅当前成员可见。"""
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if task:
+        if task.team_id is None:
+            if task.owner_username != username:
+                raise HTTPException(status_code=403, detail="无权访问该任务日志")
+        elif not get_team_membership(db, task.team_id, username):
+            raise HTTPException(status_code=403, detail="无权访问该团队任务日志")
+    else:
+        latest_log = db.query(models.OperationLog).filter(
+            models.OperationLog.object_type == "task",
+            models.OperationLog.object_id == task_id,
+        ).order_by(
+            models.OperationLog.operated_at.desc(),
+            models.OperationLog.id.desc(),
+        ).first()
+        if not latest_log:
+            raise HTTPException(status_code=404, detail="任务日志不存在")
+        if latest_log.scope_type == "personal":
+            if latest_log.scope_title != username and latest_log.operator_username != username:
+                raise HTTPException(status_code=403, detail="无权访问该任务日志")
+        elif not _can_read_log_scope(db, latest_log.scope_type, latest_log.scope_id, username):
+            raise HTTPException(status_code=403, detail="无权访问该团队任务日志")
+
+    logs = _query_operation_logs(db).filter(
+        models.OperationLog.object_type == "task",
+        models.OperationLog.object_id == task_id,
+    ).limit(_limit_operation_log_count(limit)).all()
+    return [serialize_operation_log(log) for log in logs]
+
+
+def get_scope_operation_logs(
+    db: Session,
+    scope_type: str,
+    scope_id: int | None,
+    username: str,
+    limit: int = 50
+) -> list[dict]:
+    """获取个人或团队范围内的操作日志。"""
+    if scope_type == "personal":
+        scope_filter = (
+            (models.OperationLog.scope_type == "personal") &
+            (models.OperationLog.scope_title == username)
+        )
+    elif scope_type == "team" and scope_id is not None:
+        if not get_team_membership(db, scope_id, username):
+            raise HTTPException(status_code=403, detail="无权访问该团队日志")
+        scope_filter = (
+            (models.OperationLog.scope_type == "team") &
+            (models.OperationLog.scope_id == scope_id)
+        )
+    else:
+        raise HTTPException(status_code=400, detail="日志范围参数无效")
+
+    logs = _query_operation_logs(db).filter(scope_filter).limit(_limit_operation_log_count(limit)).all()
+    return [serialize_operation_log(log) for log in logs]
