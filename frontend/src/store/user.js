@@ -100,11 +100,7 @@ export const highlightTeamId = ref(null)
 
 // 添加任务
 export const addTask = async (task) => {
-    const res = await api.createTask({
-        ...task,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-    })
+    const res = await api.createTask(task)
     const newTask = res.data
     highlightTaskId.value = newTask.id
     taskList.value.push(newTask)
@@ -135,8 +131,7 @@ export const startTask = async (taskId) => {
     if (index !== -1) {
         taskList.value[index] = {
             ...taskList.value[index],
-            status: '进行中',
-            updatedAt: new Date().toISOString()
+            status: '进行中'
         }
     }
     
@@ -167,8 +162,7 @@ export const finishTask = async (taskId) => {
     if (index !== -1) {
         taskList.value[index] = {
             ...taskList.value[index],
-            status: '已完成',
-            updatedAt: new Date().toISOString()
+            status: '已完成'
         }
     }
 
@@ -198,10 +192,7 @@ export const getTaskById = async (taskId) => {
 
 // 更新任务
 export const updateTask = async (taskId, taskData) => {
-    const res = await api.updateTask(taskId, {
-        ...taskData,
-        updatedAt: new Date().toISOString()
-    })
+    const res = await api.updateTask(taskId, taskData)
     const index = taskList.value.findIndex(t => t.id === taskId)
     if (index !== -1) {
         taskList.value[index] = res.data
