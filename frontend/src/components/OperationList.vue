@@ -63,7 +63,7 @@ const getObjectText = (object) => {
       >
         <el-table-column
             label="操作对象"
-            min-width="25%"
+            min-width="15%"
             align="left"
         >
           <template #default="{ row }">
@@ -73,19 +73,19 @@ const getObjectText = (object) => {
         <el-table-column
             prop="operator"
             label="操作人"
-            min-width="25%"
+            min-width="15%"
             align="center"
         />
         <el-table-column
             prop="description"
             label="描述"
-            min-width="50%"
+            min-width="55%"
             align="center"
         />
         <el-table-column
             prop="operatedAt"
             label="操作时间"
-            min-width="25%"
+            min-width="15%"
             align="center"
         />
       </el-table>
