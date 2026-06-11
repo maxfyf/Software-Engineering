@@ -75,6 +75,7 @@ class UserManagementAcceptanceTests(unittest.TestCase):
         status: str = models.TaskStatus.TODO.value,
     ) -> models.Task:
         task = models.Task(
+            id=crud.allocate_task_id(self.db),
             title=title,
             owner_username=owner_username,
             team_id=team_id,
@@ -310,12 +311,12 @@ class UserManagementAcceptanceTests(unittest.TestCase):
         self.assertIsNone(crud.require_team_member(self.db, team_id, "member"))
         self.assertIsNone(self.db.query(models.Task).filter(models.Task.id == task_id).first())
         log = self.db.query(models.OperationLog).filter(
-            models.OperationLog.object_type == "task",
-            models.OperationLog.object_id == task_id,
+            models.OperationLog.task_id == task_id,
+            models.OperationLog.type == "delete",
         ).one()
-        self.assertEqual(log.object_title, "team task")
-        self.assertEqual(log.scope_title, "Alpha")
-        self.assertEqual(log.object_deleted, 1)
+        self.assertEqual(log.object["title"], "team task")
+        self.assertEqual(log.scope["title"], "Alpha")
+        self.assertTrue(log.object["deleted"])
 
     def test_tc_um_14_cancel_account_cleans_data_and_keeps_logs(self):
         """TC-UM-14: 验证用户注销后的数据清理。"""
@@ -343,11 +344,11 @@ class UserManagementAcceptanceTests(unittest.TestCase):
         self.assertEqual(assigned.assignee_username, "bob")
         self.assertEqual(owned.owner_username, "bob")
         personal_log = self.db.query(models.OperationLog).filter(
-            models.OperationLog.object_type == "task",
-            models.OperationLog.object_id == personal_id,
+            models.OperationLog.task_id == personal_id,
+            models.OperationLog.type == "delete",
         ).one()
-        self.assertEqual(personal_log.action_type, "delete")
-        self.assertEqual(personal_log.object_deleted, 1)
+        self.assertEqual(personal_log.type, "delete")
+        self.assertTrue(personal_log.object["deleted"])
 
     def test_tc_um_15_cancel_account_logs_do_not_leak_sensitive_data(self):
         """TC-UM-15: 验证注销账号不会泄露敏感信息到日志。"""
@@ -359,8 +360,8 @@ class UserManagementAcceptanceTests(unittest.TestCase):
 
         self.assertTrue(cancelled)
         log = self.db.query(models.OperationLog).filter(
-            models.OperationLog.object_type == "task",
-            models.OperationLog.object_id == task_id,
+            models.OperationLog.task_id == task_id,
+            models.OperationLog.type == "delete",
         ).one()
         serialized = crud.serialize_operation_log(log)
         serialized_text = str(serialized)

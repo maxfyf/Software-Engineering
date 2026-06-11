@@ -47,7 +47,7 @@ class CrudTestCase(unittest.TestCase):
 
     def add_team(self, name: str, owner_username: str) -> models.Team:
         # 测试辅助方法：创建团队时同步补上 Owner 成员关系，使数据更贴近真实业务。
-        team = models.Team(name=name, owner_username=owner_username)
+        team = models.Team(id=crud.allocate_team_id(self.db), name=name, owner_username=owner_username)
         self.db.add(team)
         self.db.flush()
         membership = models.TeamMember(
@@ -78,6 +78,7 @@ class CrudTestCase(unittest.TestCase):
     ) -> models.Task:
         # 测试辅助方法：同时支持创建个人任务和团队任务。
         task = models.Task(
+            id=crud.allocate_task_id(self.db),
             title=title,
             owner_username=owner_username,
             team_id=team_id,
@@ -735,14 +736,14 @@ class OperationLogTests(CrudTestCase):
 
         self.assertTrue(cancelled)
         deleted_log = self.db.query(models.OperationLog).filter(
-            models.OperationLog.object_id == alice_personal_id,
-            models.OperationLog.object_type == "task",
+            models.OperationLog.task_id == alice_personal_id,
+            models.OperationLog.type == "delete",
         ).one()
-        self.assertEqual(deleted_log.operator_username, "alice")
-        self.assertEqual(deleted_log.action_type, "delete")
-        self.assertEqual(deleted_log.scope_type, "personal")
-        self.assertEqual(deleted_log.scope_title, "alice")
-        self.assertEqual(deleted_log.object_deleted, 1)
+        self.assertEqual(deleted_log.operator, "alice")
+        self.assertEqual(deleted_log.type, "delete")
+        self.assertEqual(deleted_log.scope["type"], "personal")
+        self.assertEqual(deleted_log.personal_user, "alice")
+        self.assertTrue(deleted_log.object["deleted"])
 
         bob_logs = crud.get_task_operation_logs(self.db, bob_personal.id, "bob")
         self.assertEqual(len(bob_logs), 1)
@@ -769,15 +770,49 @@ class OperationLogTests(CrudTestCase):
         self.assertTrue(deleted)
         self.assertIsNone(self.db.query(models.Task).filter(models.Task.id == task_id).first())
         log = self.db.query(models.OperationLog).filter(
-            models.OperationLog.object_id == task_id,
-            models.OperationLog.object_type == "task",
+            models.OperationLog.task_id == task_id,
+            models.OperationLog.type == "delete",
         ).one()
-        self.assertEqual(log.operator_username, "owner")
-        self.assertEqual(log.object_title, "team task")
-        self.assertEqual(log.scope_type, "team")
-        self.assertEqual(log.scope_id, team_id)
-        self.assertEqual(log.scope_title, "Core Team")
-        self.assertEqual(log.object_deleted, 1)
+        self.assertEqual(log.operator, "owner")
+        self.assertEqual(log.object["title"], "team task")
+        self.assertEqual(log.scope["type"], "team")
+        self.assertEqual(log.team_id, team_id)
+        self.assertEqual(log.scope["title"], "Core Team")
+        self.assertTrue(log.object["deleted"])
+
+    def test_deleted_task_id_is_not_reused_after_same_title_recreated(self):
+        self.add_user("owner")
+        task = self.add_task("same title", "owner")
+        old_task_id = task.id
+
+        crud.delete_task_with_deps(self.db, old_task_id, username="owner")
+        new_task = self.add_task("same title", "owner")
+
+        self.assertGreater(new_task.id, old_task_id)
+        old_logs = self.db.query(models.OperationLog).filter(
+            models.OperationLog.task_id == old_task_id
+        ).all()
+        self.assertTrue(old_logs)
+        self.assertTrue(all(log.object["deleted"] for log in old_logs))
+
+    def test_deleted_team_id_is_not_reused_after_same_name_recreated(self):
+        self.add_user("owner")
+        team = self.add_team("Same Team", "owner")
+        old_team_id = team.id
+        self.add_task("team task", "owner", team_id=team.id)
+
+        self.assertTrue(crud.delete_team(self.db, team.id, operator_username="owner"))
+        new_team = self.add_team("Same Team", "owner")
+
+        self.assertGreater(new_team.id, old_team_id)
+        old_team_logs = self.db.query(models.OperationLog).filter(
+            models.OperationLog.team_id == old_team_id
+        ).all()
+        new_team_logs = self.db.query(models.OperationLog).filter(
+            models.OperationLog.team_id == new_team.id
+        ).all()
+        self.assertTrue(old_team_logs)
+        self.assertEqual(new_team_logs, [])
 
     def test_task_logs_are_returned_newest_first(self):
         self.add_user("alice")

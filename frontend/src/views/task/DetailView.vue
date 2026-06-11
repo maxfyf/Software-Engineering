@@ -137,7 +137,7 @@ const showMoreOperations = () => {
 
 // 显示全部操作
 const showAllOperations = () => {
-  // TODO
+  shownOperationCnt.value = operations.value.length
 }
 </script>
 
