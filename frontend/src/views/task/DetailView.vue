@@ -243,7 +243,7 @@ const showAllOperations = () => {
                   v-for="item in shownOperations"
                   :key="item.id"
               >
-                {{ item.operator }}&nbsp;{{ item.operatedAt }}&nbsp;{{ item.description }}
+                {{ item.operator }}&nbsp;{{ item.operatedAt }}&nbsp;{{ item.description }}; 
               </p>
               <div v-if="shownOperationCnt < operations.length" class="more-operations">
                 <el-button
