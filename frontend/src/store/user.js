@@ -257,7 +257,10 @@ export const initTaskList = async (force = false) => {
 }
 
 // 初始化团队列表
-export const initTeamList = async () => {
+export const initTeamList = async (force = false) => {
+    if (!force && teamList.value.length > 0) {
+        return
+    }
     try {
         const res = await api.getTeamList()
         teamList.value = res.data
