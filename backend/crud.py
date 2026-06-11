@@ -854,7 +854,32 @@ def can_manage_task(db: Session, user_id: str, task: models.Task) -> bool:
     else:
         membership = get_team_membership(db, task.team_id, user_id)
         return membership is not None and membership.role in (ROLE_OWNER, ROLE_ADMIN)
-    
+
+
+def _log_dependency_removed_by_deleted_predecessor(
+    db: Session,
+    *,
+    operator_username: str,
+    predecessor: models.Task,
+    successors: list[models.Task]
+) -> None:
+    """删除前置任务导致依赖自动移除时，给保留下来的后继任务写日志。"""
+    for successor in successors:
+        scope_type, scope_id, scope_title = _task_log_scope(successor)
+        log_operation(
+            db=db,
+            operator=operator_username,
+            action_type="remove_dependency",
+            object_id=successor.id,
+            object_type="task",
+            object_title=successor.title,
+            scope_type=scope_type,
+            scope_id=scope_id,
+            scope_title=scope_title,
+            description=f"前置任务 {predecessor.title} 被删除，依赖关系自动移除",
+            personal_user=successor.owner_username
+        )
+     
 def delete_task_with_deps(db: Session, task_id: int, cascade: bool = False, username: str = "未知用户") -> None:
     """删除任务，根据 cascade 决定是否级联删除所有后继任务"""
     # 获取要删除的任务对象（用于后续判断）
@@ -902,6 +927,7 @@ def delete_task_with_deps(db: Session, task_id: int, cascade: bool = False, user
         # 删除任务
         db.query(models.Task).filter(models.Task.id.in_(to_delete)).delete(synchronize_session=False)
     else:
+        successor_tasks = get_successors(db, task_id)
         # 【新增】：记录普通删除日志
         log_operation(
             db=db, operator=username, action_type="delete",
@@ -909,6 +935,12 @@ def delete_task_with_deps(db: Session, task_id: int, cascade: bool = False, user
             scope_type=scope_type, scope_id=task.team_id, scope_title="团队任务" if task.team_id else "个人任务",
             description="删除了该任务", object_deleted=True,
             personal_user=task.owner_username
+        )
+        _log_dependency_removed_by_deleted_predecessor(
+            db,
+            operator_username=username,
+            predecessor=task,
+            successors=successor_tasks
         )
         mark_task_logs_deleted(db, {task_id})
         # 非级联：只删除当前任务，并清理所有与它相关的依赖（作为前置或后继）
