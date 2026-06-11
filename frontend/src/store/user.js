@@ -180,6 +180,9 @@ export const removeTask = async (taskId, cascade = false) => {
         if (index !== -1) {
             taskList.value.splice(index, 1)
         }
+        taskList.value.forEach(task => {
+            task.predecessor = (task.predecessor || []).filter(predId => Number(predId) !== Number(taskId))
+        })
     }
     return true
 }

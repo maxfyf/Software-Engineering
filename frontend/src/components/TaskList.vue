@@ -104,7 +104,8 @@ const startTask = async (row) => {
 const findUnfinishedPredecessor = (task) => {
   const predecessors = task.predecessor || []
   for (const predItem of predecessors) {
-    const predTask = taskList.value.find(t => t.id === predItem)
+    const predTask = taskList.value.find(t => Number(t.id) === Number(predItem))
+    if (!predTask) continue
     if(predTask.status !== '已完成') return predTask
   }
   return null
@@ -268,10 +269,10 @@ const deleteTask = (row) => {
         cancelButtonText: '取消',
         type: undefined
       }
-  ).then(() => {
+  ).then(async () => {
     highlightTaskId.value = null
     // 传递 cascade 参数给后端
-    removeTask(row.id, cascade)
+    await removeTask(row.id, cascade)
     ElMessage.success('任务已删除')
   }).catch(() => {
     console.log('取消删除')

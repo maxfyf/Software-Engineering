@@ -93,6 +93,7 @@ const findTaskByDependencyItem = (item) => {
 const findUnfinishedPredecessor = (predecessors) => {
   for (const predItem of predecessors) {
     const predTask = findTaskByDependencyItem(predItem)
+    if (!predTask) continue
     if(predTask.status !== '已完成') return predTask
   }
   return null
