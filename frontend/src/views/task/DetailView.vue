@@ -134,6 +134,11 @@ const showMoreOperations = () => {
       operations.value.length
   )
 }
+
+// 显示全部操作
+const showAllOperations = () => {
+  // TODO
+}
 </script>
 
 <template>
@@ -245,15 +250,25 @@ const showMoreOperations = () => {
               >
                 {{ item.operator }}&nbsp;{{ item.operatedAt }}&nbsp;{{ item.description }}
               </p>
-              <el-button
-                  v-if="shownOperationCnt < operations.length"
-                  link
-                  type="primary"
-                  class="more-operations"
-                  @click="showMoreOperations"
-              >
-                更多
-              </el-button>
+              <div v-if="shownOperationCnt < operations.length" class="more-operations">
+                <el-button
+                    link
+                    type="primary"
+                    class="more-operations"
+                    @click="showMoreOperations"
+                >
+                  更多
+                </el-button>
+
+                <el-button
+                    link
+                    type="primary"
+                    class="more-operations"
+                    @click="showAllOperations"
+                >
+                  展开全部
+                </el-button>
+              </div>
             </div>
           </div>
         </div>
@@ -340,12 +355,20 @@ const showMoreOperations = () => {
 }
 
 .more-operations {
-  color: black;
+  display: flex;
+  flex-direction: row;
+  margin-top: 5px;
+  margin-left: 5px;
+}
+
+.more-operations-button {
+  color: #337ecc;
   font-size: 15px;
 }
 
-.more-operations:hover {
+.more-operations-button:hover {
   color: #409eff;
+  text-decoration: underline;
 }
 
 .footer {
