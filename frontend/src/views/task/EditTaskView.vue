@@ -27,7 +27,9 @@ const newPriority = ref('中')
 const newDate = ref('')
 
 const pastDate = (time) => {
-  return time.getTime() < Date.now() - 8.64e7
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return time.getTime() < today.getTime()
 }
 
 // 判断当前任务是否为团队任务

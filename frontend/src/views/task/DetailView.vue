@@ -106,12 +106,7 @@ const viewSuccessorDetail = async (index) => {
 
 const formatDate = (dateStr) => {
   if (!dateStr) return '未设置'
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).replace(/\//g, '-')
+  return String(dateStr).slice(0, 10)
 }
 
 // 以该任务为对象的操作（按时间戳倒序排列）

@@ -1,8 +1,19 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
+from datetime import timedelta, timezone
 import models, schemas, security
 from fastapi import HTTPException
 from log_service import log_task_operation
+
+CN_TZ = timezone(timedelta(hours=8))
+
+
+def format_cn_datetime(value):
+    if not value:
+        return None
+    if value.tzinfo is not None:
+        value = value.astimezone(CN_TZ).replace(tzinfo=None)
+    return value.strftime("%Y-%m-%d %H:%M:%S")
 
 ROLE_OWNER = models.TeamRole.OWNER.value
 ROLE_ADMIN = models.TeamRole.ADMIN.value
@@ -34,6 +45,22 @@ def mark_task_logs_deleted(db: Session, task_ids: list[int] | set[int]) -> None:
         obj = dict(log.object or {})
         obj["deleted"] = True
         log.object = obj
+
+
+def get_task_log_display_title(db: Session, task: models.Task) -> str:
+    """返回任务日志应使用的标题快照，避免改名后删除日志丢失旧名标记。"""
+    latest_log = db.query(models.OperationLog).filter(
+        models.OperationLog.task_id == task.id
+    ).order_by(
+        models.OperationLog.operated_at.desc(),
+        models.OperationLog.id.desc()
+    ).first()
+    if latest_log:
+        obj = latest_log.object or {}
+        latest_title = obj.get("title") if isinstance(obj, dict) else None
+        if latest_title == task.title or latest_title.startswith(f"{task.title}（"):
+            return latest_title
+    return task.title
 
 # 注册相关
 
@@ -908,12 +935,13 @@ def delete_task_with_deps(db: Session, task_id: int, cascade: bool = False, user
 
         tasks_to_delete = db.query(models.Task).filter(models.Task.id.in_(to_delete)).all()
         task_title_map = {item.id: item.title for item in tasks_to_delete}
+        task_log_title_map = {item.id: get_task_log_display_title(db, item) for item in tasks_to_delete}
         
         #循环遍历即将被删除的任务，记录级联删除日志
         for del_id in to_delete:
             log_operation(
                 db=db, operator=username, action_type="delete",
-                object_id=del_id, object_type="task", object_title=task_title_map.get(del_id, f"任务ID:{del_id}"),
+                object_id=del_id, object_type="task", object_title=task_log_title_map.get(del_id, task_title_map.get(del_id, f"任务ID:{del_id}")),
                 scope_type=scope_type, scope_id=task.team_id, scope_title="团队任务" if task.team_id else "个人任务",
                 description="级联删除了该任务及其依赖", object_deleted=True,
                 personal_user=task.owner_username
@@ -931,7 +959,7 @@ def delete_task_with_deps(db: Session, task_id: int, cascade: bool = False, user
         # 【新增】：记录普通删除日志
         log_operation(
             db=db, operator=username, action_type="delete",
-            object_id=task.id, object_type="task", object_title=task.title,
+            object_id=task.id, object_type="task", object_title=get_task_log_display_title(db, task),
             scope_type=scope_type, scope_id=task.team_id, scope_title="团队任务" if task.team_id else "个人任务",
             description="删除了该任务", object_deleted=True,
             personal_user=task.owner_username
@@ -1085,7 +1113,7 @@ def serialize_operation_log(log: models.OperationLog) -> dict:
         "operator": log.operator,
         "type": log.type,
         "object": log.object,
-        "operatedAt": log.operated_at.strftime("%Y-%m-%d %H:%M:%S") if log.operated_at else None,
+        "operatedAt": format_cn_datetime(log.operated_at),
         "description": log.description,
         "scope": log.scope,
     }
