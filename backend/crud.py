@@ -465,7 +465,8 @@ def cancel_account(db: Session, username: str) -> bool:
         models.Team, models.Task.team_id == models.Team.id
     ).filter(
         models.Task.team_id.isnot(None),
-        models.Task.assignee_username == username
+        models.Task.assignee_username == username,
+        models.Task.status != models.TaskStatus.DONE.value
     ).all()
     for task in assigned_team_tasks:
         old_assignee = task.assignee_username
