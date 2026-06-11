@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from models import TaskStatus, TaskDependency #补充
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from collections import deque
 
 from database import get_db, Base, engine
@@ -18,6 +18,16 @@ from security import verify_password, get_password_hash, create_access_token
 import crud
 from models import OperationLog
 from log_service import log_task_operation
+
+CN_TZ = timezone(timedelta(hours=8))
+
+
+def format_cn_datetime(value):
+    if not value:
+        return None
+    if value.tzinfo is not None:
+        value = value.astimezone(CN_TZ).replace(tzinfo=None)
+    return value.strftime("%Y-%m-%d %H:%M:%S")
 
 # ===================== 初始化数据库 =====================
 Base.metadata.create_all(bind=engine)
@@ -79,8 +89,8 @@ def serialize_task(task):
         "status": task.status,
         "priority": task.priority,
         "deadline": task.due_date.strftime("%Y-%m-%d") if task.due_date else None,
-        "createdAt": task.created_at.strftime("%Y-%m-%d %H:%M:%S") if task.created_at else None,
-        "updatedAt": task.updated_at.strftime("%Y-%m-%d %H:%M:%S") if task.updated_at else None,
+        "createdAt": format_cn_datetime(task.created_at),
+        "updatedAt": format_cn_datetime(task.updated_at),
         "owner": task.owner_username,
         "team": task.team.name if task.team else None,
         "assignee": [task.assignee_username] if task.assignee_username else [],
