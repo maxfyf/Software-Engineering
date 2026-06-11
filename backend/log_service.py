@@ -10,7 +10,8 @@ def log_task_operation(
     scope_type: str,
     team_id=None,
     team_title=None,
-    deleted=False
+    deleted=False,
+    object_title=None
 ):
     """
     记录任务相关操作日志
@@ -18,7 +19,7 @@ def log_task_operation(
     # 构建 object 字段
     obj = {
         "id": task.id,
-        "title": task.title,
+        "title": object_title or task.title,
         "type": "task",
         "deleted": deleted
     }
@@ -29,7 +30,7 @@ def log_task_operation(
             "id": None,
             "title": "个人任务"
         }
-        personal_user = operator
+        personal_user = task.owner_username
         team_id_for_idx = None
     else:
         scope = {
