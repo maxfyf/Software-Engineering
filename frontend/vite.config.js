@@ -9,6 +9,18 @@ export default defineConfig({
   plugins: [
     vue(),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-vue': ['vue', 'vue-router'],
+          'vendor-el': ['element-plus'],
+          'vendor-icon': ['@element-plus/icons-vue'],
+          'vendor-utils': ['axios'],
+        }
+      }
+    }
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
