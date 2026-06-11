@@ -193,6 +193,12 @@ const formatAssignee = (task) => {
   }).join(', ')
 }
 
+const hideAssigneeDetail = (task) => {
+  const assignees = Array.isArray(task.assignee) ? task.assignee : (task.assignee ? [task.assignee] : [])
+  if (assignees.length === 0) return true
+  return props.isTeamSpace && task.status === '已完成' && !isCurrentTeamMember(task, assignees[0])
+}
+
 const getPrimaryAssignee = (task) => {
   const assignees = Array.isArray(task.assignee) ? task.assignee : (task.assignee ? [task.assignee] : [])
   return assignees[0] || ''
@@ -297,7 +303,11 @@ const deleteTask = (row) => {
             align="center"
         >
           <template v-slot:default="scope">
+            <span v-if="hideAssigneeDetail(scope.row)">
+              {{ formatAssignee(scope.row) }}
+            </span>
             <el-popover
+                v-else
                 placement="bottom"
                 :fallback-placements="['bottom', 'top']"
                 :width="350"
