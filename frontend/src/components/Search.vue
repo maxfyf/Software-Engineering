@@ -37,6 +37,7 @@ const searchText = ref(props.modelValue)
 const showDropdown = ref(false)
 const hasDropdownPosition = ref(false)
 const blurTimeout = ref(null)
+const selectingOption = ref(false)
 
 const fixedDropdownStyle = ref({
   position: 'fixed',
@@ -54,7 +55,8 @@ const filteredOptions = computed(() => {
 
   return props.dataset.filter(d => {
     if (!d) return false
-    return d.data.startsWith(keyword)
+    const searchText = d.searchText ?? d.data
+    return searchText.includes(keyword) || d.data.includes(keyword) || d.aux?.includes(keyword)
   })
 })
 
@@ -67,6 +69,10 @@ watch(() => props.modelValue, (newVal) => {
 
 // 监听 searchText 变化
 watch(searchText, (newVal) => {
+  if (selectingOption.value) {
+    showDropdown.value = false
+    return
+  }
   showDropdown.value = !!newVal
   emit('update:modelValue', newVal)
   emit('input', newVal) // 兼容旧版 input 事件
@@ -139,6 +145,7 @@ const selectOption = (item) => {
     blurTimeout.value = null
   }
 
+  selectingOption.value = true
   searchText.value = item?.data
   showDropdown.value = false
 
@@ -149,6 +156,10 @@ const selectOption = (item) => {
   if (props.onSelect) {
     props.onSelect(item)
   }
+
+  nextTick(() => {
+    selectingOption.value = false
+  })
 }
 
 // HTML特殊字符转义
@@ -214,7 +225,7 @@ onMounted(() => {
           v-for="(item, idx) in filteredOptions"
           :key="idx"
           class="dropdown-item"
-          @click="selectOption(item)" 
+          @mousedown.prevent="selectOption(item)"
       >
         <span v-html="match(item?.data)"/>
         <span v-if="showAux" class="aux">

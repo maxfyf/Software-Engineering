@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from models import TaskStatus, TaskDependency #补充
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from collections import deque
 
 from database import get_db, Base, engine
@@ -16,6 +16,18 @@ from models import User, Task, Team, TaskDependency
 import schemas
 from security import verify_password, get_password_hash, create_access_token
 import crud
+from models import OperationLog
+from log_service import log_task_operation
+
+CN_TZ = timezone(timedelta(hours=8))
+
+
+def format_cn_datetime(value):
+    if not value:
+        return None
+    if value.tzinfo is not None:
+        value = value.astimezone(CN_TZ).replace(tzinfo=None)
+    return value.strftime("%Y-%m-%d %H:%M:%S")
 
 # ===================== 初始化数据库 =====================
 Base.metadata.create_all(bind=engine)
@@ -77,8 +89,8 @@ def serialize_task(task):
         "status": task.status,
         "priority": task.priority,
         "deadline": task.due_date.strftime("%Y-%m-%d") if task.due_date else None,
-        "createdAt": task.created_at.strftime("%Y-%m-%d %H:%M:%S") if task.created_at else None,
-        "updatedAt": task.updated_at.strftime("%Y-%m-%d %H:%M:%S") if task.updated_at else None,
+        "createdAt": format_cn_datetime(task.created_at),
+        "updatedAt": format_cn_datetime(task.updated_at),
         "owner": task.owner_username,
         "team": task.team.name if task.team else None,
         "assignee": [task.assignee_username] if task.assignee_username else [],
@@ -139,6 +151,65 @@ def find_nearest_done_successor(db: Session, task_id: int):
 
         queue.extend(crud.get_successors(db, successor.id))
     return None
+
+def get_task_log_scope(db: Session, task: Task):
+    """返回任务日志的作用域信息。"""
+    if task.team_id is None:
+        return "personal", None, None
+    team_obj = db.query(Team).filter(Team.id == task.team_id).first()
+    return "team", task.team_id, team_obj.name if team_obj else None
+
+def format_deadline(date_value):
+    return date_value.strftime("%Y-%m-%d") if date_value else "未设置"
+
+def update_task_log_title_snapshots(db: Session, task_id: int, new_title: str, old_title: str):
+    """任务改名后，同步该任务历史日志中的标题快照。"""
+    title_snapshot = f"{new_title}（{old_title}）"
+    logs = db.query(OperationLog).filter(OperationLog.task_id == task_id).all()
+    for log in logs:
+        obj = dict(log.object or {})
+        obj["title"] = title_snapshot
+        log.object = obj
+
+def get_task_log_display_title(db: Session, task: Task) -> str:
+    """返回任务日志应使用的标题快照，避免改名后的后续日志丢失旧名标记。"""
+    latest_log = db.query(OperationLog).filter(
+        OperationLog.task_id == task.id
+    ).order_by(
+        OperationLog.operated_at.desc(),
+        OperationLog.id.desc()
+    ).first()
+    if latest_log:
+        obj = latest_log.object or {}
+        latest_title = obj.get("title") if isinstance(obj, dict) else None
+        if latest_title == task.title or latest_title.startswith(f"{task.title}（"):
+            return latest_title
+    return task.title
+
+def append_task_log(
+    db: Session,
+    *,
+    operator: str,
+    operation_type: str,
+    task: Task,
+    description: str,
+    deleted: bool = False,
+    object_title: str | None = None
+):
+    scope_type, team_id, team_title = get_task_log_scope(db, task)
+    display_title = object_title or get_task_log_display_title(db, task)
+    log_task_operation(
+        db=db,
+        operator=operator,
+        operation_type=operation_type,
+        task=task,
+        description=description,
+        scope_type=scope_type,
+        team_id=team_id,
+        team_title=team_title,
+        deleted=deleted,
+        object_title=display_title
+    )
 
 def validate_status_transition(db: Session, task: Task, new_status: str | None):
     """校验任务状态变化不会破坏依赖状态一致性。"""
@@ -328,6 +399,7 @@ def create_task(task: TaskCreateRequest, current_user: User = Depends(get_curren
         )
 
     db_task = Task(
+        id=crud.allocate_task_id(db),
         title=task.title,
         description=task.description,
         status=task.status,
@@ -351,17 +423,45 @@ def create_task(task: TaskCreateRequest, current_user: User = Depends(get_curren
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
-    
+
+    if db_task.team_id is None:
+        scope_type = "personal"
+        team_id = None
+        team_title = None
+    else:
+        scope_type = "team"
+        team_id = db_task.team_id
+        team_obj = db.query(Team).filter(Team.id == team_id).first()
+        team_title = team_obj.name if team_obj else None
+
+    log_task_operation(
+        db=db,
+        operator=current_user.username,
+        operation_type="create_task",
+        task=db_task,
+        description=f"创建任务: {db_task.title}",
+        scope_type=scope_type,
+        team_id=team_id,
+        team_title=team_title,
+        deleted=False
+    )
+
     return success_response("创建成功", serialize_task(db_task))
 
 @app.put("/api/task/{task_id}")
 def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """更新任务 - 个人任务仅owner可编辑；团队任务Admin/Owner可全量编辑，Member仅能修改分配给自己的任务状态"""
     task = db.query(Task).filter(Task.id == task_id).first()
-    
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
-    
+
+    old_title = task.title
+    old_description = task.description
+    old_status = task.status
+    old_priority = task.priority
+    old_due_date = task.due_date
+    old_team_id = task.team_id
+    old_assignee = task.assignee_username
 
     validate_status_transition(db, task, task_update.status)
 
@@ -405,7 +505,6 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
         is_assignee = task.assignee_username == current_user.username
         
         if is_admin_or_owner:
-            old_status = task.status
             new_title = task_update.title if task_update.title is not None else task.title
             conflict = crud.find_task_title_conflict(
                 db,
@@ -452,7 +551,80 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
     
     db.commit()
     db.refresh(task)
-    
+
+    title_snapshot = None
+    if task.title != old_title:
+        title_snapshot = f"{task.title}（{old_title}）"
+        update_task_log_title_snapshots(db, task.id, task.title, old_title)
+        append_task_log(
+            db=db,
+            operator=current_user.username,
+            operation_type="update_title",
+            task=task,
+            description=f"修改任务名: {old_title} -> {task.title}",
+            object_title=title_snapshot
+        )
+
+    if (task.description or "") != (old_description or ""):
+        append_task_log(
+            db=db,
+            operator=current_user.username,
+            operation_type="update_description",
+            task=task,
+            description=f"修改描述: {old_description or '空'} -> {task.description or '空'}",
+            object_title=title_snapshot
+        )
+
+    if task.status != old_status:
+        append_task_log(
+            db=db,
+            operator=current_user.username,
+            operation_type="update_status",
+            task=task,
+            description=f"修改状态: {old_status} -> {task.status}",
+            object_title=title_snapshot
+        )
+
+    if task.priority != old_priority:
+        append_task_log(
+            db=db,
+            operator=current_user.username,
+            operation_type="update_priority",
+            task=task,
+            description=f"修改优先级: {old_priority} -> {task.priority}",
+            object_title=title_snapshot
+        )
+
+    if task.due_date != old_due_date:
+        append_task_log(
+            db=db,
+            operator=current_user.username,
+            operation_type="update_deadline",
+            task=task,
+            description=f"修改截止日期: {format_deadline(old_due_date)} -> {format_deadline(task.due_date)}",
+            object_title=title_snapshot
+        )
+
+    if task.team_id != old_team_id:
+        append_task_log(
+            db=db,
+            operator=current_user.username,
+            operation_type="update_scope",
+            task=task,
+            description="修改任务所属团队",
+            object_title=title_snapshot
+        )
+
+    if task.assignee_username != old_assignee:
+        append_task_log(
+            db=db,
+            operator=current_user.username,
+            operation_type="update_assignee",
+            task=task,
+            description=f"修改负责人: {old_assignee or '未分配'} -> {task.assignee_username or '未分配'}",
+            object_title=title_snapshot
+        )
+
     return success_response("更新成功", serialize_task(task))
 
 @app.delete("/api/task/{task_id}")
@@ -466,6 +638,7 @@ def delete_task(
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
+    old_status = task.status
 
     # 权限检查
     if not task.team_id:
@@ -476,7 +649,7 @@ def delete_task(
             raise HTTPException(status_code=403, detail="无权删除该团队任务")
 
     # 调用 crud 中的级联删除函数
-    crud.delete_task_with_deps(db, task_id, cascade)
+    crud.delete_task_with_deps(db, task_id, cascade, current_user.username)
     return success_response("删除成功")
 
 # ===================== 团队管理模块 =====================
@@ -533,8 +706,7 @@ def delete_team_endpoint(team_id: int, current_user: User = Depends(get_current_
     if team.owner_username != current_user.username:
         raise HTTPException(status_code=403, detail="只有拥有者可解散团队")
     
-    db.delete(team)
-    db.commit()
+    crud.delete_team(db, team_id, operator_username=current_user.username)
     return success_response("团队已解散")
 
 @app.post("/api/team/{team_id}/member")
@@ -783,6 +955,10 @@ def update_predecessors(
     if not crud.can_manage_task(db, current_user.username, task):
         raise HTTPException(status_code=403, detail="无权修改该任务的依赖")
 
+    old_predecessors = crud.get_predecessors(db, task_id)
+    old_pred_ids = {pred.id for pred in old_predecessors}
+    old_pred_title_map = {pred.id: pred.title for pred in old_predecessors}
+
     # 校验所有前置任务
     for pred_id in req.predecessor_ids:
         if pred_id == task_id:
@@ -812,6 +988,29 @@ def update_predecessors(
             raise HTTPException(status_code=400, detail=f"前置任务「{blocker.title}」未完成，无法完成当前任务")
 
     crud.update_predecessors(db, task_id, req.predecessor_ids)
+    new_pred_ids = set(req.predecessor_ids)
+    added_ids = new_pred_ids - old_pred_ids
+    removed_ids = old_pred_ids - new_pred_ids
+
+    for pred_id in added_ids:
+        pred_task = db.query(Task).filter(Task.id == pred_id).first()
+        append_task_log(
+            db=db,
+            operator=current_user.username,
+            operation_type="add_dependency",
+            task=task,
+            description=f"新增前置任务: {pred_task.title if pred_task else pred_id}"
+        )
+
+    for pred_id in removed_ids:
+        append_task_log(
+            db=db,
+            operator=current_user.username,
+            operation_type="remove_dependency",
+            task=task,
+            description=f"删除前置任务: {old_pred_title_map.get(pred_id, pred_id)}"
+        )
+
     return success_response("更新成功")
 
 @app.put("/api/team/{team_id}/owner")
@@ -840,3 +1039,62 @@ def leave_team(
     if not success:
         raise HTTPException(status_code=400, detail=error)
     return success_response("已离开团队")
+
+# ===================== 操作日志查询 =====================
+
+@app.get("/api/task/{task_id}/operations")
+def get_task_operations(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    # 权限校验
+    if task.team_id is None:
+        if task.owner_username != current_user.username and task.assignee_username != current_user.username:
+            raise HTTPException(status_code=403, detail="无权查看该任务日志")
+    else:
+        if not crud.require_team_member(db, task.team_id, current_user.username):
+            raise HTTPException(status_code=403, detail="无权查看该任务日志")
+    logs = db.query(OperationLog).filter(OperationLog.task_id == task_id).order_by(OperationLog.operated_at.desc()).all()
+    return {"success": True, "data": [crud.serialize_operation_log(log) for log in logs]}
+
+@app.get("/api/operation/personal")
+def get_personal_operations(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    logs = db.query(OperationLog).filter(OperationLog.personal_user == current_user.username).order_by(OperationLog.operated_at.desc()).all()
+    return {"success": True, "data": [crud.serialize_operation_log(log) for log in logs]}
+
+@app.get("/api/team/{team_id}/operations")
+def get_team_operations(
+    team_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if not crud.require_team_member(db, team_id, current_user.username):
+        raise HTTPException(status_code=403, detail="无权查看该团队日志")
+    logs = db.query(OperationLog).filter(OperationLog.team_id == team_id).order_by(OperationLog.operated_at.desc()).all()
+    return {"success": True, "data": [crud.serialize_operation_log(log) for log in logs]}
+
+@app.get("/api/user/profile")
+def get_user_profile(
+    username: str = Query(..., description="用户名"),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    return {
+        "success": True,
+        "data": {
+            "username": user.username,
+            "firstName": user.first_name,
+            "lastName": user.last_name,
+            "phone": user.phone_number,
+            "email": user.email
+        }
+    }

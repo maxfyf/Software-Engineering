@@ -1,8 +1,14 @@
-from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, String, Integer, Text, DateTime, JSON, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from datetime import datetime, timedelta, timezone
 import enum
 from database import Base
+
+CN_TZ = timezone(timedelta(hours=8))
+
+
+def now_cn():
+    return datetime.now(CN_TZ).replace(tzinfo=None)
 
 # 定义任务状态的枚举类，方便规范数据
 class TaskStatus(str, enum.Enum):
@@ -61,8 +67,8 @@ class Team(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String(100), nullable=False)
     owner_username = Column(String(20), ForeignKey("users.username"), nullable=False)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=now_cn)
+    updated_at = Column(DateTime, default=now_cn, onupdate=now_cn)
 
     owner = relationship("User", back_populates="owned_teams", foreign_keys=[owner_username])
     members = relationship("TeamMember", back_populates="team", cascade="all, delete-orphan")
@@ -81,7 +87,7 @@ class TeamMember(Base):
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
     username = Column(String(20), ForeignKey("users.username"), nullable=False)
     role = Column(String, default=TeamRole.MEMBER.value, nullable=False)
-    joined_at = Column(DateTime, default=func.now())
+    joined_at = Column(DateTime, default=now_cn)
 
     team = relationship("Team", back_populates="members")
     user = relationship("User", back_populates="team_memberships")
@@ -100,9 +106,9 @@ class Task(Base):
     due_date = Column(DateTime, nullable=True)                   # 截止时间
     
     # 自动处理时间戳
-    created_at = Column(DateTime, default=func.now())           # 创建时间
+    created_at = Column(DateTime, default=now_cn)           # 创建时间
     # onupdate 会在每次修改这条记录时自动更新为当前时间
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now()) # 更新时间
+    updated_at = Column(DateTime, default=now_cn, onupdate=now_cn) # 更新时间
 
     # 外键：关联到 users 表的 username 字段，这是区分任务归属的关键
     owner_username = Column(String(20), ForeignKey("users.username"), nullable=False)
@@ -140,3 +146,21 @@ class TaskDependency(Base):
     successor = relationship("Task", foreign_keys=[successor_id], backref="predecessors_rel")
 
     __table_args__ = (UniqueConstraint("predecessor_id", "successor_id", name="unique_dep"),)
+
+
+
+class OperationLog(Base):
+    __tablename__ = "operation_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    operator = Column(String(50), nullable=False)                # 操作人用户名
+    type = Column(String(50), nullable=False)                    # 操作类型: create_task, update_status, ...
+    object = Column(JSON, nullable=False)                        # {"id":任务id,"title":"任务名","type":"task","deleted":bool}
+    operated_at = Column(DateTime, default=now_cn)
+    description = Column(String(500), nullable=False)            # 可读变更描述
+    scope = Column(JSON, nullable=False)                         # {"type":"personal"/"team","id":团队id或null,"title":"个人任务"/团队名}
+
+    # 冗余索引字段，提升查询性能
+    task_id = Column(Integer, nullable=True, index=True)         # 关联的任务ID
+    team_id = Column(Integer, nullable=True, index=True)         # 关联的团队ID（若为团队任务）
+    personal_user = Column(String(50), nullable=True, index=True) # 关联的个人用户名（若为个人任务）

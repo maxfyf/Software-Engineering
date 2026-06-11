@@ -7,6 +7,8 @@ import {
   highlightTaskId,
   removeTask,
   currentUser,
+  getUserProfile,
+  userProfileMap,
   teamList,
   taskList
 } from "@/store/user.js";
@@ -102,7 +104,8 @@ const startTask = async (row) => {
 const findUnfinishedPredecessor = (task) => {
   const predecessors = task.predecessor || []
   for (const predItem of predecessors) {
-    const predTask = taskList.value.find(t => t.id === predItem)
+    const predTask = taskList.value.find(t => Number(t.id) === Number(predItem))
+    if (!predTask) continue
     if(predTask.status !== '已完成') return predTask
   }
   return null
@@ -191,6 +194,33 @@ const formatAssignee = (task) => {
   }).join(', ')
 }
 
+const hideAssigneeDetail = (task) => {
+  const assignees = Array.isArray(task.assignee) ? task.assignee : (task.assignee ? [task.assignee] : [])
+  if (assignees.length === 0) return true
+  return props.isTeamSpace && task.status === '已完成' && !isCurrentTeamMember(task, assignees[0])
+}
+
+const getPrimaryAssignee = (task) => {
+  const assignees = Array.isArray(task.assignee) ? task.assignee : (task.assignee ? [task.assignee] : [])
+  return assignees[0] || ''
+}
+
+const loadAssigneeProfile = async (task) => {
+  const username = getPrimaryAssignee(task)
+  if (!username || userProfileMap[username]) return
+
+  try {
+    await getUserProfile(username)
+  } catch (error) {
+    console.error('获取负责人信息失败:', error)
+  }
+}
+
+const getAssigneeProfile = (task) => {
+  const username = getPrimaryAssignee(task)
+  return username ? userProfileMap[username] : null
+}
+
 const DeleteConfirmContent = defineComponent({
   props: {
     title: {
@@ -239,10 +269,10 @@ const deleteTask = (row) => {
         cancelButtonText: '取消',
         type: undefined
       }
-  ).then(() => {
+  ).then(async () => {
     highlightTaskId.value = null
     // 传递 cascade 参数给后端
-    removeTask(row.id, cascade)
+    await removeTask(row.id, cascade)
     ElMessage.success('任务已删除')
   }).catch(() => {
     console.log('取消删除')
@@ -274,7 +304,43 @@ const deleteTask = (row) => {
             align="center"
         >
           <template v-slot:default="scope">
-            {{ formatAssignee(scope.row) }}
+            <span v-if="hideAssigneeDetail(scope.row)">
+              {{ formatAssignee(scope.row) }}
+            </span>
+            <el-popover
+                v-else
+                placement="bottom"
+                :fallback-placements="['bottom', 'top']"
+                :width="350"
+                :height="250"
+                :offset="0"
+                trigger="hover"
+                :append-to-body="true"
+                popper-class="top-layer-popover"
+                @show="loadAssigneeProfile(scope.row)"
+            >
+              <template #reference>
+                <span class="assignee">
+                  {{ formatAssignee(scope.row) }}
+                </span>
+              </template><div>
+              <h2 class="popover-title">
+                {{ formatAssignee(scope.row) }}
+              </h2>
+              <p class="popover-info" v-if="getAssigneeProfile(scope.row)?.lastName && getAssigneeProfile(scope.row)?.firstName">
+                <span class="key">全名：</span>
+                {{ getAssigneeProfile(scope.row).lastName }}{{ getAssigneeProfile(scope.row).firstName }}
+              </p>
+              <p class="popover-info" v-if="getAssigneeProfile(scope.row)?.phone">
+                <span class="key">电话号码：</span>
+                {{ getAssigneeProfile(scope.row).phone }}
+              </p>
+              <p class="popover-info" v-if="getAssigneeProfile(scope.row)?.email">
+                <span class="key">电子邮箱：</span>
+                {{ getAssigneeProfile(scope.row).email }}
+              </p>
+            </div>
+            </el-popover>
           </template>
         </el-table-column>
         <el-table-column
@@ -435,6 +501,32 @@ const deleteTask = (row) => {
 .task-table {
   width: 100%;
   box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
+}
+
+.top-layer-popover {
+  z-index: 200;
+}
+
+.top-layer-popover .popover-content {
+  position: relative;
+  z-index: 200;
+}
+
+.assignee:hover {
+  color: #409eff;
+}
+
+.popover-title {
+  font-weight: bold;
+  text-align: center;
+}
+
+.popover-info {
+  padding: 3px 10px;
+}
+
+.key {
+  font-weight: bold;
 }
 
 .pagination {

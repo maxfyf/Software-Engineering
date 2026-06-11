@@ -1,8 +1,8 @@
 <script setup lang="js">
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { handleBack } from "@/utils/routeManager.js";
-import { getTaskById, getPredecessors, getSuccessors } from "@/store/user.js";
+import { getTaskById, getPredecessors, getSuccessors, getTaskOperations } from "@/store/user.js";
 import Route from "@/components/Route.vue";
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
 
@@ -51,10 +51,20 @@ const loadTaskDetail = async (taskId) => {
       title: succ.title,
       status: succ.status
     }))
+    try {
+      const taskOperations = await getTaskOperations(currentTask.id)
+      operations.value = taskOperations
+      shownOperationCnt.value = Math.min(extraOperationCnt.value, taskOperations.length)
+    } catch (error) {
+      operations.value = []
+      shownOperationCnt.value = 0
+    }
   } catch (error) {
     task.value = null
     predecessorTasks.value = []
     successorTasks.value = []
+    operations.value = []
+    shownOperationCnt.value = 0
   } finally {
     loading.value = false
   }
@@ -96,12 +106,33 @@ const viewSuccessorDetail = async (index) => {
 
 const formatDate = (dateStr) => {
   if (!dateStr) return '未设置'
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).replace(/\//g, '-')
+  return String(dateStr).slice(0, 10)
+}
+
+// 以该任务为对象的操作（按时间戳倒序排列）
+const operations = ref([])
+
+// 当前显示的操作数目
+const shownOperationCnt = ref(0)
+
+// 单次点击“更多”展开的任务数
+const extraOperationCnt = ref(10)
+
+const shownOperations = computed(() => {
+  return operations.value.slice(0, shownOperationCnt.value)
+})
+
+// 显示更多操作
+const showMoreOperations = () => {
+  shownOperationCnt.value = Math.min(
+      shownOperationCnt.value + extraOperationCnt.value,
+      operations.value.length
+  )
+}
+
+// 显示全部操作
+const showAllOperations = () => {
+  shownOperationCnt.value = operations.value.length
 }
 </script>
 
@@ -118,59 +149,59 @@ const formatDate = (dateStr) => {
         <div v-if="loading" class="loading-wrapper">
           <span>加载中...</span>
         </div>
-        <div v-else class="item-wrapper">
+        <div v-else-if="task" class="item-wrapper">
           <p class="item">
             <span class="key">任务标题：</span>
             <span class="content">
               {{ task?.title }}
             </span>
           </p>
-          <p v-if="task?.team !== null" class="item">
+          <p v-if="task.team" class="item">
             <span class="key">所属团队：</span>
             <span class="content">
-              {{ task?.team }}
+              {{ task.team }}
             </span>
           </p>
-          <p v-if="task?.team !== null" class="item">
+          <p v-if="task.team" class="item">
             <span class="key">负责人：</span>
             <span class="content">
-              {{ Array.isArray(task?.assignee) ? task?.assignee.join(', ') : task?.assignee }}
+              {{ Array.isArray(task.assignee) ? task.assignee.join(', ') : task.assignee }}
             </span>
           </p>
-          <p v-if="task?.description !== ''" class="item">
+          <p v-if="task.description" class="item">
             <span class="key">描述：</span>
             <span class="content">
-              {{ task?.description }}
+              {{ task.description }}
             </span>
           </p>
           <p class="item">
             <span class="key">状态：</span>
             <span class="content">
-              {{ task?.status }}
+              {{ task.status }}
             </span>
           </p>
           <p class="item">
             <span class="key">优先级：</span>
             <span class="content">
-              {{ task?.priority }}
+              {{ task.priority }}
             </span>
           </p>
-          <p v-if="task?.deadline !== null" class="item">
+          <p v-if="task.deadline" class="item">
             <span class="key">截止时间：</span>
             <span class="content">
-              {{ task?.deadline }}
+              {{ task.deadline }}
             </span>
           </p>
           <p class="item">
             <span class="key">创建时间：</span>
             <span class="content">
-              {{ formatDate(task?.createdAt) }}
+              {{ formatDate(task.createdAt) }}
             </span>
           </p>
           <p class="item">
             <span class="key">更新时间：</span>
             <span class="content">
-              {{ formatDate(task?.updatedAt) }}
+              {{ formatDate(task.updatedAt) }}
             </span>
           </p>
           <div v-if="predecessorTasks.length > 0" class="item">
@@ -199,6 +230,45 @@ const formatDate = (dateStr) => {
               </p>
             </div>
           </div>
+          <div class="item">
+            <span class="key">操作日志：</span>
+            <div class="content">
+              <p
+                  v-if="shownOperations.length === 0"
+                  class="empty-operations"
+              >
+                暂无操作记录
+              </p>
+              <p
+                  v-for="item in shownOperations"
+                  :key="item.id"
+              >
+                {{ item.operator }}&nbsp;{{ item.operatedAt }}&nbsp;{{ item.description }};
+              </p>
+              <div v-if="shownOperationCnt < operations.length" class="more-operations">
+                <el-button
+                    link
+                    type="primary"
+                    class="more-operations-button"
+                    @click="showMoreOperations"
+                >
+                  更多
+                </el-button>
+
+                <el-button
+                    link
+                    type="primary"
+                    class="more-operations-button"
+                    @click="showAllOperations"
+                >
+                  展开全部
+                </el-button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-else class="loading-wrapper">
+          <span>任务不存在或无权访问</span>
         </div>
 
         <template #footer>
@@ -276,6 +346,23 @@ const formatDate = (dateStr) => {
 }
 
 .clickable:hover {
+  text-decoration: underline;
+}
+
+.more-operations {
+  display: flex;
+  flex-direction: row;
+  margin-top: 5px;
+  margin-left: 5px;
+}
+
+.more-operations-button {
+  color: #337ecc;
+  font-size: 15px;
+}
+
+.more-operations-button:hover {
+  color: #409eff;
   text-decoration: underline;
 }
 

@@ -27,7 +27,9 @@ const newPriority = ref('中')
 const newDate = ref('')
 
 const pastDate = (time) => {
-  return time.getTime() < Date.now() - 8.64e7
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return time.getTime() < today.getTime()
 }
 
 // 判断当前任务是否为团队任务
@@ -91,6 +93,7 @@ const findTaskByDependencyItem = (item) => {
 const findUnfinishedPredecessor = (predecessors) => {
   for (const predItem of predecessors) {
     const predTask = findTaskByDependencyItem(predItem)
+    if (!predTask) continue
     if(predTask.status !== '已完成') return predTask
   }
   return null
