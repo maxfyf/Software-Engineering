@@ -254,7 +254,7 @@ const showAllOperations = () => {
                 <el-button
                     link
                     type="primary"
-                    class="more-operations"
+                    class="more-operations-button"
                     @click="showMoreOperations"
                 >
                   更多
@@ -263,7 +263,7 @@ const showAllOperations = () => {
                 <el-button
                     link
                     type="primary"
-                    class="more-operations"
+                    class="more-operations-button"
                     @click="showAllOperations"
                 >
                   展开全部
