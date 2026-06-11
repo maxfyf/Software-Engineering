@@ -54,7 +54,8 @@ const filteredOptions = computed(() => {
 
   return props.dataset.filter(d => {
     if (!d) return false
-    return d.data.startsWith(keyword)
+    const searchText = d.searchText ?? d.data
+    return searchText.includes(keyword) || d.data.includes(keyword) || d.aux?.includes(keyword)
   })
 })
 

@@ -6,6 +6,7 @@ import { getPersonalOperations, getTeamOperations } from '@/store/user.js'
 const getObjectId = (operation) => {
   const object = operation?.object
   if (object && typeof object === 'object') {
+    if (object.type && object.type !== 'task') return null
     return object.taskId ?? object.task_id ?? object.objectId ?? object.object_id ?? object.id ?? null
   }
   if (typeof object === 'number') return object
@@ -18,6 +19,21 @@ const getObjectLabel = (operation) => {
     return object.title ?? object.name ?? object.label ?? String(getObjectId(operation) ?? '')
   }
   return object === undefined || object === null ? '' : String(object)
+}
+
+const getObjectDisplayLabel = (operation) => {
+  const label = getObjectLabel(operation)
+  const object = operation?.object
+  if (object && typeof object === 'object' && object.deleted) {
+    return `${label}（已删除）`
+  }
+  return label
+}
+
+const getObjectSearchText = (operation) => {
+  const label = getObjectDisplayLabel(operation)
+  const id = getObjectId(operation)
+  return id ? `${label} taskId:${id}` : label
 }
 
 const getObjectAux = (operation) => {
@@ -56,14 +72,16 @@ export function useOperationView() {
     operations.value.forEach((item) => {
       const id = getObjectId(item)
       const label = getObjectLabel(item)
+      const displayLabel = getObjectDisplayLabel(item)
       if (!label && !id) return
 
       const key = id ? `id:${id}` : `label:${label}`
       if (seen.has(key)) return
       seen.add(key)
       result.push({
-        data: label || String(id),
+        data: displayLabel || String(id),
         aux: id ? `taskId: ${id}` : getObjectAux(item),
+        searchText: getObjectSearchText(item),
         taskId: id,
         object: item.object
       })

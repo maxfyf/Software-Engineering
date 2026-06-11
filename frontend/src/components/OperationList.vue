@@ -44,7 +44,8 @@ const handleCurrentChange = (page) => {
 
 const getObjectText = (object) => {
   if (object && typeof object === 'object') {
-    return object.title ?? object.name ?? object.label ?? object.id ?? ''
+    const title = object.title ?? object.name ?? object.label ?? object.id ?? ''
+    return object.deleted ? `${title}（已删除）` : title
   }
   return object ?? ''
 }
