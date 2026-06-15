@@ -217,23 +217,13 @@ const handleAddMember = async () => {
   const role = newAuthority.value
 
   try {
-    await api.addMember(teamId.value, username, role)
-
-    const currentTeam = teamList.value.find(t => t.id === teamId.value)
-    if (currentTeam) {
-      if (role === 'admin' && !currentTeam.admin.includes(username)) {
-        currentTeam.admin.push(username)
-      } else if (role === 'member' && !currentTeam.member.includes(username)) {
-        currentTeam.member.push(username)
-      }
-    }
-
-    ElMessage.success('成员添加成功')
+    await api.notifyTeamInvitation(teamId.value, username, role)
+    ElMessage.success('邀请已发送')
     addVisible.value = false
     newUsername.value = ''
     newAuthority.value = 'member'
   } catch (error) {
-    console.error('添加成员失败:', error)
+    console.error('发送团队邀请失败:', error)
     await initTeamList()
   }
 }
