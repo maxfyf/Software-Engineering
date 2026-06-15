@@ -130,7 +130,6 @@ const doRemoveMember = async (username) => {
       currentTeam.admin = currentTeam.admin.filter(a => a !== username)
       currentTeam.member = currentTeam.member.filter(m => m !== username)
     }
-    // TODO: 给相应成员发送needOperation=false的通知，告知其被移出团队
     ElMessage.success('成员已移除')
     // 强制刷新任务列表，更新被转派任务的负责人显示
     await initTaskList(true)
@@ -218,24 +217,13 @@ const handleAddMember = async () => {
   const role = newAuthority.value
 
   try {
-    await api.addMember(teamId.value, username, role)
-
-    const currentTeam = teamList.value.find(t => t.id === teamId.value)
-    if (currentTeam) {
-      if (role === 'admin' && !currentTeam.admin.includes(username)) {
-        currentTeam.admin.push(username)
-      } else if (role === 'member' && !currentTeam.member.includes(username)) {
-        currentTeam.member.push(username)
-      }
-    }
-
-    // TODO: 发送needOperation=true的通知给相应用户，邀请其加入团队
-    ElMessage.success('成员添加成功')
+    await api.notifyTeamInvitation(teamId.value, username, role)
+    ElMessage.success('邀请已发送')
     addVisible.value = false
     newUsername.value = ''
     newAuthority.value = 'member'
   } catch (error) {
-    console.error('添加成员失败:', error)
+    console.error('发送团队邀请失败:', error)
     await initTeamList()
   }
 }

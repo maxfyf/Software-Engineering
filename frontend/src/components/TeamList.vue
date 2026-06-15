@@ -4,7 +4,7 @@ import api from "@/request/api.js";
 import { ElMessage, ElMessageBox } from "element-plus";
 import TwoColumnsWrapper from "@/components/TwoColumnsWrapper.vue";
 import { MoreFilled, Right } from "@element-plus/icons-vue";
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 
 const props = defineProps({
   teams: {
@@ -86,9 +86,7 @@ const quitTeam = (item) => {
     } catch (e) {
       console.error('退出团队失败:', e)
     }
-  }).catch(() => {
-    console.log('取消退出')
-  })
+  }).catch(() => {})
 }
 
 // 转让拥有者权限
@@ -109,21 +107,19 @@ const handoverOwner = (item) => {
   ).then(async () => {
     try {
       currentTeam.value = item
-      console.log(currentTeam.value)
-      console.log(visible.value)
       await new Promise((resolve) => {
         resolveDialog = resolve
       })
-      // TODO：向转让对象发送needOperation=true的通知，请求其成为新的拥有者
-      // 将该团队的owner改成newOwner
-      await api.transferOwner(item.id, newOwner.value)
-      ElMessage.success('已发送转让拥有者权限请求给TODO')
+      if (!newOwner.value) {
+        ElMessage.error('请选择新的拥有者')
+        return
+      }
+      await api.requestOwnerTransfer(item.id, newOwner.value)
+      ElMessage.success(`已发送转让拥有者权限请求给${newOwner.value}`)
     } catch (e) {
       console.error('转让拥有者权限失败:', e)
     }
-  }).catch(() => {
-    console.log('取消转让团队拥有者权限')
-  })
+  }).catch(() => {})
 }
 
 // 解散团队
@@ -141,15 +137,11 @@ const deleteTeam = (item) => {
     highlightTeamId.value = null
     removeTeam(item.id)
     ElMessage.success('团队已解散')
-  }).catch(() => {
-    console.log('取消删除')
-  })
+  }).catch(() => {})
 }
 
 // 进入团队空间
 const enterTeamSpace = (item) => {
-  console.log('进入团队空间:', item.id)
-  console.log(currentTeam.value)
   highlightTeamId.value = item.id
   emit('enterTeamSpace', item.id)
 }

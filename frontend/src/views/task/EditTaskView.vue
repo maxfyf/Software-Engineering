@@ -9,6 +9,7 @@ import { taskList, addTask, getTaskById, updateTask, teamList, getPredecessors, 
   from '@/store/user.js';
 import { handleBack } from "@/utils/routeManager.js"
 import { Edit } from "@element-plus/icons-vue";
+import api from '@/request/api.js'
 
 const route = useRoute();
 const router = useRouter();
@@ -351,8 +352,17 @@ const saveChanges = async () => {
     }
     newTask.predecessor = newPredecessor.value.slice()
     ElMessage.success('任务创建成功')
-    // TODO: 发送needOperation=false的通知给负责人告知分配任务
+    if (isTeamTask.value && newAssignee.value) {
+      try {
+        await api.notifyTaskAssigned(newTask.id, newAssignee.value)
+      } catch (error) {
+        console.error('发送任务分配通知失败:', error)
+      }
+    }
   } else {
+    const oldAssignee = Array.isArray(originalTask.value?.assignee)
+        ? (originalTask.value.assignee[0] || '')
+        : (originalTask.value?.assignee || '')
     // 更新任务
     const idx = scopeTaskList.value.findIndex(t => t.title === newTitle.value && t.id !== taskId.value)
     if (idx !== -1) {
@@ -369,7 +379,13 @@ const saveChanges = async () => {
       await updatePredecessors(taskId.value, predecessorIds)
     }
     ElMessage.success('任务更新成功')
-    // TODO: 如果负责人被更新，发送needOperation=false的通知给新负责人告知分配任务，并删除发送给旧负责人的通知（如未在清空处删除该通知）
+    if (isTeamTask.value && oldAssignee !== newAssignee.value) {
+      try {
+        await api.notifyTaskAssigneeChanged(taskId.value, oldAssignee, newAssignee.value)
+      } catch (error) {
+        console.error('发送任务负责人变更通知失败:', error)
+      }
+    }
   }
 
   // 返回来源页面

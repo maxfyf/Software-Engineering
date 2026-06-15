@@ -3,7 +3,22 @@ import { ref, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { List, Connection, Setting, Bell } from "@element-plus/icons-vue";
-import { handleLogout, currentUser, isLoggedIn, initUserInfo } from '@/store/user.js'
+import {
+  acceptNotification,
+  clearNotificationList,
+  currentUser,
+  handleLogout,
+  initNotificationList,
+  initTeamList,
+  initUserInfo,
+  isLoggedIn,
+  markAllNotificationsRead,
+  notifications,
+  readNotification,
+  rejectNotification,
+  resetNotificationList,
+  unreadCount
+} from '@/store/user.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -11,88 +26,38 @@ const router = useRouter()
 // 导航栏选中状态
 const activeMenu = ref('/task')
 
-// TODO：消息通知
-const notifications = ref([
-  {
-    id: 1,
-    text: '您有一条新的系统更新提醒，请及时查看。',
-    needOperation: true,
-    isRead: false,
-  },
-  {
-    id: 2,
-    text: '张三向您发起了协作邀请。',
-    needOperation: true,
-    isRead: false,
-  },
-  {
-    id: 3,
-    text: '您的报告已生成，点击下载。',
-    needOperation: true,
-    isRead: true,
-  },
-  {
-    id: 4,
-    text: '您的报告已生成，点击下载。',
-    needOperation: false,
-    isRead: true,
-  },
-  {
-    id: 5,
-    text: '您的报告已生成，点击下载。',
-    needOperation: false,
-    isRead: false,
-  }
-])
-
-// 未读消息
-const unreadCount = ref(notifications.value.filter(n => !n.isRead).length)
-
 // 接受通知消息（用于转让owner或邀请进入团队，needOperation=true，需发送通知给owner告知结果）
-const handleAccept = (item) => {
+const handleAccept = async (item) => {
   if (item.isRead) return
-  item.isRead = true
-  updateUnreadCount()
+  await acceptNotification(item.id)
+  await initTeamList(true)
   ElMessage.success(`已接受：${item.text}`)
-  // TODO
 }
 
 // 拒绝通知消息（用于转让owner或邀请进入团队，needOperation=true，需发送通知给owner告知结果）
-const handleReject = (item) => {
+const handleReject = async (item) => {
   if (item.isRead) return
-  item.isRead = true
-  updateUnreadCount()
+  await rejectNotification(item.id)
   ElMessage.warning(`已拒绝：${item.text}`)
-  // TODO
 }
 
 // 确认通知消息（用于通知团队成员其被分配了新任务/通知团队成员其被owner移出团队/通知原owner其权限转交成功与否/通知owner成员加入或拒绝加入团队，needOperation=false）
-const handleRead = (item) => {
+const handleRead = async (item) => {
   if (item.isRead) return
-  item.isRead = true
-  updateUnreadCount()
+  await readNotification(item.id)
   ElMessage.warning(`已确认：${item.text}`)
-  // TODO
 }
 
 // 清空消息
-const clearNotifications = () => {
-  // TODO
-  updateUnreadCount()
+const clearNotifications = async () => {
+  await clearNotificationList()
+  ElMessage.info('通知已清空')
 }
 
 // 全部标记为已读
-const markAllAsRead = () => {
-  notifications.value.forEach(n => {
-    if (!n.isRead) n.isRead = true
-  })
-  updateUnreadCount()
+const markAllAsRead = async () => {
+  await markAllNotificationsRead()
   ElMessage.info('所有通知已标记为已读')
-}
-
-// 更新未读通知数量
-const updateUnreadCount = () => {
-  unreadCount.value = notifications.value.filter(n => !n.isRead).length
 }
 
 // 监听路由变化，更新导航栏选中状态
@@ -111,6 +76,17 @@ watch(() => route.path, (newPath) => {
 // 页面加载时检查登录状态
 onMounted(async () => {
     await initUserInfo()
+    if (isLoggedIn.value) {
+      await initNotificationList()
+    }
+})
+
+watch(() => currentUser.username, async (username) => {
+  if (isLoggedIn.value && username) {
+    await initNotificationList()
+  } else {
+    resetNotificationList()
+  }
 })
 
 // 退出登录处理
