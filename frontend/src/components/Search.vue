@@ -287,11 +287,6 @@ onMounted(() => {
   }
 }
 
-:deep(.search-dropdown) {
-  scrollbar-width: thin;
-  scrollbar-color: var(--el-color-info-light-8) transparent;
-}
-
 .no-match {
   padding: 8px 16px;
   font-size: 14px;

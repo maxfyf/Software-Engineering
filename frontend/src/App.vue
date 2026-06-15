@@ -1,7 +1,8 @@
 <script setup lang="js">
 import { ref, watch, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
-import { List, Connection, Setting } from "@element-plus/icons-vue";
+import { List, Connection, Setting, Bell } from "@element-plus/icons-vue";
 import { handleLogout, currentUser, isLoggedIn, initUserInfo } from '@/store/user.js'
 
 const route = useRoute()
@@ -9,6 +10,90 @@ const router = useRouter()
 
 // 导航栏选中状态
 const activeMenu = ref('/task')
+
+// TODO：消息通知
+const notifications = ref([
+  {
+    id: 1,
+    text: '您有一条新的系统更新提醒，请及时查看。',
+    needOperation: true,
+    isRead: false,
+  },
+  {
+    id: 2,
+    text: '张三向您发起了协作邀请。',
+    needOperation: true,
+    isRead: false,
+  },
+  {
+    id: 3,
+    text: '您的报告已生成，点击下载。',
+    needOperation: true,
+    isRead: true,
+  },
+  {
+    id: 4,
+    text: '您的报告已生成，点击下载。',
+    needOperation: false,
+    isRead: true,
+  },
+  {
+    id: 5,
+    text: '您的报告已生成，点击下载。',
+    needOperation: false,
+    isRead: false,
+  }
+])
+
+// 未读消息
+const unreadCount = ref(notifications.value.filter(n => !n.isRead).length)
+
+// 接受通知消息（用于转让owner或邀请进入团队，needOperation=true，需发送通知给owner告知结果）
+const handleAccept = (item) => {
+  if (item.isRead) return
+  item.isRead = true
+  updateUnreadCount()
+  ElMessage.success(`已接受：${item.text}`)
+  // TODO
+}
+
+// 拒绝通知消息（用于转让owner或邀请进入团队，needOperation=true，需发送通知给owner告知结果）
+const handleReject = (item) => {
+  if (item.isRead) return
+  item.isRead = true
+  updateUnreadCount()
+  ElMessage.warning(`已拒绝：${item.text}`)
+  // TODO
+}
+
+// 确认通知消息（用于通知团队成员其被分配了新任务/通知团队成员其被owner移出团队/通知原owner其权限转交成功与否/通知owner成员加入或拒绝加入团队，needOperation=false）
+const handleRead = (item) => {
+  if (item.isRead) return
+  item.isRead = true
+  updateUnreadCount()
+  ElMessage.warning(`已确认：${item.text}`)
+  // TODO
+}
+
+// 清空消息
+const clearNotifications = () => {
+  // TODO
+  updateUnreadCount()
+}
+
+// 全部标记为已读
+const markAllAsRead = () => {
+  notifications.value.forEach(n => {
+    if (!n.isRead) n.isRead = true
+  })
+  updateUnreadCount()
+  ElMessage.info('所有通知已标记为已读')
+}
+
+// 更新未读通知数量
+const updateUnreadCount = () => {
+  unreadCount.value = notifications.value.filter(n => !n.isRead).length
+}
 
 // 监听路由变化，更新导航栏选中状态
 watch(() => route.path, (newPath) => {
@@ -85,7 +170,75 @@ const onHandleLogout = async () => {
 
     <!-- 账户信息 -->
     <div class="account">
-      <span v-if="isLoggedIn">
+      <div v-if="isLoggedIn">
+        <el-popover
+            placement="bottom"
+            :width="250"
+            :offset="0"
+            trigger="click"
+            :append-to-body="true"
+            popper-class="second-layer-popover"
+        >
+          <template #reference>
+            <el-badge
+                :value="unreadCount > 99 ? '99+' : (unreadCount > 0 ? unreadCount : '')"
+                class="notifications"
+            >
+              <el-icon>
+                <Bell/>
+              </el-icon>
+            </el-badge>
+          </template>
+
+          <div class="notification-popover">
+            <div class="notification-header">
+              <span class="notification-title">通知</span>
+              <div class="notification-buttons">
+                <el-button link type="primary" @click="clearNotifications" v-if="notifications.length > 0">
+                  清空
+                </el-button>
+                <el-button link type="primary" @click="markAllAsRead" v-if="unreadCount > 0">
+                  全部已读
+                </el-button>
+              </div>
+            </div>
+            <div class="notification-list" v-if="notifications.length">
+              <div
+                  v-for="item in notifications"
+                  :key="item.id"
+                  class="notification-item"
+                  :class="{ unread: !item.isRead }"
+              >
+                <div class="notification-text">{{ item.text }}</div>
+                <div class="notification-actions" v-if="!item.isRead">
+                  <div v-if="item.needOperation">
+                    <el-button size="small" link type="primary" @click="handleAccept(item)">
+                      接受
+                    </el-button>
+                    <el-button size="small" link type="danger" @click="handleReject(item)">
+                      拒绝
+                    </el-button>
+                  </div>
+                  <div v-else>
+                    <el-button size="small" link type="primary" @click="handleRead(item)">
+                      确认
+                    </el-button>
+                  </div>
+                </div>
+                <div class="notification-actions" v-else>
+                  <el-tag size="small" type="info">
+                    <span v-if="item.needOperation">已处理</span>
+                    <span v-else>已确认</span>
+                  </el-tag>
+                </div>
+              </div>
+            </div>
+            <div class="empty-placeholder" v-else>
+              暂无通知
+            </div>
+          </div>
+        </el-popover>
+
         <el-popover
           placement="bottom"
           :width="350"
@@ -122,12 +275,12 @@ const onHandleLogout = async () => {
                   class="logout-button"
                   @click="onHandleLogout"
               >
-              退出登录
-            </el-button>
+                退出登录
+              </el-button>
             </div>
           </div>
         </el-popover>
-      </span>
+      </div>
       <span v-else class="info">
         未登录
       </span>
@@ -185,6 +338,98 @@ const onHandleLogout = async () => {
 
 .route:hover {
   text-shadow: 2px 2px 3px rgba(0,0,0,0.5);
+}
+
+.notifications {
+  color: black;
+  font-size: large;
+  margin-right: 20px;
+}
+
+.notifications:hover {
+  cursor: pointer;
+  text-shadow: 2px 2px 3px rgba(0,0,0,0.5);
+  color: #409eff;
+}
+
+.notification-popover {
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+.notification-header {
+  display: flex;
+  align-items: flex-end;
+  padding: 12px 16px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.notification-title {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.notification-buttons {
+  display: flex;
+  flex-direction: row;
+  margin-left: auto;
+}
+
+.notification-list {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 200px;
+}
+
+:deep(.notification-list) {
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--el-color-info-light-8);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--el-color-info);
+  }
+}
+
+.notification-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s;
+}
+
+.notification-item.unread {
+  background-color: #f0f9ff;
+}
+
+.notification-text {
+  font-size: 14px;
+  color: #303133;
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+
+.notification-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.empty-placeholder {
+  text-align: center;
+  padding: 32px 16px;
+  color: #909399;
+  font-size: 14px;
 }
 
 .account {

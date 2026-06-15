@@ -351,6 +351,7 @@ const saveChanges = async () => {
     }
     newTask.predecessor = newPredecessor.value.slice()
     ElMessage.success('任务创建成功')
+    // TODO: 发送needOperation=false的通知给负责人告知分配任务
   } else {
     // 更新任务
     const idx = scopeTaskList.value.findIndex(t => t.title === newTitle.value && t.id !== taskId.value)
@@ -368,6 +369,7 @@ const saveChanges = async () => {
       await updatePredecessors(taskId.value, predecessorIds)
     }
     ElMessage.success('任务更新成功')
+    // TODO: 如果负责人被更新，发送needOperation=false的通知给新负责人告知分配任务，并删除发送给旧负责人的通知（如未在清空处删除该通知）
   }
 
   // 返回来源页面
