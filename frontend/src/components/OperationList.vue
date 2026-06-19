@@ -1,6 +1,6 @@
 <script setup lang="js">
 import { computed } from "vue";
-import { getUserProfile, userProfileMap } from "@/store/user.js";
+import { getUserProfile, teamList, userProfileMap } from "@/store/user.js";
 
 const props = defineProps({
   route: {
@@ -39,6 +39,12 @@ const isTeamSpace = computed(() => {
   return props.route.fullPath.includes('/space')
 })
 
+const currentTeam = computed(() => {
+  const teamId = Number(props.route.query?.teamId)
+  if (!teamId) return null
+  return teamList.value.find(team => Number(team.id) === teamId) || null
+})
+
 // 表格行样式回调
 const tableRowClassName = () => {
   return ''
@@ -63,16 +69,29 @@ const getObjectText = (object) => {
 
 const formatOperator = (operation) => {
   const operator = operation.operator
-  // TODO: 仿照TaskList，根据操作者是否还在团队中添加‘已离队’
+  if (!operator) return '未知用户'
+  if (isTeamSpace.value && !isCurrentTeamMember(operator)) {
+    return `${operator}（已离队）`
+  }
+  return operator
 }
 
 const hideOperatorDetail = (operation) => {
   const operator = operation.operator
-  //TODO: 返回命题“该operator不在团队中”的布尔值
+  return !operator
+}
+
+const isCurrentTeamMember = (username) => {
+  if (!username || !currentTeam.value) return true
+  const team = currentTeam.value
+  return team.owner === username ||
+      team.admin?.includes(username) ||
+      team.member?.includes(username)
 }
 
 const loadOperatorProfile = async (operation) => {
   const username = operation.operator
+  if (!username || userProfileMap[username]) return
 
   try {
     await getUserProfile(username)
@@ -184,6 +203,33 @@ const getOperatorProfile = (operation) => {
 .operation-table {
   width: 100%;
   box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
+}
+
+.user-detail-popover {
+  z-index: 100;
+}
+
+.user-detail-popover .popover-content {
+  position: relative;
+  z-index: 100;
+}
+
+.assignee:hover {
+  color: #409eff;
+  cursor: pointer;
+}
+
+.popover-title {
+  font-weight: bold;
+  text-align: center;
+}
+
+.popover-info {
+  padding: 3px 10px;
+}
+
+.key {
+  font-weight: bold;
 }
 
 .pagination {
