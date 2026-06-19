@@ -81,6 +81,7 @@ const api = {
     login: (data) => request.post('/user/login', data),
     logout: () => request.post('/user/logout'),
     getUserInfo: () => request.get('/user/info'),
+    updateUserInfo: (data) => request.put('/user/info', data),
     getUserProfile: (username) => request.get('/user/profile', { username }),
     cancelAccount: () => request.delete('/user/cancel'),
 

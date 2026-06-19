@@ -2,47 +2,112 @@
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
 import { ref } from "vue";
 import { useRoute, useRouter } from 'vue-router';
-import { currentUser, handleCancelAccount } from "@/store/user.js";
+import { currentUser, handleCancelAccount, validateEmail, validatePhone } from "@/store/user.js";
 import Route from "@/components/Route.vue";
 import { Edit } from "@element-plus/icons-vue";
+import { ElMessage } from "element-plus";
+import api from "@/request/api.js";
 
 const route = useRoute()
 const router = useRouter()
 
+const originalFirstName = ref('')
+const originalLastName = ref('')
+const originalPhone = ref('')
+const originalEmail = ref('')
+
+const syncUserInfo = (data = {}) => {
+  currentUser.firstName = data.firstName ?? data.first_name ?? currentUser.firstName
+  currentUser.lastName = data.lastName ?? data.last_name ?? currentUser.lastName
+  currentUser.phone = data.phone ?? data.phone_number ?? currentUser.phone
+  currentUser.email = data.email ?? currentUser.email
+}
+
+const updateUserInfo = async (payload) => {
+  const res = await api.updateUserInfo(payload)
+  syncUserInfo(res.data || {})
+}
+
 const editingFirstName = ref(false);
 const editFirstName = () => {
+  originalFirstName.value = currentUser.firstName || ''
   editingFirstName.value = true;
 }
-const updateFirstName = () => {
-  editingFirstName.value = false;
-  // TODO: 将当前的currentUser.firstName作为新名传给后端数据库完成更新
+const updateFirstName = async () => {
+  const nextValue = (currentUser.firstName || '').trim()
+  try {
+    await updateUserInfo({ first_name: nextValue || null })
+    currentUser.firstName = nextValue
+    editingFirstName.value = false
+    ElMessage.success('名已更新')
+  } catch (error) {
+    currentUser.firstName = originalFirstName.value
+  }
 }
 
 const editingLastName = ref(false);
 const editLastName = () => {
+  originalLastName.value = currentUser.lastName || ''
   editingLastName.value = true;
 }
-const updateLastName = () => {
-  editingLastName.value = false;
-  // TODO: 将当前的currentUser.lastName作为新姓传给后端数据库完成更新
+const updateLastName = async () => {
+  const nextValue = (currentUser.lastName || '').trim()
+  try {
+    await updateUserInfo({ last_name: nextValue || null })
+    currentUser.lastName = nextValue
+    editingLastName.value = false
+    ElMessage.success('姓已更新')
+  } catch (error) {
+    currentUser.lastName = originalLastName.value
+  }
 }
 
 const editingPhone = ref(false);
 const editPhone = () => {
+  originalPhone.value = currentUser.phone || ''
   editingPhone.value = true;
 }
-const updatePhone = () => {
-  editingPhone.value = false;
-  // TODO: 检查当前的currentUser.phone是否合法，若合法则作为新电话号码传给后端数据库完成更新，否则恢复原来的电话号码
+const updatePhone = async () => {
+  const nextValue = (currentUser.phone || '').trim()
+  if (!validatePhone(nextValue)) {
+    currentUser.phone = originalPhone.value
+    editingPhone.value = false
+    ElMessage.error('电话号码必须为8位或11位数字')
+    return
+  }
+
+  try {
+    await updateUserInfo({ phone_number: nextValue || null })
+    currentUser.phone = nextValue
+    editingPhone.value = false
+    ElMessage.success('电话号码已更新')
+  } catch (error) {
+    currentUser.phone = originalPhone.value
+  }
 }
 
 const editingEmail = ref(false);
 const editEmail = () => {
+  originalEmail.value = currentUser.email || ''
   editingEmail.value = true;
 }
-const updateEmail = () => {
-  editingEmail.value = false;
-  // TODO: 检查当前的currentUser.email是否合法，若合法则作为新电子邮箱传给后端数据库完成更新，否则恢复原来的电子邮箱
+const updateEmail = async () => {
+  const nextValue = (currentUser.email || '').trim()
+  if (!validateEmail(nextValue)) {
+    currentUser.email = originalEmail.value
+    editingEmail.value = false
+    ElMessage.error('邮箱格式不正确，应为"xxx@xxx.xxx"')
+    return
+  }
+
+  try {
+    await updateUserInfo({ email: nextValue || null })
+    currentUser.email = nextValue
+    editingEmail.value = false
+    ElMessage.success('电子邮箱已更新')
+  } catch (error) {
+    currentUser.email = originalEmail.value
+  }
 }
 
 const onHandleCancelAccount = async () => {
