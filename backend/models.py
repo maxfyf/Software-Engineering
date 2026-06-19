@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Text, DateTime, JSON, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, String, Integer, Text, DateTime, JSON, ForeignKey, UniqueConstraint, Index, func
 from sqlalchemy.orm import relationship
 from datetime import datetime, timedelta, timezone
 import enum
@@ -164,3 +164,18 @@ class OperationLog(Base):
     task_id = Column(Integer, nullable=True, index=True)         # 关联的任务ID
     team_id = Column(Integer, nullable=True, index=True)         # 关联的团队ID（若为团队任务）
     personal_user = Column(String(50), nullable=True, index=True) # 关联的个人用户名（若为个人任务）
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    id = Column(Integer, primary_key=True, index=True)
+    receiver_username = Column(String(50), nullable=False, index=True)
+    sender_username = Column(String(50), nullable=True)
+    text = Column(String(500), nullable=False)
+    type = Column(String(50), nullable=False)
+    need_operation = Column(Boolean, default=False)
+    is_read = Column(Boolean, default=False)
+    metadata = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (Index('ix_notifications_receiver_read', 'receiver_username', 'is_read'),)
