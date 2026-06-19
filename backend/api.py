@@ -19,6 +19,15 @@ import crud
 from models import OperationLog
 from log_service import log_task_operation
 
+from notification_service import (
+    create_notification, get_user_notifications, mark_notification_read,
+    mark_all_read, clear_notifications, accept_notification, reject_notification
+)
+from schemas import NotificationCreate, NotificationOut
+from models import Notification
+import re
+from pydantic import BaseModel, Field, EmailStr, validator
+
 CN_TZ = timezone(timedelta(hours=8))
 
 
@@ -71,6 +80,20 @@ class TaskUpdateRequest(BaseModel):
 class DependencyCreateRequest(BaseModel):
     predecessor_id: int = Field(..., description="前置任务ID")
     successor_id: int = Field(..., description="后继任务ID")   
+
+class UserUpdateRequest(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    email: Optional[EmailStr] = None
+
+    @validator('phone_number')
+    def validate_phone(cls, v):
+        if v is None or v == "":
+            return v
+        if not re.match(r'^\d{8}$|^\d{11}$', v):
+            raise ValueError('手机号必须为8位或11位数字')
+        return v
 
 # ===================== 统一响应格式 =====================
 
@@ -328,9 +351,21 @@ def get_user_info(current_user: User = Depends(get_current_user)):
 @app.delete("/api/user/cancel")
 def cancel_account(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """注销账号"""
-    crud.cancel_account(db, current_user.username)
-    return success_response("账号已注销")
+    success, transferred_tasks = crud.cancel_account(db, current_user.username)
+    if not success:
+        raise HTTPException(status_code=500, detail="注销失败")
 
+    for task in transferred_tasks:
+        create_notification(db, NotificationCreate(
+            receiver_username=task.team.owner_username,
+            sender_username=current_user.username,
+            text=f"用户 {current_user.username} 注销账号，任务「{task.title}」已自动转交给您。",
+            type="task_transferred_to_owner",
+            need_operation=False,
+            metadata={"taskId": task.id, "taskTitle": task.title, "teamId": task.team_id}
+        ))
+
+    return success_response("账号已注销")
 # ===================== 任务模块 =====================
 
 @app.get("/api/task/list")
@@ -445,7 +480,16 @@ def create_task(task: TaskCreateRequest, current_user: User = Depends(get_curren
         team_title=team_title,
         deleted=False
     )
-
+        # ===== 新增：分配负责人通知 =====
+    if db_task.assignee_username:
+        create_notification(db, NotificationCreate(
+            receiver_username=db_task.assignee_username,
+            sender_username=current_user.username,
+            text=f"您被分配为任务「{db_task.title}」的负责人。",
+            type="task_assigned",
+            need_operation=False,
+            metadata={"taskId": db_task.id, "taskTitle": db_task.title}
+        ))
     return success_response("创建成功", serialize_task(db_task))
 
 @app.put("/api/task/{task_id}")
@@ -624,7 +668,52 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
             description=f"修改负责人: {old_assignee or '未分配'} -> {task.assignee_username or '未分配'}",
             object_title=title_snapshot
         )
-
+        
+    new_assignee = task.assignee_username
+    if old_assignee != new_assignee:
+        # 给新负责人发通知
+        if new_assignee:
+            create_notification(db, NotificationCreate(
+                receiver_username=new_assignee,
+                sender_username=current_user.username,
+                text=f"您被分配为任务「{task.title}」的负责人。",
+                type="task_assigned",
+                need_operation=False,
+                metadata={"taskId": task.id, "taskTitle": task.title}
+            ))
+        # 处理旧负责人
+        if old_assignee:
+            # 查找未读的分配通知
+            unread = db.query(Notification).filter(
+                Notification.receiver_username == old_assignee,
+                Notification.type == "task_assigned",
+                Notification.is_read == False
+            ).all()
+            target = None
+            for n in unread:
+                if n.metadata and n.metadata.get("taskId") == task.id:
+                    target = n
+                    break
+            if target:
+                db.delete(target)
+                db.commit()
+            else:
+                # 检查是否有已读的分配通知
+                read = db.query(Notification).filter(
+                    Notification.receiver_username == old_assignee,
+                    Notification.type == "task_assigned",
+                    Notification.is_read == True
+                ).all()
+                has_read = any(n.metadata and n.metadata.get("taskId") == task.id for n in read)
+                if has_read and old_assignee != current_user.username:
+                    create_notification(db, NotificationCreate(
+                        receiver_username=old_assignee,
+                        sender_username=current_user.username,
+                        text=f"您不再是任务「{task.title}」的负责人。",
+                        type="task_unassigned",
+                        need_operation=False,
+                        metadata={"taskId": task.id, "taskTitle": task.title}
+                    ))
     return success_response("更新成功", serialize_task(task))
 
 @app.delete("/api/task/{task_id}")
@@ -716,22 +805,37 @@ def add_member_endpoint(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """添加成员到团队"""
+    """发送加入团队邀请（Owner 专用）"""
     username = request.get("username")
     role = request.get("role", "member")
     
     if not username:
         raise HTTPException(status_code=400, detail="用户名不能为空")
     
-    member, error = crud.add_team_member(db, team_id, username, current_user.username)
-    if error:
-        raise HTTPException(status_code=400, detail=error)
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="团队不存在")
+    if team.owner_username != current_user.username:
+        raise HTTPException(status_code=403, detail="只有 Owner 可发送邀请")
     
-    # 如果指定了 admin 角色，升级权限
-    if role == "admin":
-        crud.update_team_member_role(db, team_id, username, crud.ROLE_ADMIN, current_user.username)
+    user = crud.get_user_by_username(db, username)
+    if not user:
+        raise HTTPException(status_code=400, detail="用户不存在")
+    if crud.get_team_membership(db, team_id, username):
+        raise HTTPException(status_code=400, detail="用户已在团队中")
+    if role not in ["admin", "member"]:
+        raise HTTPException(status_code=400, detail="角色必须为 admin 或 member")
     
-    return success_response("成员添加成功")
+    # 创建邀请通知（不直接加入）
+    create_notification(db, NotificationCreate(
+        receiver_username=username,
+        sender_username=current_user.username,
+        text=f"{current_user.username} 邀请您加入团队「{team.name}」。",
+        type="team_invitation",
+        need_operation=True,
+        metadata={"teamId": team_id, "teamTitle": team.name, "role": role}
+    ))
+    return success_response("邀请已发送")
 
 @app.delete("/api/team/{team_id}/member")
 def remove_member_endpoint(
@@ -744,9 +848,30 @@ def remove_member_endpoint(
     if not username:
         raise HTTPException(status_code=400, detail="用户名不能为空")
 
-    success, error = crud.remove_team_member(db, team_id, username, current_user.username)
+    success, error, transferred_tasks = crud.remove_team_member(db, team_id, username, current_user.username)
     if error:
         raise HTTPException(status_code=400, detail=error)
+
+    team = db.query(Team).filter(Team.id == team_id).first()
+    # 通知被移除者
+    create_notification(db, NotificationCreate(
+        receiver_username=username,
+        sender_username=current_user.username,
+        text=f"您已被移出团队「{team.name}」。",
+        type="team_removed",
+        need_operation=False,
+        metadata={"teamId": team_id, "teamTitle": team.name}
+    ))
+    # 通知 Owner 任务转交
+    for task in transferred_tasks:
+        create_notification(db, NotificationCreate(
+            receiver_username=team.owner_username,
+            sender_username=current_user.username,
+            text=f"成员 {username} 被移出团队，任务「{task.title}」已自动转交给您。",
+            type="task_transferred_to_owner",
+            need_operation=False,
+            metadata={"taskId": task.id, "taskTitle": task.title, "teamId": team_id}
+        ))
 
     return success_response("成员移除成功")
 
@@ -1035,9 +1160,21 @@ def leave_team(
     db: Session = Depends(get_db)
 ):
     """当前用户主动离开团队"""
-    success, error = crud.leave_team(db, team_id, current_user.username)
+    success, error, transferred_tasks = crud.leave_team(db, team_id, current_user.username)
     if not success:
         raise HTTPException(status_code=400, detail=error)
+
+    team = db.query(Team).filter(Team.id == team_id).first()
+    for task in transferred_tasks:
+        create_notification(db, NotificationCreate(
+            receiver_username=team.owner_username,
+            sender_username=current_user.username,
+            text=f"成员 {current_user.username} 主动离开团队，任务「{task.title}」已自动转交给您。",
+            type="task_transferred_to_owner",
+            need_operation=False,
+            metadata={"taskId": task.id, "taskTitle": task.title, "teamId": team_id}
+        ))
+
     return success_response("已离开团队")
 
 # ===================== 操作日志查询 =====================
@@ -1098,3 +1235,107 @@ def get_user_profile(
             "email": user.email
         }
     }
+
+@app.put("/api/user/info")
+def update_user_info(
+    update_data: UserUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    user = current_user
+    if update_data.first_name is not None:
+        user.first_name = update_data.first_name
+    if update_data.last_name is not None:
+        user.last_name = update_data.last_name
+    if update_data.phone_number is not None:
+        user.phone_number = update_data.phone_number
+    if update_data.email is not None:
+        if update_data.email != user.email:
+            existing = db.query(User).filter(User.email == update_data.email, User.username != user.username).first()
+            if existing:
+                raise HTTPException(status_code=400, detail="该邮箱已被其他用户使用")
+        user.email = update_data.email
+    db.commit()
+    db.refresh(user)
+    return success_response("更新成功", {
+        "username": user.username,
+        "firstName": user.first_name,
+        "lastName": user.last_name,
+        "phone": user.phone_number,
+        "email": user.email
+    })
+
+@app.post("/api/team/{team_id}/owner-transfer-request")
+def owner_transfer_request(
+    team_id: int,
+    req: schemas.TransferOwnerRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    team = crud.get_team_by_id(db, team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="团队不存在")
+    if team.owner_username != current_user.username:
+        raise HTTPException(status_code=403, detail="只有 Owner 可发起转让")
+    if req.new_owner_id == current_user.username:
+        raise HTTPException(status_code=400, detail="不能转让给自己")
+    if not crud.get_team_membership(db, team_id, req.new_owner_id):
+        raise HTTPException(status_code=400, detail="新 Owner 不是团队成员")
+    
+    create_notification(db, NotificationCreate(
+        receiver_username=req.new_owner_id,
+        sender_username=current_user.username,
+        text=f"{current_user.username} 请求将团队「{team.name}」的拥有者权限转让给您。",
+        type="owner_transfer_request",
+        need_operation=True,
+        metadata={"teamId": team_id, "teamTitle": team.name, "oldOwner": current_user.username, "newOwner": req.new_owner_id}
+    ))
+    return success_response("转让请求已发送")
+
+@app.get("/api/notification/list")
+def get_notification_list(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    notifs = get_user_notifications(db, current_user.username)
+    result = []
+    for n in notifs:
+        result.append({
+            "id": n.id,
+            "text": n.text,
+            "needOperation": n.need_operation,
+            "isRead": n.is_read,
+            "type": n.type,
+            "sender": n.sender_username,
+            "createdAt": n.created_at.strftime("%Y-%m-%d %H:%M:%S") if n.created_at else None,
+            "metadata": n.metadata
+        })
+    return success_response("获取成功", result)
+
+@app.put("/api/notification/{notification_id}/read")
+def mark_read(notification_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    notif = mark_notification_read(db, notification_id, current_user.username)
+    if not notif:
+        raise HTTPException(status_code=404, detail="通知不存在或无权操作")
+    return success_response("已标记为已读")
+
+@app.put("/api/notification/read-all")
+def read_all(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    mark_all_read(db, current_user.username)
+    return success_response("全部已读")
+
+@app.delete("/api/notification/clear")
+def clear_notifications_endpoint(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    clear_notifications(db, current_user.username)
+    return success_response("清空成功")
+
+@app.post("/api/notification/{notification_id}/accept")
+def accept_notification_endpoint(notification_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    notif, msg = accept_notification(db, notification_id, current_user.username)
+    if not notif:
+        raise HTTPException(status_code=400, detail=msg)
+    return success_response(msg)
+
+@app.post("/api/notification/{notification_id}/reject")
+def reject_notification_endpoint(notification_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    notif, msg = reject_notification(db, notification_id, current_user.username)
+    if not notif:
+        raise HTTPException(status_code=400, detail=msg)
+    return success_response(msg)

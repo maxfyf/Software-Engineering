@@ -317,26 +317,26 @@ def remove_team_member(
     team_id: int,
     member_username: str,
     operator_username: str
-) -> tuple[bool, str | None]:
-    """Owner 移除成员，或成员主动离开团队；失败时返回错误信息。"""
+) -> tuple[bool, str | None, list[models.Task]]:
+    """Owner 移除成员，或成员主动离开团队；失败时返回错误信息。返回 (成功, 错误信息, 转交任务列表)"""
     team = get_team_by_id(db, team_id)
     if not team:
-        return False, "团队不存在"
+        return False, "团队不存在", []
 
     operator_membership = get_team_membership(db, team_id, operator_username)
     if not operator_membership:
-        return False, "团队权限不足"
+        return False, "团队权限不足", []
 
     membership = get_team_membership(db, team_id, member_username)
     if not membership:
-        return False, "团队成员不存在"
+        return False, "团队成员不存在", []
 
     is_self_leave = member_username == operator_username
     if not is_self_leave and operator_membership.role != ROLE_OWNER:
-        return False, "团队权限不足"
+        return False, "团队权限不足", []
     if membership.role == ROLE_OWNER:
         if not is_self_leave:
-            return False, "不能移除 Owner"
+            return False, "不能移除 Owner", []
 
         new_owner = db.query(models.TeamMember).filter(
             models.TeamMember.team_id == team_id,
@@ -356,7 +356,7 @@ def remove_team_member(
                 models.TeamMember.id.asc()
             ).first()
         if not new_owner:
-            return False, "仅含 Owner 的团队不允许退出"
+            return False, "仅含 Owner 的团队不允许退出", []
 
         team.owner_username = new_owner.username
         new_owner.role = ROLE_OWNER
@@ -364,7 +364,8 @@ def remove_team_member(
     else:
         task_assignee_username = team.owner_username
 
-    # 移除成员前，将其负责的未完成团队任务转交给当前 Owner；已完成任务保留历史负责人。
+    # 收集被转交的任务
+    transferred_tasks = []
     assigned_tasks = db.query(models.Task).filter(
         models.Task.team_id == team_id,
         models.Task.assignee_username == member_username,
@@ -373,6 +374,7 @@ def remove_team_member(
     for task in assigned_tasks:
         old_assignee = task.assignee_username
         task.assignee_username = task_assignee_username
+        transferred_tasks.append(task)   # 收集
         reason = f"成员 {member_username} 主动离开团队" if is_self_leave else f"成员 {member_username} 被移出团队"
         _log_task_assignee_change(
             db,
@@ -385,7 +387,7 @@ def remove_team_member(
 
     db.delete(membership)
     db.commit()
-    return True, None
+    return True, None, transferred_tasks
 
 
 def delete_team(
@@ -435,7 +437,9 @@ def delete_team(
 def cancel_account(db: Session, username: str) -> bool:
     """按业务规则注销账号，并清理/迁移与该用户关联的数据。"""
     if not get_user_by_username(db, username):
-        return False
+        return False, []
+    
+    transferred_tasks = []   # 收集所有被转交的任务
 
     # 1. 删除该用户的所有个人任务。
     personal_tasks = db.query(models.Task).filter(
@@ -471,6 +475,7 @@ def cancel_account(db: Session, username: str) -> bool:
     for task in assigned_team_tasks:
         old_assignee = task.assignee_username
         task.assignee_username = task.team.owner_username
+        transferred_tasks.append(task)
         _log_task_assignee_change(
             db,
             operator_username=username,
@@ -479,7 +484,6 @@ def cancel_account(db: Session, username: str) -> bool:
             new_assignee=task.team.owner_username,
             reason=f"用户 {username} 注销账号"
         )
-
     # 4. 对仍然保留的团队任务，如果该用户是创建者，则同步改为团队拥有者，
     #    避免删除用户时留下 owner 外键引用。
     owned_team_tasks = db.query(models.Task).join(
@@ -532,7 +536,7 @@ def cancel_account(db: Session, username: str) -> bool:
         models.User.username == username
     ).delete(synchronize_session=False)
     db.commit()
-    return True
+    return True,transferred_tasks
 
 # 任务相关（创建、查询、更新、删除）
 
@@ -1010,27 +1014,28 @@ def transfer_team_ownership(db: Session, team_id: int, new_owner_username: str, 
     return True, None
 
 def leave_team(
-    db: Session, team_id: int, username: str) -> tuple[bool, str | None]:
-    """用户主动离开团队。如果是 Owner 且团队内还有其他人，则自动选择新 Owner（优先 Admin，否则 Member），并将原 Owner 降为 Admin 后移除（或直接移除并转让所有权）。离开前，将该用户负责的未完成任务转交给团队当前 Owner。"""
+    db: Session, team_id: int, username: str
+) -> tuple[bool, str | None, list[models.Task]]:
+    """用户主动离开团队，返回 (成功, 错误信息, 转交任务列表)"""
     team = get_team_by_id(db, team_id)
     if not team:
-        return False, "团队不存在"
+        return False, "团队不存在", []
+
     membership = get_team_membership(db, team_id, username)
     if not membership:
-        return False, "您不是该团队成员"
+        return False, "您不是该团队成员", []
 
     task_assignee_username = team.owner_username
 
     # 如果是 Owner 离开
     if team.owner_username == username:
-        # 检查是否还有其他成员
         other_members = db.query(models.TeamMember).filter(
             models.TeamMember.team_id == team_id,
             models.TeamMember.username != username
         ).all()
         if not other_members:
-            return False, "团队仅剩您一人，请直接解散团队"
-        # 选择新 Owner：优先 Admin，否则取第一个 Member
+            return False, "团队仅剩您一人，请直接解散团队", []
+
         new_owner_candidate = None
         for m in other_members:
             if m.role == ROLE_ADMIN:
@@ -1039,13 +1044,12 @@ def leave_team(
         if not new_owner_candidate:
             new_owner_candidate = other_members[0]
 
-        # 转让所有权
         team.owner_username = new_owner_candidate.username
-        # 新 owner 角色提升为 Owner
         new_owner_candidate.role = ROLE_OWNER
         task_assignee_username = new_owner_candidate.username
 
-    # 处理任务转交：将该用户负责的未完成任务转给团队 Owner
+    # 收集被转交的任务
+    transferred_tasks = []
     assigned_tasks = db.query(models.Task).filter(
         models.Task.team_id == team_id,
         models.Task.assignee_username == username,
@@ -1054,6 +1058,7 @@ def leave_team(
     for task in assigned_tasks:
         old_assignee = task.assignee_username
         task.assignee_username = task_assignee_username
+        transferred_tasks.append(task)
         _log_task_assignee_change(
             db,
             operator_username=username,
@@ -1063,10 +1068,9 @@ def leave_team(
             reason=f"成员 {username} 主动离开团队"
         )
 
-    # 删除该用户的成员记录
     db.delete(membership)
     db.commit()
-    return True, None
+    return True, None, transferred_tasks
 
 #=============写入操作日志公有函数================
 #供各个业务操作调用，用以生成一条记录。注意本身不执行db.commit()，由调用方根据业务流程决定是否提交事务。
