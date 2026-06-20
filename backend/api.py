@@ -4,19 +4,18 @@ from fastapi import FastAPI, Depends, HTTPException, status, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr, validator
 
-from models import TaskStatus, TaskDependency #补充
+from models import OperationLog, TaskStatus, TaskDependency #补充
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 from collections import deque
 
 from database import get_db, Base, engine
-from models import User, Task, Team, TaskDependency
+from models import User, Task, Team, Notification
 import schemas
 from security import verify_password, get_password_hash, create_access_token
 import crud
-from models import OperationLog
 from log_service import log_task_operation
 
 from notification_service import (
@@ -24,9 +23,8 @@ from notification_service import (
     mark_all_read, clear_notifications, accept_notification, reject_notification
 )
 from schemas import NotificationCreate, NotificationOut
-from models import Notification
 import re
-from pydantic import BaseModel, Field, EmailStr, validator
+
 
 CN_TZ = timezone(timedelta(hours=8))
 
