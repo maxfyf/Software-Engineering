@@ -84,7 +84,9 @@ project_root/                                    # 项目根目录
 │   │   │   ├── layout.js                        # 界面样式数据
 │   │   │   └── user.js                          # 登录用户数据
 │   │   ├── utils/                               # 可复用的工具函数
+│   │   │   ├── profileLoader.js                 # 用户信息加载器
 │   │   │   ├── routeManager.js                  # 二级以上内部路由管理器
+│   │   │   ├── useOperationView.js              # 操作日志界面的通用函数
 │   │   │   ├── useTaskView.js                   # 任务列表界面的通用函数
 │   │   │   └── useTeamView.js                   # 团队列表界面的通用函数
 │   │   ├── views/                               # 界面
