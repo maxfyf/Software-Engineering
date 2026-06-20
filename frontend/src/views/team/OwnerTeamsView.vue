@@ -9,7 +9,7 @@ const isOwner = (team) => team.owner === currentUser.username
 
 <template>
   <TeamViewWrapper
-      v-if="!route.path.includes('/space')"
+      v-if="!route.path.includes('/disbanded') && !route.path.includes('/space')"
       :filter-fn="isOwner"
       :show-new-button="true"
   />

@@ -116,6 +116,11 @@ const router = createRouter({
                                     component: () => import('@/views/OperationView.vue')
                                 }
                             ]
+                        },
+                        {
+                            path: 'disbanded',
+                            name: 'AllDisbandedTeams',
+                            component: () => import('@/views/team/DisbandedTeamsView.vue'),
                         }
                     ]
                 },
@@ -150,6 +155,11 @@ const router = createRouter({
                                     component: () => import('@/views/OperationView.vue')
                                 }
                             ]
+                        },
+                        {
+                            path: 'disbanded',
+                            name: 'OwnerDisbandedTeams',
+                            component: () => import('@/views/team/DisbandedTeamsView.vue'),
                         }
                     ]
                 },

@@ -7,7 +7,7 @@ const route = useRoute();
 
 <template>
   <TeamViewWrapper
-      v-if="!route.path.includes('/space')"
+      v-if="!route.path.includes('/disbanded') && !route.path.includes('/space')"
       :show-new-button="true"
   />
   <router-view v-else />

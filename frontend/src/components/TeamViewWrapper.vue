@@ -4,7 +4,7 @@ import Route from "@/components/Route.vue";
 import Search from "@/components/Search.vue";
 import TeamList from "@/components/TeamList.vue";
 import { useTeamView } from "@/utils/useTeamView.js";
-import { Plus } from "@element-plus/icons-vue";
+import { DeleteFilled, Plus } from "@element-plus/icons-vue";
 import { useRoute, useRouter } from "vue-router";
 
 const props = defineProps({
@@ -25,11 +25,17 @@ const {
   teams,
   dataset,
   createDialogVisible,
+  renameDialogVisible,
   newTeamTitle,
+  renameTeamTitle,
   handleSelect,
   handleNew,
+  handleRename,
   handleCreateTeam,
   handleCancelCreate,
+  handleRenameTeam,
+  handleCancelRename,
+  handleEnterDisbandedTeamsPage,
   handleEnterTeamSpace
 } = useTeamView(props.filterFn)
 </script>
@@ -49,6 +55,11 @@ const {
 
     <div class="main-content-wrapper">
       <div v-if="showNewButton" class="header">
+        <el-button type="primary" class="bin-button" @click="handleEnterDisbandedTeamsPage">
+          <el-icon><DeleteFilled/></el-icon>
+          &nbsp;回收站
+        </el-button>
+
         <el-button type="primary" class="new-button" @click="handleNew">
           <el-icon><Plus/></el-icon>
           &nbsp;新建团队
@@ -57,6 +68,7 @@ const {
 
       <TeamList
           :teams="teams"
+          :handle-rename="handleRename"
           @enter-team-space="handleEnterTeamSpace"
       />
     </div>
@@ -66,7 +78,6 @@ const {
         v-model="createDialogVisible"
         width="500px"
         center
-        :beforeClose="handleCancelCreate"
     >
       <template #header>
         <span class="dialog-title">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;新建团队</span>
@@ -91,6 +102,42 @@ const {
               type="primary"
               class="check"
               @click="handleCreateTeam"
+          >
+            确定
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 重命名团队弹窗 -->
+    <el-dialog
+        v-model="renameDialogVisible"
+        width="500px"
+        center
+    >
+      <template #header>
+        <span class="dialog-title">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;重命名团队</span>
+      </template>
+      <el-input
+          v-model="renameTeamTitle"
+          type="text"
+          placeholder="新团队名"
+          maxlength="10"
+          show-word-limit
+      />
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button
+              type="default"
+              class="cancel"
+              @click="handleCancelRename"
+          >
+            取消
+          </el-button>
+          <el-button
+              type="primary"
+              class="check"
+              @click="handleRenameTeam"
           >
             确定
           </el-button>
@@ -127,6 +174,12 @@ const {
 .header {
   width: 100%;
   display: flex;
+}
+
+.bin-button {
+  width: 90px;
+  margin-left: 25px;
+  margin-right: auto;
 }
 
 .new-button {

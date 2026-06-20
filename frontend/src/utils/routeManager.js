@@ -222,6 +222,12 @@ export const translate = (route) => {
                         default:
                             return ''
                     }
+                case 'disbanded':
+                    if(res.path[2] !== 'all' && res.path[2] !== 'owner') return ''
+                    innerRoute.push('回收站')
+
+                    if(res.path.length > 4) return ''
+                    return innerRoute
                 default:
                     return ''
             }
