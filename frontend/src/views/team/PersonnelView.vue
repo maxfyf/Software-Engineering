@@ -217,7 +217,7 @@ const handleAddMember = async () => {
   const role = newAuthority.value
 
   try {
-    await api.notifyTeamInvitation(teamId.value, username, role)
+    await api.addMember(teamId.value, username, role)
     ElMessage.success('邀请已发送')
     addVisible.value = false
     newUsername.value = ''

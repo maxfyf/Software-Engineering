@@ -9,6 +9,7 @@ import {
   currentUser,
   handleLogout,
   initNotificationList,
+  initTaskList,
   initTeamList,
   initUserInfo,
   isLoggedIn,
@@ -30,7 +31,7 @@ const activeMenu = ref('/task')
 const handleAccept = async (item) => {
   if (item.isRead) return
   await acceptNotification(item.id)
-  await initTeamList(true)
+  await Promise.all([initTeamList(true), initTaskList(true)])
   ElMessage.success(`已接受：${item.text}`)
 }
 

@@ -105,20 +105,6 @@ const api = {
     clearNotifications: () => request.delete('/notification/clear'),
     acceptNotification: (notificationId) => request.post(`/notification/${notificationId}/accept`),
     rejectNotification: (notificationId) => request.post(`/notification/${notificationId}/reject`),
-    notifyTaskAssigned: (taskId, receiver) => request.post('/notification/task-assigned', {
-        task_id: taskId,
-        receiver
-    }),
-    notifyTaskAssigneeChanged: (taskId, oldAssignee, newAssignee) => request.post('/notification/task-assignee-changed', {
-        task_id: taskId,
-        old_assignee: oldAssignee,
-        new_assignee: newAssignee
-    }),
-    notifyTeamInvitation: (teamId, username, role) => request.post('/notification/team-invitation', {
-        team_id: teamId,
-        username,
-        role
-    }),
     requestOwnerTransfer: (teamId, newOwner) => request.post(`/team/${teamId}/owner-transfer-request`, {
         new_owner_id: newOwner
     }),
