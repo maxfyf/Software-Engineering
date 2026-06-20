@@ -4,7 +4,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
-from pydantic import BaseModel, Field, EmailStr, validator
+from pydantic import BaseModel, Field, validator
 
 from models import OperationLog, TaskStatus, TaskDependency #补充
 from typing import Optional
@@ -83,14 +83,22 @@ class UserUpdateRequest(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     phone_number: Optional[str] = None
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
 
     @validator('phone_number')
     def validate_phone(cls, v):
         if v is None or v == "":
             return v
-        if not re.match(r'^\d{8}$|^\d{11}$', v):
+        if not re.match(r'^(\d{8}|\d{11})$', v):
             raise ValueError('手机号必须为8位或11位数字')
+        return v
+
+    @validator('email')
+    def validate_email(cls, v):
+        if v is None or v == "":
+            return v
+        if not re.match(r'^[^@]+@[^@]+\.[^@]+$', v):
+            raise ValueError('邮箱格式不正确')
         return v
 
 # ===================== 统一响应格式 =====================
@@ -689,7 +697,7 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
             ).all()
             target = None
             for n in unread:
-                if n.metadata and n.metadata.get("taskId") == task.id:
+                if n.metadata_ and n.metadata_.get("taskId") == task.id:
                     target = n
                     break
             if target:
@@ -702,7 +710,7 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
                     Notification.type == "task_assigned",
                     Notification.is_read == True
                 ).all()
-                has_read = any(n.metadata and n.metadata.get("taskId") == task.id for n in read)
+                has_read = any(n.metadata_ and n.metadata_.get("taskId") == task.id for n in read)
                 if has_read and old_assignee != current_user.username:
                     create_notification(db, NotificationCreate(
                         receiver_username=old_assignee,
@@ -1303,7 +1311,7 @@ def get_notification_list(current_user: User = Depends(get_current_user), db: Se
             "type": n.type,
             "sender": n.sender_username,
             "createdAt": n.created_at.strftime("%Y-%m-%d %H:%M:%S") if n.created_at else None,
-            "metadata": n.metadata
+            "metadata": n.metadata_
         })
     return success_response("获取成功", result)
 
@@ -1324,16 +1332,25 @@ def clear_notifications_endpoint(current_user: User = Depends(get_current_user),
     clear_notifications(db, current_user.username)
     return success_response("清空成功")
 
+def notification_error_status(msg: str) -> int:
+    if msg == "通知不存在":
+        return 404
+    if msg.startswith("无权"):
+        return 403
+    if msg == "通知已处理":
+        return 409
+    return 400
+
 @app.post("/api/notification/{notification_id}/accept")
 def accept_notification_endpoint(notification_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     notif, msg = accept_notification(db, notification_id, current_user.username)
     if not notif:
-        raise HTTPException(status_code=400, detail=msg)
+        raise HTTPException(status_code=notification_error_status(msg), detail=msg)
     return success_response(msg)
 
 @app.post("/api/notification/{notification_id}/reject")
 def reject_notification_endpoint(notification_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     notif, msg = reject_notification(db, notification_id, current_user.username)
     if not notif:
-        raise HTTPException(status_code=400, detail=msg)
+        raise HTTPException(status_code=notification_error_status(msg), detail=msg)
     return success_response(msg)

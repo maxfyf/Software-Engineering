@@ -10,7 +10,7 @@ def create_notification(db: Session, notification: NotificationCreate) -> Notifi
         text=notification.text,
         type=notification.type,
         need_operation=notification.need_operation,
-        metadata=notification.metadata,
+        metadata_=notification.metadata,
         is_read=False
     )
     db.add(db_notif)
@@ -49,7 +49,7 @@ def accept_notification(db: Session, notif_id: int, username: str):
         db.commit()
         return notif, "已标记已读"
 
-    meta = notif.metadata or {}
+    meta = notif.metadata_ or {}
     if notif.type == "team_invitation":
         team_id = meta.get("teamId")
         role = meta.get("role", "member")
@@ -118,7 +118,7 @@ def reject_notification(db: Session, notif_id: int, username: str):
         notif.is_read = True
         db.commit()
         return notif, "已标记已读"
-    meta = notif.metadata or {}
+    meta = notif.metadata_ or {}
     if notif.type == "team_invitation":
         team_id = meta.get("teamId")
         team = db.query(Team).filter(Team.id == team_id).first()

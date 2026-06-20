@@ -175,7 +175,7 @@ class Notification(Base):
     type = Column(String(50), nullable=False)
     need_operation = Column(Boolean, default=False)
     is_read = Column(Boolean, default=False)
-    metadata = Column(JSON, nullable=True)
+    metadata_ = Column("metadata", JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (Index('ix_notifications_receiver_read', 'receiver_username', 'is_read'),)

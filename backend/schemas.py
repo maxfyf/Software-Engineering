@@ -205,5 +205,5 @@ class NotificationOut(BaseModel):
             type=obj.type,
             sender=obj.sender_username,
             createdAt=obj.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-            metadata=obj.metadata
+            metadata=obj.metadata_
         )
