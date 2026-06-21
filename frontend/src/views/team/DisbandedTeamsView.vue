@@ -30,7 +30,7 @@ const pageData = computed(() => {
 
 const searchData = computed(() => disbandedTeams.value.map(team => ({
   data: team.title,
-  aux: team.disbandedAt ? `解散日期：${team.disbandedAt}` : '',
+  aux: team.disbandedAt ? `解散时间：${team.disbandedAt}` : '',
   id: team.id
 })))
 
@@ -118,13 +118,13 @@ onMounted(async () => {
             />
             <el-table-column
                 prop="createdAt"
-                label="创建日期"
+                label="创建时间"
                 min-width="20%"
                 align="center"
             />
             <el-table-column
                 prop="disbandedAt"
-                label="解散日期"
+                label="解散时间"
                 min-width="20%"
                 align="center"
             />
