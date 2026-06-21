@@ -356,18 +356,19 @@ def get_user_info(current_user: User = Depends(get_current_user)):
 @app.delete("/api/user/cancel")
 def cancel_account(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """注销账号"""
-    success, transferred_tasks = crud.cancel_account(db, current_user.username)
+    username = current_user.username
+    success, transferred_tasks = crud.cancel_account(db, username)
     if not success:
         raise HTTPException(status_code=500, detail="注销失败")
 
-    for task in transferred_tasks:
+    for item in transferred_tasks:
         create_notification(db, NotificationCreate(
-            receiver_username=task.team.owner_username,
-            sender_username=current_user.username,
-            text=f"用户 {current_user.username} 注销账号，任务「{task.title}」已自动转交给您。",
+            receiver_username=item["receiver_username"],
+            sender_username=username,
+            text=f"用户 {username} 注销账号，任务「{item['task_title']}」已自动转交给您。",
             type="task_transferred_to_owner",
             need_operation=False,
-            metadata={"taskId": task.id, "taskTitle": task.title, "teamId": task.team_id}
+            metadata={"taskId": item["task_id"], "taskTitle": item["task_title"], "teamId": item["team_id"]}
         ))
 
     return success_response("账号已注销")

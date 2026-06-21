@@ -565,12 +565,12 @@ def restore_team(
     return team, None, removed_usernames, transferred_tasks
 
 
-def cancel_account(db: Session, username: str) -> bool:
+def cancel_account(db: Session, username: str) -> tuple[bool, list[dict]]:
     """按业务规则注销账号，并清理/迁移与该用户关联的数据。"""
     if not get_user_by_username(db, username):
         return False, []
     
-    transferred_tasks = []   # 收集所有被转交的任务
+    transferred_tasks = []   # 收集通知所需快照，避免删除用户后再访问过期 ORM 对象
 
     # 1. 删除该用户的所有个人任务。
     personal_tasks = db.query(models.Task).filter(
@@ -605,14 +605,20 @@ def cancel_account(db: Session, username: str) -> bool:
     ).all()
     for task in assigned_team_tasks:
         old_assignee = task.assignee_username
-        task.assignee_username = task.team.owner_username
-        transferred_tasks.append(task)
+        receiver_username = task.team.owner_username
+        task.assignee_username = receiver_username
+        transferred_tasks.append({
+            "receiver_username": receiver_username,
+            "task_id": task.id,
+            "task_title": task.title,
+            "team_id": task.team_id
+        })
         _log_task_assignee_change(
             db,
             operator_username=username,
             task=task,
             old_assignee=old_assignee,
-            new_assignee=task.team.owner_username,
+            new_assignee=receiver_username,
             reason=f"用户 {username} 注销账号"
         )
     # 4. 对仍然保留的团队任务，如果该用户是创建者，则同步改为团队拥有者，
@@ -667,7 +673,7 @@ def cancel_account(db: Session, username: str) -> bool:
         models.User.username == username
     ).delete(synchronize_session=False)
     db.commit()
-    return True,transferred_tasks
+    return True, transferred_tasks
 
 # 任务相关（创建、查询、更新、删除）
 
@@ -1193,7 +1199,7 @@ def leave_team(
     assigned_tasks = db.query(models.Task).filter(
         models.Task.team_id == team_id,
         models.Task.assignee_username == username,
-        models.Task.status != "已完成"
+        models.Task.status != models.TaskStatus.DONE.value
     ).all()
     for task in assigned_tasks:
         old_assignee = task.assignee_username
