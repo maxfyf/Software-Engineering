@@ -27,6 +27,7 @@ export function useTeamView(filterFn = null) {
     const createDialogVisible = ref(false)
     const renameDialogVisible = ref(false)
     const currentTeam = ref(null)
+    const renameAfterSuccess = ref(null)
     const newTeamTitle = ref('')
     const renameTeamTitle = ref('')
 
@@ -52,10 +53,11 @@ export function useTeamView(filterFn = null) {
     }
 
     // 重命名团队
-    const handleRename = (team) => {
+    const handleRename = (team, options = {}) => {
         renameDialogVisible.value = true
         currentTeam.value = team
         renameTeamTitle.value = team.title
+        renameAfterSuccess.value = options.afterRename || null
     }
 
     // 确认创建团队
@@ -102,11 +104,17 @@ export function useTeamView(filterFn = null) {
         }
 
         try {
-            await renameTeam(currentTeam.value.id, trimmedTitle)
+            const updatedTeam = await renameTeam(currentTeam.value.id, trimmedTitle)
+            const afterRename = renameAfterSuccess.value
+            const renamedTeam = { ...currentTeam.value, ...updatedTeam, title: updatedTeam?.title || trimmedTitle }
             ElMessage.success('团队已重命名')
             renameDialogVisible.value = false
+            renameAfterSuccess.value = null
             currentTeam.value = null
             renameTeamTitle.value = ''
+            if (afterRename) {
+                await afterRename(renamedTeam)
+            }
         } catch (error) {
             console.error('重命名团队失败:', error)
         }
@@ -116,6 +124,7 @@ export function useTeamView(filterFn = null) {
     const handleCancelRename = () => {
         renameDialogVisible.value = false
         currentTeam.value = null
+        renameAfterSuccess.value = null
         renameTeamTitle.value = ''
     }
 

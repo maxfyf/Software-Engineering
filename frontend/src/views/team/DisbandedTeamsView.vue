@@ -1,5 +1,5 @@
 <script setup lang="js">
-import { computed, inject, onMounted, ref, watch } from "vue";
+import { computed, inject, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
 import Route from "@/components/Route.vue";
@@ -13,41 +13,70 @@ const teamView = inject('teamView', null)
 
 const currentPage = ref(1)
 const pageSize = ref(10)
-const selectedTeam = ref(null)
+const highlightedTeamId = ref(null)
 const searchText = ref("")
+const tableRef = ref(null)
 
 const disbandedTeams = computed(() => teamView?.disbandedTeams?.value || [])
-const filteredTeams = computed(() => {
-  if (!selectedTeam.value) return disbandedTeams.value
-  return disbandedTeams.value.filter(team => Number(team.id) === Number(selectedTeam.value.id))
-})
-const total = computed(() => filteredTeams.value.length)
+const total = computed(() => disbandedTeams.value.length)
 const pageData = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
   const end = start + pageSize.value
-  return filteredTeams.value.slice(start, end)
+  return disbandedTeams.value.slice(start, end)
 })
 
 const searchData = computed(() => disbandedTeams.value.map(team => ({
   data: team.title,
-  aux: team.disbandedAt ? `解散时间：${team.disbandedAt}` : '',
-  id: team.id
+  aux: '',
+  id: team.id,
+  searchText: team.title
 })))
-
 
 watch(searchText, (value) => {
   if (!value) {
-    selectedTeam.value = null
+    highlightedTeamId.value = null
     currentPage.value = 1
   }
 })
+
 const handleCurrentChange = (page) => {
   currentPage.value = page
 }
 
-const handleSelectDisbandedTeam = (item) => {
-  selectedTeam.value = item || null
-  currentPage.value = 1
+const scrollToHighlightedRow = async () => {
+  await nextTick()
+  const row = tableRef.value?.$el?.querySelector('.highlight-row')
+  row?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+}
+
+const handleSelectDisbandedTeam = async (item) => {
+  if (!item) return
+  const index = disbandedTeams.value.findIndex(team => Number(team.id) === Number(item.id))
+  if (index === -1) return
+
+  currentPage.value = Math.floor(index / pageSize.value) + 1
+  highlightedTeamId.value = item.id
+  await scrollToHighlightedRow()
+}
+
+const rowClassName = ({ row }) => {
+  return Number(row.id) === Number(highlightedTeamId.value) ? 'highlight-row' : ''
+}
+
+const isRestoreNameConflict = (error) => {
+  const detail = error?.response?.data?.detail || error?.detail || error?.msg || ''
+  return String(detail).includes('同名团队') || String(detail).includes('重命名后再恢复')
+}
+
+const openRenameThenRestore = (team) => {
+  ElMessage.warning('当前已有同名团队，请先重命名该团队后再恢复')
+  teamView.handleRename(team, {
+    afterRename: async (renamedTeam) => {
+      await teamView.handleRestoreTeam(renamedTeam)
+      highlightedTeamId.value = null
+      currentPage.value = 1
+    }
+  })
 }
 
 const restoreTeam = async (team) => {
@@ -57,8 +86,7 @@ const restoreTeam = async (team) => {
   }
 
   if (teamView.hasActiveTeamTitle(team.title)) {
-    ElMessage.warning('当前已有同名团队，请先重命名该团队后再恢复')
-    teamView.handleRename(team)
+    openRenameThenRestore(team)
     return
   }
 
@@ -73,12 +101,15 @@ const restoreTeam = async (team) => {
         }
     )
     await teamView.handleRestoreTeam(team)
-    selectedTeam.value = null
+    highlightedTeamId.value = null
     currentPage.value = 1
   } catch (error) {
-    if (error !== 'cancel' && error !== 'close') {
-      console.error('恢复团队失败:', error)
+    if (error === 'cancel' || error === 'close') return
+    if (isRestoreNameConflict(error)) {
+      openRenameThenRestore(team)
+      return
     }
+    console.error('恢复团队失败:', error)
   }
 }
 
@@ -105,7 +136,9 @@ onMounted(async () => {
       <el-row>
         <el-col>
           <el-table
+              ref="tableRef"
               :data="pageData"
+              :row-class-name="rowClassName"
               empty-text="暂无解散的团队"
               stripe
               class="disbanded-teams-table"
@@ -192,6 +225,14 @@ onMounted(async () => {
 .disbanded-teams-table {
   width: 100%;
   box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
+}
+
+.disbanded-teams-table :deep(.highlight-row) {
+  background-color: #ecf5ff !important;
+}
+
+.disbanded-teams-table :deep(.highlight-row td) {
+  background-color: #ecf5ff !important;
 }
 
 .pagination {

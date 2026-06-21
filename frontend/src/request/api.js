@@ -37,6 +37,11 @@ service.interceptors.response.use(
         const detail = error.response?.data?.detail
         const msg = error.response?.data?.msg
         const isLoginRequest = error.config.url.includes('/user/login')
+        const silentError = error.config?.silentError === true
+
+        if (silentError) {
+            return Promise.reject(error)
+        }
 
         if (status === 401) {
             if (isLoginRequest) {
@@ -69,9 +74,9 @@ service.interceptors.response.use(
 
 const request = {
     get: (url, params = {}) => service.get(url, { params }),
-    post: (url, data = {}) => service.post(url, data),
-    put: (url, data = {}) => service.put(url, data),
-    delete: (url, params = {}) => service.delete(url, { params })
+    post: (url, data = {}, config = {}) => service.post(url, data, config),
+    put: (url, data = {}, config = {}) => service.put(url, data, config),
+    delete: (url, params = {}, config = {}) => service.delete(url, { params, ...config })
 }
 
 // API 接口封装
@@ -114,7 +119,7 @@ const api = {
     getDisbandedTeams: () => request.get('/team/disbanded'),
     createTeam: (data) => request.post('/team/create', data),
     renameTeam: (teamId, title) => request.put(`/team/${teamId}/rename`, { title }),
-    restoreTeam: (teamId) => request.post(`/team/${teamId}/restore`),
+    restoreTeam: (teamId) => request.post(`/team/${teamId}/restore`, {}, { silentError: true }),
     deleteTeam: (teamId) => request.delete(`/team/${teamId}`),
     addMember: (teamId, username, role) => request.post(`/team/${teamId}/member`, { username, role }),
     removeMember: (teamId, username) => request.delete(`/team/${teamId}/member`, { username }),
