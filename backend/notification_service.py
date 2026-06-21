@@ -38,7 +38,7 @@ def clear_notifications(db: Session, username: str):
     db.commit()
 
 def accept_notification(db: Session, notif_id: int, username: str):
-    from crud import add_team_member, update_team_member_role, transfer_team_ownership
+    from crud import ROLE_ADMIN, add_team_member, get_team_by_id, update_team_member_role, transfer_team_ownership
     notif = db.query(Notification).filter(Notification.id == notif_id, Notification.receiver_username == username).first()
     if not notif:
         return None, "通知不存在"
@@ -53,7 +53,7 @@ def accept_notification(db: Session, notif_id: int, username: str):
     if notif.type == "team_invitation":
         team_id = meta.get("teamId")
         role = meta.get("role", "member")
-        team = db.query(Team).filter(Team.id == team_id).first()
+        team = get_team_by_id(db, team_id)
         if not team:
             return None, "团队不存在"
         if db.query(TeamMember).filter(TeamMember.team_id == team_id, TeamMember.username == username).first():
@@ -63,7 +63,9 @@ def accept_notification(db: Session, notif_id: int, username: str):
         if error:
             return None, error
         if role == "admin":
-            update_team_member_role(db, team_id, username, "admin", team.owner_username)
+            _, role_error = update_team_member_role(db, team_id, username, ROLE_ADMIN, team.owner_username)
+            if role_error:
+                return None, role_error
         notif.is_read = True
         db.commit()
         if notif.sender_username:
@@ -83,7 +85,7 @@ def accept_notification(db: Session, notif_id: int, username: str):
         new_owner = meta.get("newOwner")
         if username != new_owner:
             return None, "无权接受此转让"
-        team = db.query(Team).filter(Team.id == team_id).first()
+        team = get_team_by_id(db, team_id)
         if not team:
             return None, "团队不存在"
         if team.owner_username != old_owner:

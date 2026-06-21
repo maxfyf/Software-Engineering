@@ -69,6 +69,7 @@ class Team(Base):
     owner_username = Column(String(20), ForeignKey("users.username"), nullable=False)
     created_at = Column(DateTime, default=now_cn)
     updated_at = Column(DateTime, default=now_cn, onupdate=now_cn)
+    disbanded_at = Column(DateTime, nullable=True, index=True)
 
     owner = relationship("User", back_populates="owned_teams", foreign_keys=[owner_username])
     members = relationship("TeamMember", back_populates="team", cascade="all, delete-orphan")
