@@ -1,6 +1,7 @@
 <script setup lang="js">
-import { computed, ref } from "vue";
+import { computed, inject, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { ElMessage, ElMessageBox } from "element-plus";
 import Route from "@/components/Route.vue";
 import Search from "@/components/Search.vue";
 import HeaderWrapper from "@/components/HeaderWrapper.vue";
@@ -8,34 +9,82 @@ import { handleBack } from "@/utils/routeManager.js";
 
 const route = useRoute()
 const router = useRouter()
+const teamView = inject('teamView', null)
 
-//TODO
-const disbandedTeams = []
-const total = computed(() => disbandedTeams.length)
 const currentPage = ref(1)
 const pageSize = ref(10)
+const selectedTeam = ref(null)
+const searchText = ref("")
+
+const disbandedTeams = computed(() => teamView?.disbandedTeams?.value || [])
+const filteredTeams = computed(() => {
+  if (!selectedTeam.value) return disbandedTeams.value
+  return disbandedTeams.value.filter(team => Number(team.id) === Number(selectedTeam.value.id))
+})
+const total = computed(() => filteredTeams.value.length)
 const pageData = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
   const end = start + pageSize.value
-  return disbandedTeams.slice(start, end)
+  return filteredTeams.value.slice(start, end)
 })
 
+const searchData = computed(() => disbandedTeams.value.map(team => ({
+  data: team.title,
+  aux: team.disbandedAt ? `解散日期：${team.disbandedAt}` : '',
+  id: team.id
+})))
+
+
+watch(searchText, (value) => {
+  if (!value) {
+    selectedTeam.value = null
+    currentPage.value = 1
+  }
+})
 const handleCurrentChange = (page) => {
-  // TODO
+  currentPage.value = page
 }
 
-const searchData = []    // TODO: 搜索框数组
-const handleSelectDisbandedTeam = () => {
-  // TODO: 搜索框搜索函数
+const handleSelectDisbandedTeam = (item) => {
+  selectedTeam.value = item || null
+  currentPage.value = 1
 }
 
-const restoreTeam = (team) => {
-  /* TODO: 首先检查是否有别的团队与该解散的团队重名，如有，则需调用TeamViewWrapper中创建的useTeamView对象中的
-           handleRename(currentName)函数，要求重命名该团队后再恢复。完成恢复后需要去除disbandedAt属性（解散日期），
-           并对所有团队中的其他成员，如果其未读解散该团队时发送的通知，则删除该通知；如果其已读解散该团队是发送的通知，则
-           发送一条新的通知告知该团队已恢复
-   */
+const restoreTeam = async (team) => {
+  if (!teamView) {
+    ElMessage.error('回收站状态未初始化')
+    return
+  }
+
+  if (teamView.hasActiveTeamTitle(team.title)) {
+    ElMessage.warning('当前已有同名团队，请先重命名该团队后再恢复')
+    teamView.handleRename(team)
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+        `确定要恢复团队"${team.title}"吗？`,
+        '',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: undefined
+        }
+    )
+    await teamView.handleRestoreTeam(team)
+    selectedTeam.value = null
+    currentPage.value = 1
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') {
+      console.error('恢复团队失败:', error)
+    }
+  }
 }
+
+onMounted(async () => {
+  await teamView?.loadDisbandedTeams(true)
+})
 </script>
 
 <template>
@@ -47,7 +96,7 @@ const restoreTeam = (team) => {
         </div>
 
         <div class="search-wrapper">
-          <Search :dataset="searchData" :onSelect="handleSelectDisbandedTeam" />
+          <Search v-model="searchText" :dataset="searchData" :onSelect="handleSelectDisbandedTeam" />
         </div>
       </div>
     </template>

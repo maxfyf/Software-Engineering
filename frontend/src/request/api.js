@@ -111,7 +111,10 @@ const api = {
 
     // 团队模块
     getTeamList: () => request.get('/team/list'),
+    getDisbandedTeams: () => request.get('/team/disbanded'),
     createTeam: (data) => request.post('/team/create', data),
+    renameTeam: (teamId, title) => request.put(`/team/${teamId}/rename`, { title }),
+    restoreTeam: (teamId) => request.post(`/team/${teamId}/restore`),
     deleteTeam: (teamId) => request.delete(`/team/${teamId}`),
     addMember: (teamId, username, role) => request.post(`/team/${teamId}/member`, { username, role }),
     removeMember: (teamId, username) => request.delete(`/team/${teamId}/member`, { username }),

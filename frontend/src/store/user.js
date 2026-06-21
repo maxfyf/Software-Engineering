@@ -94,6 +94,9 @@ export const taskList = ref([])
 // 当前用户的团队列表
 export const teamList = ref([])
 
+// 当前用户可恢复的已解散团队列表
+export const disbandedTeamList = ref([])
+
 // 当前用户的通知列表
 export const notifications = ref([])
 
@@ -108,6 +111,7 @@ export const resetTaskList = () => {
 // 重置团队列表
 export const resetTeamList = () => {
     teamList.value = []
+    disbandedTeamList.value = []
 }
 
 // 重置通知列表
@@ -311,6 +315,51 @@ export const addTeam = async (team) => {
         console.error('创建团队失败:', error)
         throw error
     }
+}
+
+export const renameTeam = async (teamId, title) => {
+    const res = await api.renameTeam(teamId, title)
+    const updatedTeam = res.data
+    const updateList = (list) => {
+        const index = list.findIndex(t => Number(t.id) === Number(teamId))
+        if (index !== -1) {
+            list[index] = {
+                ...list[index],
+                ...updatedTeam,
+                title: updatedTeam?.title || title
+            }
+        }
+    }
+    updateList(teamList.value)
+    updateList(disbandedTeamList.value)
+    return updatedTeam
+}
+
+export const initDisbandedTeamList = async (force = false) => {
+    if (!force && disbandedTeamList.value.length > 0) {
+        return
+    }
+    try {
+        const res = await api.getDisbandedTeams()
+        disbandedTeamList.value = res.data || []
+    } catch (error) {
+        console.error('获取已解散团队列表失败:', error)
+        disbandedTeamList.value = []
+    }
+}
+
+export const restoreTeam = async (teamId) => {
+    const res = await api.restoreTeam(teamId)
+    const restoredTeam = res.data
+    const index = disbandedTeamList.value.findIndex(t => Number(t.id) === Number(teamId))
+    if (index !== -1) {
+        disbandedTeamList.value.splice(index, 1)
+    }
+    if (restoredTeam && !teamList.value.some(t => Number(t.id) === Number(restoredTeam.id))) {
+        teamList.value.push(restoredTeam)
+    }
+    await initTeamList(true)
+    return restoredTeam
 }
 
 // 初始化任务列表

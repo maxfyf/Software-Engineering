@@ -1,5 +1,5 @@
 import { ref, computed, onMounted } from 'vue'
-import { teamList, highlightTeamId, addTeam, initTeamList } from '@/store/user.js'
+import { teamList, disbandedTeamList, highlightTeamId, addTeam, initTeamList, initDisbandedTeamList, renameTeam, restoreTeam } from '@/store/user.js'
 import { useRoute, useRouter } from 'vue-router'
 import { handleEnter } from "@/utils/routeManager.js";
 import { ElMessage } from 'element-plus';
@@ -90,7 +90,6 @@ export function useTeamView(filterFn = null) {
 
     // 确认重命名团队
     const handleRenameTeam = async () => {
-        console.log('handleRenameTeam')
         if (!renameTeamTitle.value || renameTeamTitle.value.trim() === '') {
             ElMessage.error('新团队名称不能为空')
             return
@@ -103,7 +102,8 @@ export function useTeamView(filterFn = null) {
         }
 
         try {
-            // TODO: 调API
+            await renameTeam(currentTeam.value.id, trimmedTitle)
+            ElMessage.success('团队已重命名')
             renameDialogVisible.value = false
             currentTeam.value = null
             renameTeamTitle.value = ''
@@ -114,12 +114,25 @@ export function useTeamView(filterFn = null) {
 
     // 取消重命名团队
     const handleCancelRename = () => {
-        console.log('handleCancelRename')
         renameDialogVisible.value = false
         currentTeam.value = null
         renameTeamTitle.value = ''
     }
 
+    const disbandedTeams = computed(() => disbandedTeamList.value)
+
+    const activeTeamTitleSet = computed(() => new Set(teamList.value.map(team => team.title)))
+
+    const hasActiveTeamTitle = (title) => activeTeamTitleSet.value.has(title)
+
+    const loadDisbandedTeams = async (force = false) => {
+        await initDisbandedTeamList(force)
+    }
+
+    const handleRestoreTeam = async (team) => {
+        await restoreTeam(team.id)
+        ElMessage.success(`团队「${team.title}」已恢复`)
+    }
     // 进入回收站
     const handleEnterDisbandedTeamsPage = () => {
         const newPage = {
@@ -151,6 +164,10 @@ export function useTeamView(filterFn = null) {
         renameDialogVisible,
         newTeamTitle,
         renameTeamTitle,
+        disbandedTeams,
+        hasActiveTeamTitle,
+        loadDisbandedTeams,
+        handleRestoreTeam,
         handleSelect,
         handleNew,
         handleRename,

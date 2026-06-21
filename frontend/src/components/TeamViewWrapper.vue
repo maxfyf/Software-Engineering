@@ -5,6 +5,7 @@ import Search from "@/components/Search.vue";
 import TeamList from "@/components/TeamList.vue";
 import { useTeamView } from "@/utils/useTeamView.js";
 import { DeleteFilled, Plus } from "@element-plus/icons-vue";
+import { computed, provide } from 'vue';
 import { useRoute, useRouter } from "vue-router";
 
 const props = defineProps({
@@ -20,6 +21,9 @@ const props = defineProps({
 
 const route = useRoute()
 const router = useRouter()
+
+const teamView = useTeamView(props.filterFn)
+provide('teamView', teamView)
 
 const {
   teams,
@@ -37,11 +41,13 @@ const {
   handleCancelRename,
   handleEnterDisbandedTeamsPage,
   handleEnterTeamSpace
-} = useTeamView(props.filterFn)
+} = teamView
+
+const isNestedPage = computed(() => route.path.includes('/disbanded') || route.path.includes('/space'))
 </script>
 
 <template>
-  <HeaderWrapper>
+  <HeaderWrapper v-if="!isNestedPage">
     <template #header>
       <div class="inner-header">
         <div class="route-wrapper">
@@ -72,79 +78,81 @@ const {
           @enter-team-space="handleEnterTeamSpace"
       />
     </div>
-
-    <!-- 新建团队弹窗 -->
-    <el-dialog
-        v-model="createDialogVisible"
-        width="500px"
-        center
-    >
-      <template #header>
-        <span class="dialog-title">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;新建团队</span>
-      </template>
-      <el-input
-          v-model="newTeamTitle"
-          type="text"
-          placeholder="团队名"
-          maxlength="10"
-          show-word-limit
-      />
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button
-              type="default"
-              class="cancel"
-              @click="handleCancelCreate"
-          >
-            取消
-          </el-button>
-          <el-button
-              type="primary"
-              class="check"
-              @click="handleCreateTeam"
-          >
-            确定
-          </el-button>
-        </div>
-      </template>
-    </el-dialog>
-
-    <!-- 重命名团队弹窗 -->
-    <el-dialog
-        v-model="renameDialogVisible"
-        width="500px"
-        center
-    >
-      <template #header>
-        <span class="dialog-title">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;重命名团队</span>
-      </template>
-      <el-input
-          v-model="renameTeamTitle"
-          type="text"
-          placeholder="新团队名"
-          maxlength="10"
-          show-word-limit
-      />
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button
-              type="default"
-              class="cancel"
-              @click="handleCancelRename"
-          >
-            取消
-          </el-button>
-          <el-button
-              type="primary"
-              class="check"
-              @click="handleRenameTeam"
-          >
-            确定
-          </el-button>
-        </div>
-      </template>
-    </el-dialog>
   </HeaderWrapper>
+
+  <router-view v-else />
+
+  <!-- 新建团队弹窗 -->
+  <el-dialog
+      v-model="createDialogVisible"
+      width="500px"
+      center
+  >
+    <template #header>
+      <span class="dialog-title">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;新建团队</span>
+    </template>
+    <el-input
+        v-model="newTeamTitle"
+        type="text"
+        placeholder="团队名"
+        maxlength="10"
+        show-word-limit
+    />
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button
+            type="default"
+            class="cancel"
+            @click="handleCancelCreate"
+        >
+          取消
+        </el-button>
+        <el-button
+            type="primary"
+            class="check"
+            @click="handleCreateTeam"
+        >
+          确定
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
+
+  <!-- 重命名团队弹窗 -->
+  <el-dialog
+      v-model="renameDialogVisible"
+      width="500px"
+      center
+  >
+    <template #header>
+      <span class="dialog-title">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;重命名团队</span>
+    </template>
+    <el-input
+        v-model="renameTeamTitle"
+        type="text"
+        placeholder="新团队名"
+        maxlength="10"
+        show-word-limit
+    />
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button
+            type="default"
+            class="cancel"
+            @click="handleCancelRename"
+        >
+          取消
+        </el-button>
+        <el-button
+            type="primary"
+            class="check"
+            @click="handleRenameTeam"
+        >
+          确定
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped>
