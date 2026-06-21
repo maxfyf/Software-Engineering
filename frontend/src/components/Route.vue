@@ -1,8 +1,9 @@
 <script setup lang="js">
-import { computed, ref, onMounted, nextTick } from "vue";
+import { computed, ref, onMounted, nextTick, watch } from "vue";
 import { translate, handleBack } from "@/utils/routeManager.js"
 import { Back, MoreFilled } from "@element-plus/icons-vue";
 import { contentWidth } from "@/store/layout.js";
+import { taskList, teamList } from "@/store/user.js";
 
 const props = defineProps({
   route: {
@@ -86,10 +87,6 @@ const computeVisibleRoute = async () => {
   return true
 }
 
-onMounted(async () => {
-  collapse.value = await computeVisibleRoute()
-})
-
 const refreshRoute = async () => {
   innerRoute.value = translate(props.route)
   routeWidths.value = []
@@ -98,6 +95,19 @@ const refreshRoute = async () => {
   visibleRoute.value = []
   collapse.value = await computeVisibleRoute()
 }
+
+onMounted(refreshRoute)
+
+watch(
+  [
+    () => props.route.fullPath,
+    () => taskList.value.map(task => `${task.id}:${task.title}:${task.team || ''}`).join('|'),
+    () => teamList.value.map(team => `${team.id}:${team.title}`).join('|'),
+    () => maxWidth.value
+  ],
+  refreshRoute
+)
+
 defineExpose({ refreshRoute })
 
 const handleCommand = (index) => {
