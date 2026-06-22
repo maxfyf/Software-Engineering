@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from collections import deque
 
 from database import get_db, Base, engine
-from models import User, Task, Team, Notification
+from models import User, Task, Team, TeamMember, Notification
 import schemas
 from security import verify_password, get_password_hash, create_access_token
 import crud
@@ -38,7 +38,6 @@ def format_cn_datetime(value):
 
 # ===================== 初始化数据库 =====================
 Base.metadata.create_all(bind=engine)
-
 # ===================== 创建应用 =====================
 app = FastAPI(title="协作式任务管理系统 API")
 
@@ -130,7 +129,7 @@ def get_team_id_by_name(db: Session, name: str) -> int | None:
     """根据团队名称查询团队 ID"""
     if not name:
         return None
-    team = db.query(Team).filter(Team.name == name).first()
+    team = db.query(Team).filter(Team.name == name, Team.disbanded_at.is_(None)).first()
     return team.id if team else None
 
 def find_top_unfinished_predecessor(db: Session, task_id: int, predecessor_ids: list[int] | None = None):
@@ -357,18 +356,19 @@ def get_user_info(current_user: User = Depends(get_current_user)):
 @app.delete("/api/user/cancel")
 def cancel_account(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """注销账号"""
-    success, transferred_tasks = crud.cancel_account(db, current_user.username)
+    username = current_user.username
+    success, transferred_tasks = crud.cancel_account(db, username)
     if not success:
         raise HTTPException(status_code=500, detail="注销失败")
 
-    for task in transferred_tasks:
+    for item in transferred_tasks:
         create_notification(db, NotificationCreate(
-            receiver_username=task.team.owner_username,
-            sender_username=current_user.username,
-            text=f"用户 {current_user.username} 注销账号，任务「{task.title}」已自动转交给您。",
+            receiver_username=item["receiver_username"],
+            sender_username=username,
+            text=f"用户 {username} 注销账号，任务「{item['task_title']}」已自动转交给您。",
             type="task_transferred_to_owner",
             need_operation=False,
-            metadata={"taskId": task.id, "taskTitle": task.title, "teamId": task.team_id}
+            metadata={"taskId": item["task_id"], "taskTitle": item["task_title"], "teamId": item["team_id"]}
         ))
 
     return success_response("账号已注销")
@@ -764,13 +764,22 @@ def serialize_team(team):
         "title": team.name,
         "owner": team.owner_username,
         "admin": admins,
-        "member": members
+        "member": members,
+        "createdAt": format_cn_datetime(team.created_at),
+        "disbandedAt": format_cn_datetime(team.disbanded_at)
     }
 
 @app.get("/api/team/list")
 def get_team_list(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """获取当前用户加入的所有团队"""
     teams = crud.get_user_teams(db, current_user.username)
+    return success_response("获取成功", [serialize_team(team) for team in teams])
+
+
+@app.get("/api/team/disbanded")
+def get_disbanded_team_list(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """获取当前用户拥有的已解散团队。"""
+    teams = crud.get_disbanded_teams(db, current_user.username)
     return success_response("获取成功", [serialize_team(team) for team in teams])
 
 @app.post("/api/team/create")
@@ -785,12 +794,67 @@ def create_team_endpoint(request: dict, current_user: User = Depends(get_current
         raise HTTPException(status_code=400, detail="团队名称长度不能超过10个字符")
 
     # 检查是否已存在同名团队
-    existing_team = db.query(Team).filter(Team.name == title).first()
+    existing_team = db.query(Team).filter(Team.name == title, Team.disbanded_at.is_(None)).first()
     if existing_team:
         raise HTTPException(status_code=400, detail="团队名称已存在，请使用其他名称")
 
     team = crud.create_team(db, schemas.TeamCreate(name=title), current_user.username)
     return success_response("团队创建成功", serialize_team(team))
+
+
+def get_existing_team_member_usernames(db: Session, team_id: int) -> list[str]:
+    """返回团队中账号仍存在的非 Owner 成员用户名。"""
+    rows = db.query(TeamMember.username).join(User, TeamMember.username == User.username).filter(
+        TeamMember.team_id == team_id,
+        TeamMember.role != crud.ROLE_OWNER
+    ).all()
+    return [row[0] for row in rows]
+
+def notify_team_disbanded(db: Session, team: Team, operator_username: str):
+    for username in get_existing_team_member_usernames(db, team.id):
+        create_notification(db, NotificationCreate(
+            receiver_username=username,
+            sender_username=operator_username,
+            text=f"团队「{team.name}」已解散。",
+            type="team_disbanded",
+            need_operation=False,
+            metadata={"teamId": team.id, "teamTitle": team.name}
+        ))
+
+def handle_team_restored_notifications(db: Session, team: Team, operator_username: str):
+    """恢复团队时处理成员消息。
+
+    如果成员尚未确认团队解散通知，删除那条未读解散通知即可；
+    如果成员已经确认过团队解散通知，再额外发送团队恢复通知。
+    """
+    for username in get_existing_team_member_usernames(db, team.id):
+        candidate_notifs = db.query(Notification).filter(
+            Notification.receiver_username == username,
+            Notification.type == "team_disbanded",
+        ).all()
+        disband_notifs = [
+            item for item in candidate_notifs
+            if isinstance(item.metadata_, dict) and str(item.metadata_.get("teamId")) == str(team.id)
+        ]
+        has_read_disband_notice = any(item.is_read for item in disband_notifs)
+
+        for item in disband_notifs:
+            if not item.is_read:
+                db.delete(item)
+
+        if not has_read_disband_notice:
+            continue
+
+        create_notification(db, NotificationCreate(
+            receiver_username=username,
+            sender_username=operator_username,
+            text=f"团队「{team.name}」已恢复。",
+            type="team_restored",
+            need_operation=False,
+            metadata={"teamId": team.id, "teamTitle": team.name}
+        ))
+    db.commit()
+
 
 @app.delete("/api/team/{team_id}")
 def delete_team_endpoint(team_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -802,7 +866,42 @@ def delete_team_endpoint(team_id: int, current_user: User = Depends(get_current_
         raise HTTPException(status_code=403, detail="只有拥有者可解散团队")
     
     crud.delete_team(db, team_id, operator_username=current_user.username)
+    notify_team_disbanded(db, team, current_user.username)
     return success_response("团队已解散")
+
+
+@app.put("/api/team/{team_id}/rename")
+def rename_team_endpoint(team_id: int, request: dict, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """重命名团队，支持未解散和已解散团队。"""
+    team, error = crud.rename_team(db, team_id, request.get("title"), current_user.username)
+    if error:
+        status_code = 404 if error == "团队不存在" else 403 if error.startswith("只有") else 400
+        raise HTTPException(status_code=status_code, detail=error)
+    return success_response("团队已重命名", serialize_team(team))
+
+@app.post("/api/team/{team_id}/restore")
+def restore_team_endpoint(team_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """恢复已解散团队。"""
+    team, error, removed_usernames, transferred_tasks = crud.restore_team(db, team_id, current_user.username)
+    if error:
+        status_code = 404 if error == "团队不存在" else 403 if error.startswith("只有") else 400
+        raise HTTPException(status_code=status_code, detail=error)
+
+    handle_team_restored_notifications(db, team, current_user.username)
+
+    for former_username, task in transferred_tasks:
+        create_notification(db, NotificationCreate(
+            receiver_username=team.owner_username,
+            sender_username=former_username,
+            text=f"用户 {former_username} 注销账号，任务「{task.title}」已自动转交给您。",
+            type="task_transferred_to_owner",
+            need_operation=False,
+            metadata={"taskId": task.id, "taskTitle": task.title, "teamId": team_id}
+        ))
+
+    data = serialize_team(team)
+    data["removedMembers"] = removed_usernames
+    return success_response("团队已恢复", data)
 
 @app.post("/api/team/{team_id}/member")
 def add_member_endpoint(
@@ -818,7 +917,7 @@ def add_member_endpoint(
     if not username:
         raise HTTPException(status_code=400, detail="用户名不能为空")
     
-    team = db.query(Team).filter(Team.id == team_id).first()
+    team = crud.get_team_by_id(db, team_id)
     if not team:
         raise HTTPException(status_code=404, detail="团队不存在")
     if team.owner_username != current_user.username:
@@ -858,7 +957,7 @@ def remove_member_endpoint(
     if error:
         raise HTTPException(status_code=400, detail=error)
 
-    team = db.query(Team).filter(Team.id == team_id).first()
+    team = crud.get_team_by_id(db, team_id)
     # 通知被移除者
     create_notification(db, NotificationCreate(
         receiver_username=username,
@@ -1170,7 +1269,7 @@ def leave_team(
     if not success:
         raise HTTPException(status_code=400, detail=error)
 
-    team = db.query(Team).filter(Team.id == team_id).first()
+    team = crud.get_team_by_id(db, team_id)
     for task in transferred_tasks:
         create_notification(db, NotificationCreate(
             receiver_username=team.owner_username,

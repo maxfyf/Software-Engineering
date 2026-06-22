@@ -103,9 +103,12 @@ def authenticate_user(db: Session, username: str, password: str) -> tuple[models
 
 # 团队与成员管理相关
 
-def get_team_by_id(db: Session, team_id: int) -> models.Team | None:
-    """根据团队ID查询团队"""
-    return db.query(models.Team).filter(models.Team.id == team_id).first()
+def get_team_by_id(db: Session, team_id: int, include_disbanded: bool = False) -> models.Team | None:
+    """根据团队ID查询团队；默认只返回未解散团队。"""
+    query = db.query(models.Team).filter(models.Team.id == team_id)
+    if not include_disbanded:
+        query = query.filter(models.Team.disbanded_at.is_(None))
+    return query.first()
 
 def get_team_membership(db: Session, team_id: int, username: str) -> models.TeamMember | None:
     """查询用户在指定团队中的成员身份"""
@@ -238,10 +241,18 @@ def create_team(db: Session, team: schemas.TeamCreate, username: str) -> models.
     return db_team
 
 def get_user_teams(db: Session, username: str) -> list[models.Team]:
-    """获取当前用户加入的团队"""
+    """获取当前用户加入且未解散的团队。"""
     return db.query(models.Team).join(models.TeamMember).filter(
-        models.TeamMember.username == username
+        models.TeamMember.username == username,
+        models.Team.disbanded_at.is_(None)
     ).all()
+
+def get_disbanded_teams(db: Session, username: str) -> list[models.Team]:
+    """获取当前用户拥有的已解散团队。"""
+    return db.query(models.Team).filter(
+        models.Team.owner_username == username,
+        models.Team.disbanded_at.isnot(None)
+    ).order_by(models.Team.disbanded_at.desc(), models.Team.id.desc()).all()
 
 def get_team_members(
     db: Session,
@@ -390,18 +401,15 @@ def remove_team_member(
     return True, None, transferred_tasks
 
 
-def delete_team(
+def hard_delete_team(
     db: Session,
     team_id: int,
     *,
     commit: bool = True,
     operator_username: str | None = None
 ) -> bool:
-    """删除团队、成员关系和团队任务；团队任务不迁移为个人任务。
-
-    团队任务被删除时，相关任务依赖关系也会被同步清理。
-    """
-    team = get_team_by_id(db, team_id)
+    """物理删除团队、成员关系和团队任务；仅用于注销账号等不可恢复清理。"""
+    team = get_team_by_id(db, team_id, include_disbanded=True)
     if not team:
         return False
 
@@ -412,13 +420,10 @@ def delete_team(
             db,
             operator_username=operator,
             task=task,
-            reason=f"团队 {team.name} 解散，团队任务被删除"
+            reason=f"团队 {team.name} 被删除，团队任务被删除"
         )
 
-    # 先显式删除任务依赖和团队任务，确保现有数据库也不会把团队任务退化成个人任务。
-    team_task_ids = [
-        task.id for task in team_tasks
-    ]
+    team_task_ids = [task.id for task in team_tasks]
     if team_task_ids:
         mark_task_logs_deleted(db, team_task_ids)
         db.query(models.TaskDependency).filter(
@@ -434,12 +439,138 @@ def delete_team(
     return True
 
 
-def cancel_account(db: Session, username: str) -> bool:
+def delete_team(
+    db: Session,
+    team_id: int,
+    *,
+    commit: bool = True,
+    operator_username: str | None = None
+) -> bool:
+    """软删除/解散团队，保留成员、任务和操作日志以便回收站恢复。"""
+    team = get_team_by_id(db, team_id)
+    if not team:
+        return False
+
+    operator = operator_username or team.owner_username
+    team.disbanded_at = models.now_cn()
+    team.updated_at = models.now_cn()
+
+    team_tasks = db.query(models.Task).filter(models.Task.team_id == team_id).all()
+    for task in team_tasks:
+        scope_type, scope_id, scope_title = _task_log_scope(task)
+        log_operation(
+            db=db,
+            operator=operator,
+            action_type="disband_team",
+            object_id=task.id,
+            object_type="task",
+            object_title=get_task_log_display_title(db, task),
+            scope_type=scope_type,
+            scope_id=scope_id,
+            scope_title=scope_title,
+            description=f"团队 {team.name} 解散，团队任务暂不可见",
+            object_deleted=False,
+            personal_user=task.owner_username
+        )
+
+    if commit:
+        db.commit()
+        db.refresh(team)
+    return True
+
+
+def rename_team(db: Session, team_id: int, title: str, operator_username: str) -> tuple[models.Team | None, str | None]:
+    """重命名团队，支持已解散团队。"""
+    team = get_team_by_id(db, team_id, include_disbanded=True)
+    if not team:
+        return None, "团队不存在"
+    if team.owner_username != operator_username:
+        return None, "只有拥有者可重命名团队"
+    title = (title or "").strip()
+    if not title:
+        return None, "团队名称不能为空"
+    if len(title) > 10:
+        return None, "团队名称长度不能超过10个字符"
+    conflict = db.query(models.Team).filter(
+        models.Team.name == title,
+        models.Team.id != team_id,
+        models.Team.disbanded_at.is_(None)
+    ).first()
+    if conflict:
+        return None, "团队名称已存在，请使用其他名称"
+    team.name = title
+    team.updated_at = models.now_cn()
+    db.commit()
+    db.refresh(team)
+    return team, None
+
+
+def restore_team(
+    db: Session,
+    team_id: int,
+    operator_username: str
+) -> tuple[models.Team | None, str | None, list[str], list[tuple[str, models.Task]]]:
+    """恢复已解散团队，并清理恢复前已经注销的成员关系。"""
+    team = get_team_by_id(db, team_id, include_disbanded=True)
+    removed_usernames: list[str] = []
+    transferred_tasks: list[tuple[str, models.Task]] = []
+    if not team:
+        return None, "团队不存在", removed_usernames, transferred_tasks
+    if team.owner_username != operator_username:
+        return None, "只有拥有者可恢复团队", removed_usernames, transferred_tasks
+    if team.disbanded_at is None:
+        return None, "团队未解散", removed_usernames, transferred_tasks
+    if not get_user_by_username(db, team.owner_username):
+        return None, "团队拥有者不存在，无法恢复团队", removed_usernames, transferred_tasks
+    conflict = db.query(models.Team).filter(
+        models.Team.name == team.name,
+        models.Team.id != team_id,
+        models.Team.disbanded_at.is_(None)
+    ).first()
+    if conflict:
+        return None, "当前已有同名团队，请先重命名后再恢复", removed_usernames, transferred_tasks
+
+    memberships = db.query(models.TeamMember).filter(models.TeamMember.team_id == team_id).all()
+    for membership in memberships:
+        if get_user_by_username(db, membership.username):
+            continue
+        if membership.username == team.owner_username:
+            return None, "团队拥有者不存在，无法恢复团队", removed_usernames, transferred_tasks
+
+        assigned_tasks = db.query(models.Task).filter(
+            models.Task.team_id == team_id,
+            models.Task.assignee_username == membership.username,
+            models.Task.status != models.TaskStatus.DONE.value
+        ).all()
+        for task in assigned_tasks:
+            old_assignee = task.assignee_username
+            task.assignee_username = team.owner_username
+            transferred_tasks.append((membership.username, task))
+            _log_task_assignee_change(
+                db,
+                operator_username=operator_username,
+                task=task,
+                old_assignee=old_assignee,
+                new_assignee=team.owner_username,
+                reason=f"用户 {membership.username} 注销账号"
+            )
+
+        removed_usernames.append(membership.username)
+        db.delete(membership)
+
+    team.disbanded_at = None
+    team.updated_at = models.now_cn()
+    db.commit()
+    db.refresh(team)
+    return team, None, removed_usernames, transferred_tasks
+
+
+def cancel_account(db: Session, username: str) -> tuple[bool, list[dict]]:
     """按业务规则注销账号，并清理/迁移与该用户关联的数据。"""
     if not get_user_by_username(db, username):
         return False, []
     
-    transferred_tasks = []   # 收集所有被转交的任务
+    transferred_tasks = []   # 收集通知所需快照，避免删除用户后再访问过期 ORM 对象
 
     # 1. 删除该用户的所有个人任务。
     personal_tasks = db.query(models.Task).filter(
@@ -462,7 +593,7 @@ def cancel_account(db: Session, username: str) -> bool:
     owned_teams = db.query(models.Team).filter(models.Team.owner_username == username).all()
     owned_team_ids = [team.id for team in owned_teams]
     for team in owned_teams:
-        delete_team(db, team.id, commit=False, operator_username=username)
+        hard_delete_team(db, team.id, commit=False, operator_username=username)
 
     # 3. 将该用户负责的所有剩余团队任务转交给各自团队拥有者。
     assigned_team_tasks = db.query(models.Task).join(
@@ -474,14 +605,20 @@ def cancel_account(db: Session, username: str) -> bool:
     ).all()
     for task in assigned_team_tasks:
         old_assignee = task.assignee_username
-        task.assignee_username = task.team.owner_username
-        transferred_tasks.append(task)
+        receiver_username = task.team.owner_username
+        task.assignee_username = receiver_username
+        transferred_tasks.append({
+            "receiver_username": receiver_username,
+            "task_id": task.id,
+            "task_title": task.title,
+            "team_id": task.team_id
+        })
         _log_task_assignee_change(
             db,
             operator_username=username,
             task=task,
             old_assignee=old_assignee,
-            new_assignee=task.team.owner_username,
+            new_assignee=receiver_username,
             reason=f"用户 {username} 注销账号"
         )
     # 4. 对仍然保留的团队任务，如果该用户是创建者，则同步改为团队拥有者，
@@ -536,7 +673,7 @@ def cancel_account(db: Session, username: str) -> bool:
         models.User.username == username
     ).delete(synchronize_session=False)
     db.commit()
-    return True,transferred_tasks
+    return True, transferred_tasks
 
 # 任务相关（创建、查询、更新、删除）
 
@@ -627,8 +764,13 @@ def get_tasks(db: Session, username: str) -> list[models.Task]:
     team_tasks = db.query(models.Task).join(
         models.TeamMember,
         models.Task.team_id == models.TeamMember.team_id
+    ).join(
+        models.Team,
+        models.Task.team_id == models.Team.id
     ).filter(
-        models.TeamMember.username == username
+        models.Task.assignee_username == username,
+        models.TeamMember.username == username,
+        models.Team.disbanded_at.is_(None)
     ).all()
     return list({task.id: task for task in personal_tasks + team_tasks}.values())
 
@@ -759,9 +901,13 @@ def get_assigned_tasks(db: Session, username: str) -> list[models.Task]:
     team_tasks = db.query(models.Task).join(
         models.TeamMember,
         models.Task.team_id == models.TeamMember.team_id
+    ).join(
+        models.Team,
+        models.Task.team_id == models.Team.id
     ).filter(
         models.Task.assignee_username == username,
-        models.TeamMember.username == username
+        models.TeamMember.username == username,
+        models.Team.disbanded_at.is_(None)
     ).all()
     return list({task.id: task for task in personal_tasks + team_tasks}.values())
 
@@ -877,14 +1023,14 @@ def can_access_task(db: Session, user_id: str, task: models.Task) -> bool:
     if task.team_id is None:
         return task.owner_username == user_id or task.assignee_username == user_id
     else:
-        return get_team_membership(db, task.team_id, user_id) is not None
+        return require_team_member(db, task.team_id, user_id) is not None
 
 def can_manage_task(db: Session, user_id: str, task: models.Task) -> bool:
     """检查用户是否有权修改任务依赖/删除任务（个人任务本人，团队任务Owner/Admin）"""
     if task.team_id is None:
         return task.owner_username == user_id
     else:
-        membership = get_team_membership(db, task.team_id, user_id)
+        membership = require_team_member(db, task.team_id, user_id)
         return membership is not None and membership.role in (ROLE_OWNER, ROLE_ADMIN)
 
 
@@ -1053,7 +1199,7 @@ def leave_team(
     assigned_tasks = db.query(models.Task).filter(
         models.Task.team_id == team_id,
         models.Task.assignee_username == username,
-        models.Task.status != "已完成"
+        models.Task.status != models.TaskStatus.DONE.value
     ).all()
     for task in assigned_tasks:
         old_assignee = task.assignee_username

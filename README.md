@@ -101,6 +101,7 @@ project_root/                                    # 项目根目录
 │   │   │   ├── team/                            # 团队路由下的界面
 │   │   │   │   ├── AdminTeamsView.vue           # 用户管理的团队界面
 │   │   │   │   ├── AllTeamsView.vue             # 全部团队界面
+│   │   │   │   ├── DisbandedTeamsView.vue       # 用户解散的团队界面（团队回收站）
 │   │   │   │   ├── MemberTeamsView.vue          # 用户参与的团队界面
 │   │   │   │   ├── OwnerTeamsView.vue           # 用户拥有的团队界面
 │   │   │   │   ├── PersonnelView.vue            # 团队人员界面

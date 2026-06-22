@@ -46,7 +46,7 @@ const handleReject = async (item) => {
 const handleRead = async (item) => {
   if (item.isRead) return
   await readNotification(item.id)
-  ElMessage.warning(`已确认：${item.text}`)
+  ElMessage.success(`已确认：${item.text}`)
 }
 
 // 清空消息
@@ -78,7 +78,7 @@ watch(() => route.path, (newPath) => {
 onMounted(async () => {
     await initUserInfo()
     if (isLoggedIn.value) {
-      await initNotificationList()
+      await Promise.all([initNotificationList(), initTaskList(), initTeamList()])
     }
 })
 

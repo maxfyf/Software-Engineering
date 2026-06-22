@@ -11,6 +11,11 @@ const props = defineProps({
     type: Array,
     required: true,
     default: () => []
+  },
+  handleRename: {
+    type: Function,
+    required: true,
+    default: null
   }
 })
 
@@ -35,6 +40,9 @@ const handleCommand = (command) => {
   switch (command.action) {
     case 'quit':
       quitTeam(command.item)
+      break
+    case 'rename':
+      props.handleRename(command.item)
       break
     case 'handover':
       handoverOwner(command.item)
@@ -166,6 +174,10 @@ const enterTeamSpace = (item) => {
 
               <template #dropdown>
                 <el-dropdown-menu>
+                  <el-dropdown-item :command="{ action: 'rename', item: item }">
+                    重命名团队
+                  </el-dropdown-item>
+
                   <el-dropdown-item :command="{ action: 'handover', item: item }">
                     转让拥有者权限
                   </el-dropdown-item>
