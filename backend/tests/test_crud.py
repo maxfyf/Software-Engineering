@@ -91,26 +91,33 @@ class CrudTestCase(unittest.TestCase):
 
 
 class DeleteTeamTests(CrudTestCase):
-    def test_delete_team_removes_team_and_team_tasks_only(self):
-        # 同时构造团队任务和个人任务，验证解散团队时只清理团队相关数据。
+    def test_delete_team_soft_deletes_team_and_preserves_related_data(self):
+        # 解散团队采用软删除：活动列表中不可见，但团队、成员和任务仍保留以便恢复。
         self.add_user("owner")
         self.add_user("member")
         team = self.add_team("Alpha", "owner")
         self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
-        self.add_task("team task", "owner", team_id=team.id, assignee_username="member")
+        team_task = self.add_task(
+            "team task",
+            "owner",
+            team_id=team.id,
+            assignee_username="member",
+        )
         personal_task = self.add_task("personal task", "owner")
 
         deleted = crud.delete_team(self.db, team.id)
 
         self.assertTrue(deleted)
         self.assertIsNone(crud.get_team_by_id(self.db, team.id))
-        self.assertEqual(
-            self.db.query(models.Task).filter(models.Task.team_id == team.id).count(),
-            0,
-        )
+        disbanded_team = crud.get_team_by_id(self.db, team.id, include_disbanded=True)
+        self.assertIsNotNone(disbanded_team)
+        self.assertIsNotNone(disbanded_team.disbanded_at)
         self.assertEqual(
             self.db.query(models.TeamMember).filter(models.TeamMember.team_id == team.id).count(),
-            0,
+            2,
+        )
+        self.assertIsNotNone(
+            self.db.query(models.Task).filter(models.Task.id == team_task.id).first()
         )
         self.assertIsNotNone(
             self.db.query(models.Task).filter(models.Task.id == personal_task.id).first()
@@ -120,23 +127,23 @@ class DeleteTeamTests(CrudTestCase):
         # 不存在的团队应直接返回 False，而不是抛出异常。
         self.assertFalse(crud.delete_team(self.db, 9999))
 
-    def test_delete_team_removes_former_member_access_to_team_space(self):
-        # 团队解散后，原成员不应再通过团队空间看到团队或团队任务。
+    def test_delete_team_hides_team_but_keeps_tasks_for_restore(self):
+        # 团队解散后，原成员无法通过活动团队入口访问，但底层任务仍保留。
         self.add_user("owner")
         self.add_user("member")
         team = self.add_team("Alpha", "owner")
         self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
-        self.add_task("team task", "owner", team_id=team.id, assignee_username="member")
+        task = self.add_task("team task", "owner", team_id=team.id, assignee_username="member")
 
         deleted = crud.delete_team(self.db, team.id)
 
         self.assertTrue(deleted)
         self.assertEqual(crud.get_user_teams(self.db, "member"), [])
         self.assertIsNone(crud.require_team_member(self.db, team.id, "member"))
-        self.assertEqual(crud.get_team_tasks(self.db, team.id), [])
+        self.assertEqual([item.id for item in crud.get_team_tasks(self.db, team.id)], [task.id])
 
-    def test_delete_team_removes_team_task_dependencies(self):
-        # 团队解散时，该团队任务之间的依赖关系也应一并清理。
+    def test_delete_and_restore_team_preserves_tasks_and_dependencies(self):
+        # 软删除期间保留任务依赖；恢复后团队和依赖关系重新可用。
         self.add_user("owner")
         team = self.add_team("Alpha", "owner")
         predecessor = self.add_task("predecessor", "owner", team_id=team.id)
@@ -148,7 +155,23 @@ class DeleteTeamTests(CrudTestCase):
         deleted = crud.delete_team(self.db, team.id)
 
         self.assertTrue(deleted)
-        self.assertEqual(self.db.query(models.TaskDependency).count(), 0)
+        self.assertEqual(self.db.query(models.TaskDependency).count(), 1)
+
+        restored, error, removed_usernames, transferred_tasks = crud.restore_team(
+            self.db,
+            team.id,
+            "owner",
+        )
+
+        self.assertIsNone(error)
+        self.assertEqual(removed_usernames, [])
+        self.assertEqual(transferred_tasks, [])
+        self.assertEqual(restored.id, team.id)
+        self.assertIsNone(restored.disbanded_at)
+        self.assertEqual(
+            [item.id for item in crud.get_successors(self.db, predecessor.id)],
+            [successor.id],
+        )
 
 
 class CancelAccountTests(CrudTestCase):
@@ -184,9 +207,13 @@ class CancelAccountTests(CrudTestCase):
         )
 
         # 执行注销后，数据库中不应再保留任何指向 alice 的团队/任务/成员关系。
-        cancelled = crud.cancel_account(self.db, "alice")
+        cancelled, transferred_tasks = crud.cancel_account(self.db, "alice")
 
         self.assertTrue(cancelled)
+        self.assertEqual(
+            {item["task_id"] for item in transferred_tasks},
+            {reassigned_task.id},
+        )
         self.assertIsNone(crud.get_user_by_username(self.db, "alice"))
         self.assertIsNone(crud.get_team_by_id(self.db, owned_team.id))
         self.assertEqual(
@@ -217,7 +244,10 @@ class CancelAccountTests(CrudTestCase):
 
     def test_cancel_account_returns_false_for_missing_user(self):
         # 不存在的用户无需清理，返回 False 即可。
-        self.assertFalse(crud.cancel_account(self.db, "ghost"))
+        cancelled, transferred_tasks = crud.cancel_account(self.db, "ghost")
+
+        self.assertFalse(cancelled)
+        self.assertEqual(transferred_tasks, [])
 
     def test_cancel_account_succeeds_after_relationships_are_preloaded(self):
         # 预加载 ORM 关系后再注销，也不应因重复级联删除触发 SQLAlchemy 告警或异常。
@@ -238,9 +268,10 @@ class CancelAccountTests(CrudTestCase):
 
         with warnings.catch_warnings():
             warnings.simplefilter("error", SAWarning)
-            cancelled = crud.cancel_account(self.db, "alice")
+            cancelled, transferred_tasks = crud.cancel_account(self.db, "alice")
 
         self.assertTrue(cancelled)
+        self.assertEqual(len(transferred_tasks), 1)
         self.assertIsNone(crud.get_user_by_username(self.db, "alice"))
 
     def test_cancel_account_api_uses_crud_cleanup_logic(self):
@@ -274,9 +305,10 @@ class CancelAccountTests(CrudTestCase):
 
         with warnings.catch_warnings():
             warnings.simplefilter("error", SAWarning)
-            cancelled = crud.cancel_account(self.db, "alice")
+            cancelled, transferred_tasks = crud.cancel_account(self.db, "alice")
 
         self.assertTrue(cancelled)
+        self.assertEqual(transferred_tasks, [])
         self.assertIsNone(crud.get_user_by_username(self.db, "alice"))
 
 
@@ -320,10 +352,16 @@ class TeamMemberCrudTests(CrudTestCase):
             assignee_username="member",
         )
 
-        success, error = crud.remove_team_member(self.db, team.id, "member", "owner")
+        success, error, transferred_tasks = crud.remove_team_member(
+            self.db,
+            team.id,
+            "member",
+            "owner",
+        )
 
         self.assertTrue(success)
         self.assertIsNone(error)
+        self.assertEqual([item.id for item in transferred_tasks], [task.id])
         self.assertIsNone(crud.get_team_membership(self.db, team.id, "member"))
         self.db.refresh(task)
         self.assertEqual(task.assignee_username, "owner")
@@ -335,10 +373,16 @@ class TeamMemberCrudTests(CrudTestCase):
         team = self.add_team("Core Team", "owner")
         self.add_team_member(team.id, "admin", crud.ROLE_ADMIN)
 
-        success, error = crud.remove_team_member(self.db, team.id, "admin", "owner")
+        success, error, transferred_tasks = crud.remove_team_member(
+            self.db,
+            team.id,
+            "admin",
+            "owner",
+        )
 
         self.assertTrue(success)
         self.assertIsNone(error)
+        self.assertEqual(transferred_tasks, [])
         self.assertIsNone(crud.get_team_membership(self.db, team.id, "admin"))
 
     def test_member_can_leave_team(self):
@@ -348,10 +392,16 @@ class TeamMemberCrudTests(CrudTestCase):
         team = self.add_team("Core Team", "owner")
         self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
 
-        success, error = crud.remove_team_member(self.db, team.id, "member", "member")
+        success, error, transferred_tasks = crud.remove_team_member(
+            self.db,
+            team.id,
+            "member",
+            "member",
+        )
 
         self.assertTrue(success)
         self.assertIsNone(error)
+        self.assertEqual(transferred_tasks, [])
         self.assertIsNone(crud.get_team_membership(self.db, team.id, "member"))
 
     def test_admin_can_leave_team(self):
@@ -361,10 +411,16 @@ class TeamMemberCrudTests(CrudTestCase):
         team = self.add_team("Core Team", "owner")
         self.add_team_member(team.id, "admin", crud.ROLE_ADMIN)
 
-        success, error = crud.remove_team_member(self.db, team.id, "admin", "admin")
+        success, error, transferred_tasks = crud.remove_team_member(
+            self.db,
+            team.id,
+            "admin",
+            "admin",
+        )
 
         self.assertTrue(success)
         self.assertIsNone(error)
+        self.assertEqual(transferred_tasks, [])
         self.assertIsNone(crud.get_team_membership(self.db, team.id, "admin"))
 
     def test_member_cannot_remove_other_member(self):
@@ -375,10 +431,16 @@ class TeamMemberCrudTests(CrudTestCase):
         self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
         self.add_team_member(team.id, "other", crud.ROLE_MEMBER)
 
-        success, error = crud.remove_team_member(self.db, team.id, "other", "member")
+        success, error, transferred_tasks = crud.remove_team_member(
+            self.db,
+            team.id,
+            "other",
+            "member",
+        )
 
         self.assertFalse(success)
         self.assertEqual(error, "团队权限不足")
+        self.assertEqual(transferred_tasks, [])
         self.assertIsNotNone(crud.get_team_membership(self.db, team.id, "other"))
 
     def test_single_owner_cannot_leave_team(self):
@@ -386,10 +448,16 @@ class TeamMemberCrudTests(CrudTestCase):
         self.add_user("owner")
         team = self.add_team("Core Team", "owner")
 
-        success, error = crud.remove_team_member(self.db, team.id, "owner", "owner")
+        success, error, transferred_tasks = crud.remove_team_member(
+            self.db,
+            team.id,
+            "owner",
+            "owner",
+        )
 
         self.assertFalse(success)
         self.assertEqual(error, "仅含 Owner 的团队不允许退出")
+        self.assertEqual(transferred_tasks, [])
         self.assertEqual(crud.get_team_by_id(self.db, team.id).owner_username, "owner")
         self.assertIsNotNone(crud.get_team_membership(self.db, team.id, "owner"))
 
@@ -407,10 +475,16 @@ class TeamMemberCrudTests(CrudTestCase):
             assignee_username="owner",
         )
 
-        success, error = crud.remove_team_member(self.db, team.id, "owner", "owner")
+        success, error, transferred_tasks = crud.remove_team_member(
+            self.db,
+            team.id,
+            "owner",
+            "owner",
+        )
 
         self.assertTrue(success)
         self.assertIsNone(error)
+        self.assertEqual([item.id for item in transferred_tasks], [task.id])
         self.db.refresh(team)
         self.assertEqual(team.owner_username, "admin")
         self.assertIsNone(crud.get_team_membership(self.db, team.id, "owner"))
@@ -425,10 +499,16 @@ class TeamMemberCrudTests(CrudTestCase):
         team = self.add_team("Core Team", "owner")
         self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
 
-        success, error = crud.remove_team_member(self.db, team.id, "owner", "owner")
+        success, error, transferred_tasks = crud.remove_team_member(
+            self.db,
+            team.id,
+            "owner",
+            "owner",
+        )
 
         self.assertTrue(success)
         self.assertIsNone(error)
+        self.assertEqual(transferred_tasks, [])
         self.db.refresh(team)
         self.assertEqual(team.owner_username, "member")
         self.assertIsNone(crud.get_team_membership(self.db, team.id, "owner"))
@@ -454,10 +534,16 @@ class TaskAccessCrudTests(CrudTestCase):
             assignee_username="owner",
         )
 
-        success, error = crud.remove_team_member(self.db, team.id, "owner", "owner")
+        success, error, transferred_tasks = crud.remove_team_member(
+            self.db,
+            team.id,
+            "owner",
+            "owner",
+        )
 
         self.assertTrue(success)
         self.assertIsNone(error)
+        self.assertEqual([item.id for item in transferred_tasks], [task.id])
         self.assertEqual(task.owner_username, "owner")
         self.assert_http_error(404, crud.get_task_by_id, self.db, task.id, "owner")
         self.assert_http_error(
@@ -489,19 +575,26 @@ class TaskAccessCrudTests(CrudTestCase):
 
         self.assertNotIn(stale_task.id, [task.id for task in assigned_tasks])
 
-    def test_get_tasks_includes_team_tasks_only_for_current_members(self):
-        # 团队任务可见性必须来自成员关系，而不是 owner/assignee 字段残留。
+    def test_get_tasks_returns_only_assigned_team_tasks_for_current_members(self):
+        # 当前辅助方法只返回分配给用户且用户仍在团队中的团队任务。
         for username in ["owner", "member", "outsider"]:
             self.add_user(username)
         team = self.add_team("Core Team", "owner")
         self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
-        task = self.add_task("team task", "owner", team_id=team.id)
+        assigned_task = self.add_task(
+            "assigned team task",
+            "owner",
+            team_id=team.id,
+            assignee_username="member",
+        )
+        unassigned_task = self.add_task("unassigned team task", "owner", team_id=team.id)
 
         member_tasks = crud.get_tasks(self.db, "member")
         outsider_tasks = crud.get_tasks(self.db, "outsider")
 
-        self.assertIn(task.id, [item.id for item in member_tasks])
-        self.assertNotIn(task.id, [item.id for item in outsider_tasks])
+        self.assertIn(assigned_task.id, [item.id for item in member_tasks])
+        self.assertNotIn(unassigned_task.id, [item.id for item in member_tasks])
+        self.assertEqual(outsider_tasks, [])
 
     def test_create_team_task_rejects_non_member_assignee(self):
         # 团队任务负责人必须是当前团队成员。
@@ -679,10 +772,16 @@ class OperationLogTests(CrudTestCase):
         self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
         task = self.add_task("member task", "owner", team_id=team.id, assignee_username="member")
 
-        success, error = crud.remove_team_member(self.db, team.id, "member", "owner")
+        success, error, transferred_tasks = crud.remove_team_member(
+            self.db,
+            team.id,
+            "member",
+            "owner",
+        )
 
         self.assertTrue(success)
         self.assertIsNone(error)
+        self.assertEqual([item.id for item in transferred_tasks], [task.id])
         logs = crud.get_task_operation_logs(self.db, task.id, "owner")
         self.assertEqual(len(logs), 1)
         self.assertEqual(logs[0]["operator"], "owner")
@@ -700,10 +799,11 @@ class OperationLogTests(CrudTestCase):
         self.add_team_member(team.id, "member", crud.ROLE_MEMBER)
         task = self.add_task("member task", "owner", team_id=team.id, assignee_username="member")
 
-        success, error = crud.leave_team(self.db, team.id, "member")
+        success, error, transferred_tasks = crud.leave_team(self.db, team.id, "member")
 
         self.assertTrue(success)
         self.assertIsNone(error)
+        self.assertEqual([item.id for item in transferred_tasks], [task.id])
         logs = crud.get_task_operation_logs(self.db, task.id, "owner")
         self.assertEqual(len(logs), 1)
         self.assertEqual(logs[0]["operator"], "member")
@@ -732,9 +832,13 @@ class OperationLogTests(CrudTestCase):
         )
         alice_personal_id = alice_personal.id
 
-        cancelled = crud.cancel_account(self.db, "alice")
+        cancelled, transferred_tasks = crud.cancel_account(self.db, "alice")
 
         self.assertTrue(cancelled)
+        self.assertEqual(
+            {item["task_id"] for item in transferred_tasks},
+            {team_assigned.id},
+        )
         deleted_log = self.db.query(models.OperationLog).filter(
             models.OperationLog.task_id == alice_personal_id,
             models.OperationLog.type == "delete",
@@ -756,7 +860,7 @@ class OperationLogTests(CrudTestCase):
         team_owned_logs = crud.get_task_operation_logs(self.db, team_owned.id, "bob")
         self.assertIn("任务创建者由 alice 变更为 bob", team_owned_logs[0]["description"])
 
-    def test_delete_team_preserves_deleted_task_log_snapshot(self):
+    def test_delete_team_records_soft_delete_log_and_preserves_task(self):
         self.add_user("owner")
         self.add_user("member")
         team = self.add_team("Core Team", "owner")
@@ -768,17 +872,17 @@ class OperationLogTests(CrudTestCase):
         deleted = crud.delete_team(self.db, team.id, operator_username="owner")
 
         self.assertTrue(deleted)
-        self.assertIsNone(self.db.query(models.Task).filter(models.Task.id == task_id).first())
+        self.assertIsNotNone(self.db.query(models.Task).filter(models.Task.id == task_id).first())
         log = self.db.query(models.OperationLog).filter(
             models.OperationLog.task_id == task_id,
-            models.OperationLog.type == "delete",
+            models.OperationLog.type == "disband_team",
         ).one()
         self.assertEqual(log.operator, "owner")
         self.assertEqual(log.object["title"], "team task")
         self.assertEqual(log.scope["type"], "team")
         self.assertEqual(log.team_id, team_id)
         self.assertEqual(log.scope["title"], "Core Team")
-        self.assertTrue(log.object["deleted"])
+        self.assertFalse(log.object["deleted"])
 
     def test_deleted_task_id_is_not_reused_after_same_title_recreated(self):
         self.add_user("owner")
@@ -899,10 +1003,16 @@ class OperationLogTests(CrudTestCase):
         self.add_team_member(team.id, "other", crud.ROLE_MEMBER)
         self.add_task("other task", "owner", team_id=team.id, assignee_username="other")
 
-        success, error = crud.remove_team_member(self.db, team.id, "other", "member")
+        success, error, transferred_tasks = crud.remove_team_member(
+            self.db,
+            team.id,
+            "other",
+            "member",
+        )
 
         self.assertFalse(success)
         self.assertEqual(error, "团队权限不足")
+        self.assertEqual(transferred_tasks, [])
         self.assertEqual(self.db.query(models.OperationLog).count(), 0)
 
 
