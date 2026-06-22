@@ -1,164 +1,323 @@
-"""
-Lab2 API 端点单元测试
-测试 api.py 中的关键 API 端点
-"""
+"""直接调用 FastAPI 处理函数，验证当前 API 层规则。"""
 
-import unittest
-from unittest.mock import Mock, MagicMock, patch
-import sys
 import os
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from types import SimpleNamespace
 
-# 添加 backend 目录到路径
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-
-class CreateTeamEndpointTests(unittest.TestCase):
-    """测试创建团队 API 端点"""
-
-    def test_create_team_with_empty_name_returns_400(self):
-        """测试创建空名称团队返回 400 错误"""
-        from fastapi import HTTPException
-
-        # 模拟请求和依赖
-        request = {"title": ""}
-        current_user = Mock()
-        current_user.username = "testuser"
-        db = Mock()
-
-        # 测试空名称
-        try:
-            title = request.get("title")
-            if not title or not title.strip():
-                raise HTTPException(status_code=400, detail="团队名称不能为空")
-        except HTTPException as e:
-            self.assertEqual(e.status_code, 400)
-            self.assertEqual(e.detail, "团队名称不能为空")
-
-    def test_create_team_with_long_name_returns_400(self):
-        """测试创建超长名称团队返回 400 错误"""
-        from fastapi import HTTPException
-
-        request = {"title": "这是一个非常长的团队名称超过十二个字符"}
-
-        try:
-            title = request.get("title", "").strip()
-            if len(title) > 12:
-                raise HTTPException(status_code=400, detail="团队名称长度不能超过12个字符")
-        except HTTPException as e:
-            self.assertEqual(e.status_code, 400)
-            self.assertEqual(e.detail, "团队名称长度不能超过12个字符")
-
-    def test_create_team_with_duplicate_name_returns_400(self):
-        """测试创建同名团队返回 400 错误"""
-        from fastapi import HTTPException
-        from models import Team
-
-        request = {"title": "existingteam"}
-        db = Mock()
-
-        # Mock 查询返回已存在的团队
-        existing_team = Mock()
-        db.query.return_value.filter.return_value.first.return_value = existing_team
-
-        try:
-            title = request.get("title", "").strip()
-            existing = db.query(Team).filter(Team.name == title).first()
-            if existing:
-                raise HTTPException(status_code=400, detail="团队名称已存在，请使用其他名称")
-        except HTTPException as e:
-            self.assertEqual(e.status_code, 400)
-            self.assertEqual(e.detail, "团队名称已存在，请使用其他名称")
+from fastapi import HTTPException
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 
-class RemoveMemberEndpointTests(unittest.TestCase):
-    """测试移除团队成员 API 端点"""
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
-    def test_remove_member_with_empty_username_returns_400(self):
-        """测试移除成员时用户名为空返回 400 错误"""
-        from fastapi import HTTPException
-
-        try:
-            username = None
-            if not username:
-                raise HTTPException(status_code=400, detail="用户名不能为空")
-        except HTTPException as e:
-            self.assertEqual(e.status_code, 400)
-            self.assertEqual(e.detail, "用户名不能为空")
+import api
+import crud
+import models
+import schemas
 
 
-class UpdateTaskStatusEndpointTests(unittest.TestCase):
-    """测试更新任务状态 API 端点"""
+class ApiTestCase(unittest.TestCase):
+    def setUp(self):
+        fd, self.db_path = tempfile.mkstemp(suffix=".sqlite")
+        os.close(fd)
+        self.engine = create_engine(f"sqlite:///{self.db_path}")
+        self.SessionLocal = sessionmaker(bind=self.engine)
+        models.Base.metadata.create_all(self.engine)
+        self.db = self.SessionLocal()
 
-    def test_update_task_status_with_invalid_task_id_returns_400(self):
-        """测试无效任务 ID 返回 400 错误"""
-        from fastapi import HTTPException
+    def tearDown(self):
+        self.db.close()
+        self.engine.dispose()
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
 
-        try:
-            task_id = 0  # 无效 ID
-            if task_id <= 0:
-                raise HTTPException(status_code=400, detail="无效的任务ID")
-        except HTTPException as e:
-            self.assertEqual(e.status_code, 400)
-            self.assertEqual(e.detail, "无效的任务ID")
+    def current_user(self, username: str):
+        return SimpleNamespace(username=username)
 
-    def test_update_task_status_with_empty_status_returns_400(self):
-        """测试空状态返回 400 错误"""
-        from fastapi import HTTPException
+    def add_user(self, username: str) -> models.User:
+        user = models.User(username=username, password_hash="hashed")
+        self.db.add(user)
+        self.db.commit()
+        self.db.refresh(user)
+        return user
 
-        try:
-            status = ""
-            if not status or not status.strip():
-                raise HTTPException(status_code=400, detail="任务状态不能为空")
-        except HTTPException as e:
-            self.assertEqual(e.status_code, 400)
-            self.assertEqual(e.detail, "任务状态不能为空")
+    def add_team(self, name: str, owner_username: str) -> models.Team:
+        return crud.create_team(
+            self.db,
+            schemas.TeamCreate(name=name),
+            owner_username,
+        )
 
+    def add_task(
+        self,
+        title: str,
+        owner_username: str,
+        *,
+        team_id: int | None = None,
+        assignee_username: str | None = None,
+        status: str = models.TaskStatus.TODO.value,
+    ) -> models.Task:
+        task = models.Task(
+            id=crud.allocate_task_id(self.db),
+            title=title,
+            owner_username=owner_username,
+            team_id=team_id,
+            assignee_username=assignee_username,
+            status=status,
+        )
+        self.db.add(task)
+        self.db.commit()
+        self.db.refresh(task)
+        return task
 
-class PermissionTests(unittest.TestCase):
-    """测试权限校验逻辑"""
-
-    def test_member_cannot_modify_others_task(self):
-        """测试 Member 无法修改他人的任务"""
-        from fastapi import HTTPException
-
-        # 模拟任务和用户
-        task = Mock()
-        task.team_id = 1
-        task.assignee_username = "otheruser"
-        current_user = Mock()
-        current_user.username = "memberuser"
-
-        # 测试权限校验逻辑
-        is_assignee = task.assignee_username == current_user.username
-        if not is_assignee:
-            try:
-                raise HTTPException(status_code=403, detail="只能修改分配给自己的任务状态")
-            except HTTPException as e:
-                self.assertEqual(e.status_code, 403)
-                self.assertEqual(e.detail, "只能修改分配给自己的任务状态")
-
-    def test_non_team_member_cannot_access_team_tasks(self):
-        """测试非团队成员无法访问团队任务"""
-        from fastapi import HTTPException
-
-        task = Mock()
-        task.team_id = 1
-        current_user = Mock()
-        current_user.username = "outsider"
-
-        # 模拟用户不在团队中
-        db = Mock()
-        db.query.return_value.filter.return_value.first.return_value = None
-
-        try:
-            # 模拟权限检查
-            membership = db.query.return_value.filter.return_value.first()
-            if not membership:
-                raise HTTPException(status_code=403, detail="无权访问该团队任务")
-        except HTTPException as e:
-            self.assertEqual(e.status_code, 403)
-            self.assertEqual(e.detail, "无权访问该团队任务")
+    def assert_http_error(self, status_code: int, detail: str, func, *args, **kwargs):
+        with self.assertRaises(HTTPException) as ctx:
+            func(*args, **kwargs)
+        self.assertEqual(ctx.exception.status_code, status_code)
+        self.assertEqual(ctx.exception.detail, detail)
 
 
-if __name__ == '__main__':
+class CreateTeamEndpointTests(ApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self.add_user("owner")
+        self.owner = self.current_user("owner")
+
+    def test_create_team_rejects_empty_name(self):
+        self.assert_http_error(
+            400,
+            "团队名称不能为空",
+            api.create_team_endpoint,
+            {"title": "   "},
+            current_user=self.owner,
+            db=self.db,
+        )
+
+    def test_create_team_rejects_name_longer_than_ten_characters(self):
+        self.assert_http_error(
+            400,
+            "团队名称长度不能超过10个字符",
+            api.create_team_endpoint,
+            {"title": "12345678901"},
+            current_user=self.owner,
+            db=self.db,
+        )
+
+    def test_create_team_rejects_duplicate_active_name(self):
+        self.add_team("Alpha", "owner")
+
+        self.assert_http_error(
+            400,
+            "团队名称已存在，请使用其他名称",
+            api.create_team_endpoint,
+            {"title": "Alpha"},
+            current_user=self.owner,
+            db=self.db,
+        )
+
+    def test_create_team_allows_name_of_disbanded_team(self):
+        old_team = self.add_team("Alpha", "owner")
+        crud.delete_team(self.db, old_team.id, operator_username="owner")
+
+        response = api.create_team_endpoint(
+            {"title": "Alpha"},
+            current_user=self.owner,
+            db=self.db,
+        )
+
+        self.assertTrue(response["success"])
+        self.assertNotEqual(response["data"]["id"], old_team.id)
+
+
+class PermissionEndpointTests(ApiTestCase):
+    def test_non_owner_cannot_send_team_invitation(self):
+        for username in ["owner", "member", "candidate"]:
+            self.add_user(username)
+        team = self.add_team("Alpha", "owner")
+        membership, error = crud.add_team_member(
+            self.db,
+            team.id,
+            "member",
+            "owner",
+        )
+        self.assertIsNone(error)
+        self.assertIsNotNone(membership)
+
+        self.assert_http_error(
+            403,
+            "只有 Owner 可发送邀请",
+            api.add_member_endpoint,
+            team.id,
+            {"username": "candidate"},
+            current_user=self.current_user("member"),
+            db=self.db,
+        )
+
+    def test_outsider_cannot_read_team_tasks(self):
+        self.add_user("owner")
+        self.add_user("outsider")
+        team = self.add_team("Alpha", "owner")
+        self.add_task("team task", "owner", team_id=team.id)
+
+        self.assert_http_error(
+            403,
+            "无权访问该团队",
+            api.get_team_tasks,
+            team.id,
+            current_user=self.current_user("outsider"),
+            db=self.db,
+        )
+
+
+class UpdateTaskStatusEndpointTests(ApiTestCase):
+    def test_update_task_status_rejects_non_positive_task_id(self):
+        self.assert_http_error(
+            400,
+            "无效的任务ID",
+            api.update_task_status,
+            0,
+            "进行中",
+            current_user=self.current_user("member"),
+            db=self.db,
+        )
+
+    def test_update_task_status_rejects_blank_status(self):
+        self.assert_http_error(
+            400,
+            "任务状态不能为空",
+            api.update_task_status,
+            1,
+            " ",
+            current_user=self.current_user("member"),
+            db=self.db,
+        )
+
+    def test_update_task_status_rejects_other_users_assignment(self):
+        self.add_user("owner")
+        self.add_user("member")
+        task = self.add_task(
+            "assigned task",
+            "owner",
+            assignee_username="owner",
+        )
+
+        self.assert_http_error(
+            403,
+            "只能修改分配给自己的任务状态",
+            api.update_task_status,
+            task.id,
+            "进行中",
+            current_user=self.current_user("member"),
+            db=self.db,
+        )
+
+
+class StatusTransitionTests(ApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self.add_user("alice")
+
+    def test_done_task_requires_all_transitive_predecessors_done(self):
+        first = self.add_task("first", "alice")
+        middle = self.add_task(
+            "middle",
+            "alice",
+            status=models.TaskStatus.DONE.value,
+        )
+        last = self.add_task("last", "alice")
+        crud.create_task_dependency(self.db, first.id, middle.id)
+        crud.create_task_dependency(self.db, middle.id, last.id)
+
+        self.assert_http_error(
+            400,
+            "前置任务「first」未完成，无法完成当前任务",
+            api.validate_status_transition,
+            self.db,
+            last,
+            models.TaskStatus.DONE.value,
+        )
+
+    def test_completed_task_cannot_reopen_when_successor_is_done(self):
+        predecessor = self.add_task(
+            "predecessor",
+            "alice",
+            status=models.TaskStatus.DONE.value,
+        )
+        successor = self.add_task(
+            "successor",
+            "alice",
+            status=models.TaskStatus.DONE.value,
+        )
+        crud.create_task_dependency(self.db, predecessor.id, successor.id)
+
+        self.assert_http_error(
+            400,
+            "后继任务「successor」已完成，无法将当前任务改为未完成状态",
+            api.validate_status_transition,
+            self.db,
+            predecessor,
+            models.TaskStatus.IN_PROGRESS.value,
+        )
+
+
+class DependencyScopeEndpointTests(ApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self.add_user("owner")
+        self.owner = self.current_user("owner")
+
+    def test_personal_task_cannot_depend_on_team_task(self):
+        team = self.add_team("Alpha", "owner")
+        personal_task = self.add_task("personal", "owner")
+        team_task = self.add_task("team", "owner", team_id=team.id)
+
+        self.assert_http_error(
+            400,
+            "个人任务不能依赖团队任务",
+            api.update_predecessors,
+            personal_task.id,
+            schemas.UpdatePredecessorsRequest(predecessor_ids=[team_task.id]),
+            current_user=self.owner,
+            db=self.db,
+        )
+
+    def test_team_task_cannot_depend_on_task_from_other_team(self):
+        alpha = self.add_team("Alpha", "owner")
+        beta = self.add_team("Beta", "owner")
+        alpha_task = self.add_task("alpha task", "owner", team_id=alpha.id)
+        beta_task = self.add_task("beta task", "owner", team_id=beta.id)
+
+        self.assert_http_error(
+            400,
+            "前置任务与当前任务不在同一团队",
+            api.update_predecessors,
+            alpha_task.id,
+            schemas.UpdatePredecessorsRequest(predecessor_ids=[beta_task.id]),
+            current_user=self.owner,
+            db=self.db,
+        )
+
+    def test_update_predecessors_rejects_cycle(self):
+        first = self.add_task("first", "owner")
+        second = self.add_task("second", "owner")
+        crud.create_task_dependency(self.db, first.id, second.id)
+
+        self.assert_http_error(
+            400,
+            "不允许添加循环依赖",
+            api.update_predecessors,
+            first.id,
+            schemas.UpdatePredecessorsRequest(predecessor_ids=[second.id]),
+            current_user=self.owner,
+            db=self.db,
+        )
+
+
+if __name__ == "__main__":
     unittest.main()
