@@ -822,6 +822,11 @@ def notify_team_disbanded(db: Session, team: Team, operator_username: str):
         ))
 
 def handle_team_restored_notifications(db: Session, team: Team, operator_username: str):
+    """恢复团队时处理成员消息。
+
+    如果成员尚未确认团队解散通知，删除那条未读解散通知即可；
+    如果成员已经确认过团队解散通知，再额外发送团队恢复通知。
+    """
     for username in get_existing_team_member_usernames(db, team.id):
         candidate_notifs = db.query(Notification).filter(
             Notification.receiver_username == username,
@@ -829,21 +834,25 @@ def handle_team_restored_notifications(db: Session, team: Team, operator_usernam
         ).all()
         disband_notifs = [
             item for item in candidate_notifs
-            if isinstance(item.metadata_, dict) and int(item.metadata_.get("teamId", -1)) == int(team.id)
+            if isinstance(item.metadata_, dict) and str(item.metadata_.get("teamId")) == str(team.id)
         ]
         has_read_disband_notice = any(item.is_read for item in disband_notifs)
+
         for item in disband_notifs:
             if not item.is_read:
                 db.delete(item)
-        if has_read_disband_notice:
-            create_notification(db, NotificationCreate(
-                receiver_username=username,
-                sender_username=operator_username,
-                text=f"团队「{team.name}」已恢复。",
-                type="team_restored",
-                need_operation=False,
-                metadata={"teamId": team.id, "teamTitle": team.name}
-            ))
+
+        if not has_read_disband_notice:
+            continue
+
+        create_notification(db, NotificationCreate(
+            receiver_username=username,
+            sender_username=operator_username,
+            text=f"团队「{team.name}」已恢复。",
+            type="team_restored",
+            need_operation=False,
+            metadata={"teamId": team.id, "teamTitle": team.name}
+        ))
     db.commit()
 
 
