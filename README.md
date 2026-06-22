@@ -20,16 +20,16 @@ python-jose                          # JWT 令牌生成与解析
 ##### 1.2 前端依赖
 
 ``` text
-Node.js >= 20.19/22.12               # 让JavaScript脱离浏览器运行的前端环境
-element-plus/icons-vue >= 2.3.2      # Vue3版本的Element Plus图标库
-axios >= 1.14.0                      # HTTP客户端库，用于发送AJAX请求与调用后端API
-element-plus >= 2.13.5               # Element Plus组件库
-vue >= 3.5.29                        # Vue.js作为前端的基础框架
-vue-router >= 5.0.3                  # Vue路由管理器，实现单页应用路由
-vuedraggable >= 4.1.0                # Vue.js的拖拽排序组件库
-vitejs/plugin-vue >= 6.0.4           # Vite的Vue插件，提供Vue3单文件组件的热更新支持
-vite >= 7.3.1                        # Vite作为构建工具
-vite-plugin-vue-devtools >= 8.0.6    # Vue DevTools的Vite插件，在开发环境中提供Vue调试工具
+Node.js >= 20.19/22.12               # 让 JavaScript 脱离浏览器运行的前端环境
+element-plus/icons-vue >= 2.3.2      # Vue3 版本的 Element Plus 图标库
+axios >= 1.14.0                      # HTTP 客户端库，用于发送 AJAX 请求与调用后端 API
+element-plus >= 2.13.5               # Element Plus 组件库
+vue >= 3.5.29                        # Vue.js 作为前端的基础框架
+vue-router >= 5.0.3                  # Vue 路由管理器，实现单页应用路由
+vuedraggable >= 4.1.0                # Vue.js 的拖拽排序组件库
+vitejs/plugin-vue >= 6.0.4           # Vite 的 Vue 插件，提供 Vue3 单文件组件的热更新支持
+vite >= 7.3.1                        # Vite 作为构建工具
+vite-plugin-vue-devtools >= 8.0.6    # Vue DevTools 的 Vite 插件，在开发环境中提供 Vue 调试工具
 ```
 
 ### 2 项目架构
@@ -136,7 +136,7 @@ project_root/                                    # 项目根目录
   pip install -r requirements.txt
   ```
 
-- 前端依赖安装：确保电脑上已安装Node.js 20.19+或22.12+，打开命令行并切换到`frontend/`目录后执行
+- 前端依赖安装：确保电脑上已安装 Node.js 20.19+ 或 22.12+，打开命令行并切换到 `frontend/` 目录后执行
 
   ```bash
   npm install
@@ -164,27 +164,27 @@ project_root/                                    # 项目根目录
 
 ##### 3.3 启动前端网页
 
-1. 方式一（开发模式，推荐开发调试）：打开命令行，切换到`frontend/`目录后执行
+1. 方式一（开发模式，推荐开发调试）：打开命令行，切换到 `frontend/` 目录后执行
 
    ```bash
    npm run dev
    ```
 
-   随后按住Ctrl键点击链接，可以快捷地打开含调试信息的前端网页
+   随后按住 Ctrl 键点击链接，可以快捷地打开含调试信息的前端网页
 
-2. 方式二（构建模式，在项目部署前构建）：打开命令行，切换到`frontend/`目录后执行
+2. 方式二（构建模式，在项目部署前构建）：打开命令行，切换到 `frontend/` 目录后执行
 
    ```bash
    npm run build
    ```
 
-   前端目录下将自动生成静态文件目录`dist`。接着，在原命令行窗口中执行
+   前端目录下将自动生成静态文件目录 `dist`。接着，在原命令行窗口中执行
 
    ```bash
    npm run preview
    ```
 
-   随后按住Ctrl键点击链接，可以预览项目上线后前端网页的实际效果，并对相关功能进行测试。
+   随后按住 Ctrl 键点击链接，可以预览项目上线后前端网页的实际效果，并对相关功能进行测试。
 
 - 开发模式前端网页地址：http://localhost:5173/
 - 构建模式前端网页地址：http://localhost:4173/
