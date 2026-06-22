@@ -228,10 +228,15 @@ class UserManagementAcceptanceTests(unittest.TestCase):
         crud.add_team_member(self.db, team.id, "member", "owner")
         task = self.add_task("member task", "owner", team_id=team.id, assignee_username="member")
 
-        success, error = crud.leave_team(self.db, team.id, "member")
+        success, error, transferred_tasks = crud.leave_team(
+            self.db,
+            team.id,
+            "member",
+        )
 
         self.assertTrue(success)
         self.assertIsNone(error)
+        self.assertEqual([item.id for item in transferred_tasks], [task.id])
         self.assertIsNone(crud.get_team_membership(self.db, team.id, "member"))
         self.db.refresh(task)
         self.assertEqual(task.assignee_username, "owner")
@@ -247,10 +252,16 @@ class UserManagementAcceptanceTests(unittest.TestCase):
         crud.add_team_member(self.db, team.id, "member", "owner")
         task = self.add_task("member task", "owner", team_id=team.id, assignee_username="member")
 
-        success, error = crud.remove_team_member(self.db, team.id, "member", "owner")
+        success, error, transferred_tasks = crud.remove_team_member(
+            self.db,
+            team.id,
+            "member",
+            "owner",
+        )
 
         self.assertTrue(success)
         self.assertIsNone(error)
+        self.assertEqual([item.id for item in transferred_tasks], [task.id])
         self.assertIsNone(crud.get_team_membership(self.db, team.id, "member"))
         self.db.refresh(task)
         self.assertEqual(task.assignee_username, "owner")
@@ -263,10 +274,16 @@ class UserManagementAcceptanceTests(unittest.TestCase):
         self.add_user("owner")
         team = self.add_team("Alpha", "owner")
 
-        success, error = crud.remove_team_member(self.db, team.id, "owner", "owner")
+        success, error, transferred_tasks = crud.remove_team_member(
+            self.db,
+            team.id,
+            "owner",
+            "owner",
+        )
 
         self.assertFalse(success)
         self.assertEqual(error, "仅含 Owner 的团队不允许退出")
+        self.assertEqual(transferred_tasks, [])
         self.assertEqual(crud.get_team_by_id(self.db, team.id).owner_username, "owner")
         self.assertIsNotNone(crud.get_team_membership(self.db, team.id, "owner"))
         self.assertEqual(self.db.query(models.OperationLog).count(), 0)
@@ -281,10 +298,16 @@ class UserManagementAcceptanceTests(unittest.TestCase):
         crud.add_team_member(self.db, team.id, "member", "owner")
         task = self.add_task("owner task", "owner", team_id=team.id, assignee_username="owner")
 
-        success, error = crud.remove_team_member(self.db, team.id, "owner", "owner")
+        success, error, transferred_tasks = crud.remove_team_member(
+            self.db,
+            team.id,
+            "owner",
+            "owner",
+        )
 
         self.assertTrue(success)
         self.assertIsNone(error)
+        self.assertEqual([item.id for item in transferred_tasks], [task.id])
         self.db.refresh(team)
         self.db.refresh(task)
         self.assertEqual(team.owner_username, "admin")
@@ -294,8 +317,8 @@ class UserManagementAcceptanceTests(unittest.TestCase):
         logs = crud.get_task_operation_logs(self.db, task.id, "admin")
         self.assertIn("负责人由 owner 变更为 admin", logs[0]["description"])
 
-    def test_tc_um_13_delete_team_removes_access_and_keeps_logs(self):
-        """TC-UM-13: 验证团队解散后的访问控制与日志保留。"""
+    def test_tc_um_13_disband_team_hides_access_and_keeps_recoverable_data(self):
+        """TC-UM-13: 验证团队软删除后的访问控制与可恢复数据。"""
         self.add_user("owner")
         self.add_user("member")
         team = self.add_team("Alpha", "owner")
@@ -308,15 +331,25 @@ class UserManagementAcceptanceTests(unittest.TestCase):
 
         self.assertTrue(deleted)
         self.assertIsNone(crud.get_team_by_id(self.db, team_id))
+        disbanded_team = crud.get_team_by_id(
+            self.db,
+            team_id,
+            include_disbanded=True,
+        )
+        self.assertIsNotNone(disbanded_team)
+        self.assertIsNotNone(disbanded_team.disbanded_at)
         self.assertIsNone(crud.require_team_member(self.db, team_id, "member"))
-        self.assertIsNone(self.db.query(models.Task).filter(models.Task.id == task_id).first())
+        self.assertIsNotNone(
+            self.db.query(models.Task).filter(models.Task.id == task_id).first()
+        )
+        self.assertIsNotNone(crud.get_team_membership(self.db, team_id, "member"))
         log = self.db.query(models.OperationLog).filter(
             models.OperationLog.task_id == task_id,
-            models.OperationLog.type == "delete",
+            models.OperationLog.type == "disband_team",
         ).one()
         self.assertEqual(log.object["title"], "team task")
         self.assertEqual(log.scope["title"], "Alpha")
-        self.assertTrue(log.object["deleted"])
+        self.assertFalse(log.object["deleted"])
 
     def test_tc_um_14_cancel_account_cleans_data_and_keeps_logs(self):
         """TC-UM-14: 验证用户注销后的数据清理。"""
@@ -334,9 +367,13 @@ class UserManagementAcceptanceTests(unittest.TestCase):
         personal = self.add_task("personal", "alice")
         personal_id = personal.id
 
-        cancelled = crud.cancel_account(self.db, "alice")
+        cancelled, transferred_tasks = crud.cancel_account(self.db, "alice")
 
         self.assertTrue(cancelled)
+        self.assertEqual(
+            {item["task_id"] for item in transferred_tasks},
+            {assigned.id},
+        )
         self.assertIsNone(crud.get_user_by_username(self.db, "alice"))
         self.assertIsNone(crud.get_team_by_id(self.db, owned_team_id))
         self.db.refresh(assigned)
@@ -356,9 +393,10 @@ class UserManagementAcceptanceTests(unittest.TestCase):
         task = self.add_task("personal", "alice")
         task_id = task.id
 
-        cancelled = crud.cancel_account(self.db, "alice")
+        cancelled, transferred_tasks = crud.cancel_account(self.db, "alice")
 
         self.assertTrue(cancelled)
+        self.assertEqual(transferred_tasks, [])
         log = self.db.query(models.OperationLog).filter(
             models.OperationLog.task_id == task_id,
             models.OperationLog.type == "delete",
@@ -385,10 +423,16 @@ class UserManagementAcceptanceTests(unittest.TestCase):
         crud.add_team_member(self.db, team.id, "other", "owner")
         task = self.add_task("other task", "owner", team_id=team.id, assignee_username="other")
 
-        success, error = crud.remove_team_member(self.db, team.id, "other", "member")
+        success, error, transferred_tasks = crud.remove_team_member(
+            self.db,
+            team.id,
+            "other",
+            "member",
+        )
 
         self.assertFalse(success)
         self.assertEqual(error, "团队权限不足")
+        self.assertEqual(transferred_tasks, [])
         self.db.refresh(task)
         self.assertEqual(task.assignee_username, "other")
         self.assertIsNotNone(crud.get_team_membership(self.db, team.id, "other"))
