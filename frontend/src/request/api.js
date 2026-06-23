@@ -37,6 +37,11 @@ service.interceptors.response.use(
         const detail = error.response?.data?.detail
         const msg = error.response?.data?.msg
         const isLoginRequest = error.config.url.includes('/user/login')
+        const silentError = error.config?.silentError === true
+
+        if (silentError) {
+            return Promise.reject(error)
+        }
 
         if (status === 401) {
             if (isLoginRequest) {
@@ -69,9 +74,9 @@ service.interceptors.response.use(
 
 const request = {
     get: (url, params = {}) => service.get(url, { params }),
-    post: (url, data = {}) => service.post(url, data),
-    put: (url, data = {}) => service.put(url, data),
-    delete: (url, params = {}) => service.delete(url, { params })
+    post: (url, data = {}, config = {}) => service.post(url, data, config),
+    put: (url, data = {}, config = {}) => service.put(url, data, config),
+    delete: (url, params = {}, config = {}) => service.delete(url, { params, ...config })
 }
 
 // API 接口封装
@@ -81,6 +86,7 @@ const api = {
     login: (data) => request.post('/user/login', data),
     logout: () => request.post('/user/logout'),
     getUserInfo: () => request.get('/user/info'),
+    updateUserInfo: (data) => request.put('/user/info', data),
     getUserProfile: (username) => request.get('/user/profile', { username }),
     cancelAccount: () => request.delete('/user/cancel'),
 
@@ -97,9 +103,23 @@ const api = {
     getTaskOperations: (taskId) => request.get(`/task/${taskId}/operations`),
     getPersonalOperations: () => request.get('/operation/personal'),
 
+    // 通知模块
+    getNotifications: () => request.get('/notification/list'),
+    markNotificationRead: (notificationId) => request.put(`/notification/${notificationId}/read`),
+    markAllNotificationsRead: () => request.put('/notification/read-all'),
+    clearNotifications: () => request.delete('/notification/clear'),
+    acceptNotification: (notificationId) => request.post(`/notification/${notificationId}/accept`),
+    rejectNotification: (notificationId) => request.post(`/notification/${notificationId}/reject`),
+    requestOwnerTransfer: (teamId, newOwner) => request.post(`/team/${teamId}/owner-transfer-request`, {
+        new_owner_id: newOwner
+    }),
+
     // 团队模块
     getTeamList: () => request.get('/team/list'),
+    getDisbandedTeams: () => request.get('/team/disbanded'),
     createTeam: (data) => request.post('/team/create', data),
+    renameTeam: (teamId, title) => request.put(`/team/${teamId}/rename`, { title }),
+    restoreTeam: (teamId) => request.post(`/team/${teamId}/restore`, {}, { silentError: true }),
     deleteTeam: (teamId) => request.delete(`/team/${teamId}`),
     addMember: (teamId, username, role) => request.post(`/team/${teamId}/member`, { username, role }),
     removeMember: (teamId, username) => request.delete(`/team/${teamId}/member`, { username }),

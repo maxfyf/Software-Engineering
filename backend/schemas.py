@@ -166,3 +166,44 @@ class OperationLogOut(BaseModel):
 class OperationLogListResponse(BaseModel):
     success: bool
     data: List[OperationLogOut]
+
+    
+
+class NotificationBase(BaseModel):
+    text: str
+    type: str
+    need_operation: bool = False
+    metadata: Optional[Dict[str, Any]] = None
+
+class NotificationCreate(NotificationBase):
+    receiver_username: str
+    sender_username: Optional[str] = None
+
+class NotificationOut(BaseModel):
+    id: int
+    text: str
+    needOperation: bool
+    isRead: bool
+    type: str
+    sender: Optional[str] = None
+    createdAt: str
+    metadata: Optional[Dict[str, Any]] = None
+
+    class Config:
+        orm_mode = True
+        # 允许别名
+        allow_population_by_field_name = True
+
+    @classmethod
+    def from_orm(cls, obj):
+        # 手动构建以使用 camelCase
+        return cls(
+            id=obj.id,
+            text=obj.text,
+            needOperation=obj.need_operation,
+            isRead=obj.is_read,
+            type=obj.type,
+            sender=obj.sender_username,
+            createdAt=obj.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            metadata=obj.metadata_
+        )

@@ -73,9 +73,4 @@
     background-color: var(--el-color-info);
   }
 }
-
-:deep(.content) {
-  scrollbar-width: thin;
-  scrollbar-color: var(--el-color-info-light-8) transparent;
-}
 </style>

@@ -42,6 +42,7 @@ const {
     <div class="main-content-wrapper">
       <div class="header-spacer"/>
       <OperationList
+          :route="route"
           :operations="operations"
           :current-page="currentPage"
           :page-size="pageSize"

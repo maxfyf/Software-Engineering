@@ -4,13 +4,18 @@ import api from "@/request/api.js";
 import { ElMessage, ElMessageBox } from "element-plus";
 import TwoColumnsWrapper from "@/components/TwoColumnsWrapper.vue";
 import { MoreFilled, Right } from "@element-plus/icons-vue";
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 
 const props = defineProps({
   teams: {
     type: Array,
     required: true,
     default: () => []
+  },
+  handleRename: {
+    type: Function,
+    required: true,
+    default: null
   }
 })
 
@@ -35,12 +40,18 @@ const handleCommand = (command) => {
   switch (command.action) {
     case 'quit':
       quitTeam(command.item)
-      break;
+      break
+    case 'rename':
+      props.handleRename(command.item)
+      break
+    case 'handover':
+      handoverOwner(command.item)
+      break
     case 'disband':
       deleteTeam(command.item)
-      break;
+      break
     default:
-      break;
+      break
   }
 }
 
@@ -60,10 +71,6 @@ const closeDialog = () => {
 
 // 退出团队
 const quitTeam = (item) => {
-  if (item.admin.length === 0 && item.member.length === 0) {
-    ElMessage.error('您是团队中的唯一成员，无法退出团队')
-    return
-  }
   ElMessageBox.confirm(
       `确定要退出团队"${item.title}"吗？`,
       '',
@@ -75,16 +82,6 @@ const quitTeam = (item) => {
       }
   ).then(async () => {
     try {
-      if (item.owner === currentUser.username) {
-        currentTeam.value = item
-        console.log(currentTeam.value)
-        console.log(visible.value)
-        await new Promise((resolve) => {
-          resolveDialog = resolve
-        })
-        // 将该团队的owner改成newOwner
-        await api.transferOwner(item.id, newOwner.value)
-      }
       highlightTeamId.value = null
       // 将该用户从团队中移除
       await api.leaveTeam(item.id)
@@ -97,9 +94,40 @@ const quitTeam = (item) => {
     } catch (e) {
       console.error('退出团队失败:', e)
     }
-  }).catch(() => {
-    console.log('取消退出')
-  })
+  }).catch(() => {})
+}
+
+// 转让拥有者权限
+const handoverOwner = (item) => {
+  if (item.admin.length === 0 && item.member.length === 0) {
+    ElMessage.error('您是团队中的唯一成员，无法转让拥有者权限')
+    return
+  }
+  ElMessageBox.confirm(
+      `确定要转让团队"${item.title}"的拥有者权限吗？`,
+      '',
+      {
+        confirmButtonText: '确定',
+        confirmButtonType: 'danger',
+        cancelButtonText: '取消',
+        type: undefined
+      }
+  ).then(async () => {
+    try {
+      currentTeam.value = item
+      await new Promise((resolve) => {
+        resolveDialog = resolve
+      })
+      if (!newOwner.value) {
+        ElMessage.error('请选择新的拥有者')
+        return
+      }
+      await api.requestOwnerTransfer(item.id, newOwner.value)
+      ElMessage.success(`已发送转让拥有者权限请求给${newOwner.value}`)
+    } catch (e) {
+      console.error('转让拥有者权限失败:', e)
+    }
+  }).catch(() => {})
 }
 
 // 解散团队
@@ -117,15 +145,11 @@ const deleteTeam = (item) => {
     highlightTeamId.value = null
     removeTeam(item.id)
     ElMessage.success('团队已解散')
-  }).catch(() => {
-    console.log('取消删除')
-  })
+  }).catch(() => {})
 }
 
 // 进入团队空间
 const enterTeamSpace = (item) => {
-  console.log('进入团队空间:', item.id)
-  console.log(currentTeam.value)
   highlightTeamId.value = item.id
   emit('enterTeamSpace', item.id)
 }
@@ -138,23 +162,47 @@ const enterTeamSpace = (item) => {
         <div class="card-content">
           <div class="title-line">
             <span class="title">{{item.title}}</span>
-            <el-dropdown class="more" trigger="click" @command="handleCommand">
+            <el-dropdown
+                v-if="item.owner === currentUser.username"
+                class="more"
+                trigger="click"
+                @command="handleCommand"
+            >
               <el-icon>
                 <MoreFilled/>
               </el-icon>
 
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item
-                      :command="{ action: 'quit', item: item }"
-                  >
-                    退出团队
+                  <el-dropdown-item :command="{ action: 'rename', item: item }">
+                    重命名团队
                   </el-dropdown-item>
-                  <el-dropdown-item
-                      :command="{ action: 'disband', item: item }"
-                      v-if="item.owner === currentUser.username"
-                  >
+
+                  <el-dropdown-item :command="{ action: 'handover', item: item }">
+                    转让拥有者权限
+                  </el-dropdown-item>
+
+                  <el-dropdown-item :command="{ action: 'disband', item: item }">
                     解散团队
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+
+            <el-dropdown
+                v-else
+                class="more"
+                trigger="click"
+                @command="handleCommand"
+            >
+              <el-icon>
+                <MoreFilled/>
+              </el-icon>
+
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item :command="{ action: 'quit', item: item }">
+                    退出团队
                   </el-dropdown-item>
                 </el-dropdown-menu>
               </template>

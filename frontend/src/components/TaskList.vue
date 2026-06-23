@@ -316,7 +316,7 @@ const deleteTask = (row) => {
                 :offset="0"
                 trigger="hover"
                 :append-to-body="true"
-                popper-class="top-layer-popover"
+                popper-class="user-detail-popover"
                 @show="loadAssigneeProfile(scope.row)"
             >
               <template #reference>
@@ -503,17 +503,18 @@ const deleteTask = (row) => {
   box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
 }
 
-.top-layer-popover {
-  z-index: 200;
+.user-detail-popover {
+  z-index: 100;
 }
 
-.top-layer-popover .popover-content {
+.user-detail-popover .popover-content {
   position: relative;
-  z-index: 200;
+  z-index: 100;
 }
 
 .assignee:hover {
   color: #409eff;
+  cursor: pointer;
 }
 
 .popover-title {

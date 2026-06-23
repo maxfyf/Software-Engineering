@@ -1,5 +1,5 @@
 import { ref, computed, onMounted } from 'vue'
-import { teamList, highlightTeamId, addTeam, initTeamList } from '@/store/user.js'
+import { teamList, disbandedTeamList, highlightTeamId, addTeam, initTeamList, initDisbandedTeamList, renameTeam, restoreTeam } from '@/store/user.js'
 import { useRoute, useRouter } from 'vue-router'
 import { handleEnter } from "@/utils/routeManager.js";
 import { ElMessage } from 'element-plus';
@@ -23,9 +23,13 @@ export function useTeamView(filterFn = null) {
         })
     })
 
-    // 新建团队弹窗状态
+    // 新建/重命名团队弹窗状态
     const createDialogVisible = ref(false)
+    const renameDialogVisible = ref(false)
+    const currentTeam = ref(null)
+    const renameAfterSuccess = ref(null)
     const newTeamTitle = ref('')
+    const renameTeamTitle = ref('')
 
     // 初始化团队列表
     onMounted(async () => {
@@ -42,10 +46,18 @@ export function useTeamView(filterFn = null) {
         }
     }
 
-    // 创建新团队的函数handleNew
+    // 创建新团队
     const handleNew = () => {
         createDialogVisible.value = true
         newTeamTitle.value = ''
+    }
+
+    // 重命名团队
+    const handleRename = (team, options = {}) => {
+        renameDialogVisible.value = true
+        currentTeam.value = team
+        renameTeamTitle.value = team.title
+        renameAfterSuccess.value = options.afterRename || null
     }
 
     // 确认创建团队
@@ -78,7 +90,68 @@ export function useTeamView(filterFn = null) {
         newTeamTitle.value = ''
     }
 
-    // 进入团队空间页面的函数handleEnterTeamSpace
+    // 确认重命名团队
+    const handleRenameTeam = async () => {
+        if (!renameTeamTitle.value || renameTeamTitle.value.trim() === '') {
+            ElMessage.error('新团队名称不能为空')
+            return
+        }
+
+        const trimmedTitle = renameTeamTitle.value.trim()
+        if (trimmedTitle.length > 10) {
+            ElMessage.error('新团队名称长度不能超过10个字符')
+            return
+        }
+
+        try {
+            const updatedTeam = await renameTeam(currentTeam.value.id, trimmedTitle)
+            const afterRename = renameAfterSuccess.value
+            const renamedTeam = { ...currentTeam.value, ...updatedTeam, title: updatedTeam?.title || trimmedTitle }
+            ElMessage.success('团队已重命名')
+            renameDialogVisible.value = false
+            renameAfterSuccess.value = null
+            currentTeam.value = null
+            renameTeamTitle.value = ''
+            if (afterRename) {
+                await afterRename(renamedTeam)
+            }
+        } catch (error) {
+            console.error('重命名团队失败:', error)
+        }
+    }
+
+    // 取消重命名团队
+    const handleCancelRename = () => {
+        renameDialogVisible.value = false
+        currentTeam.value = null
+        renameAfterSuccess.value = null
+        renameTeamTitle.value = ''
+    }
+
+    const disbandedTeams = computed(() => disbandedTeamList.value)
+
+    const activeTeamTitleSet = computed(() => new Set(teamList.value.map(team => team.title)))
+
+    const hasActiveTeamTitle = (title) => activeTeamTitleSet.value.has(title)
+
+    const loadDisbandedTeams = async (force = false) => {
+        await initDisbandedTeamList(force)
+    }
+
+    const handleRestoreTeam = async (team) => {
+        await restoreTeam(team.id)
+        ElMessage.success(`团队「${team.title}」已恢复`)
+    }
+    // 进入回收站
+    const handleEnterDisbandedTeamsPage = () => {
+        const newPage = {
+            path: 'disbanded',
+            params: []
+        }
+        handleEnter(route, router, newPage)
+    }
+
+    // 进入团队空间页面
     const handleEnterTeamSpace = (teamId) => {
         highlightTeamId.value = teamId
         const newPage = {
@@ -97,11 +170,21 @@ export function useTeamView(filterFn = null) {
         teams,
         dataset,
         createDialogVisible,
+        renameDialogVisible,
         newTeamTitle,
+        renameTeamTitle,
+        disbandedTeams,
+        hasActiveTeamTitle,
+        loadDisbandedTeams,
+        handleRestoreTeam,
         handleSelect,
         handleNew,
+        handleRename,
         handleCreateTeam,
         handleCancelCreate,
+        handleRenameTeam,
+        handleCancelRename,
+        handleEnterDisbandedTeamsPage,
         handleEnterTeamSpace
     }
 }

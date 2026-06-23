@@ -1,5 +1,5 @@
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import api from '@/request/api.js'
 
 // 用户数据结构
@@ -49,6 +49,18 @@ export const operation = {
     scope: null        // 所属范围(个人/某个团队)
 }
 
+// 通知数据结构
+export const notificationInfo = {
+    id: null,
+    text: '',          // 通知正文
+    needOperation: false, // 是否需要接受/拒绝
+    isRead: false,    // 是否已读/已处理
+    type: '',         // 通知类型，例如 task_assigned / owner_transfer_request
+    sender: '',       // 发送者
+    createdAt: '',    // 创建时间
+    metadata: null    // 关联业务数据，例如 taskId / teamId
+}
+
 const sortOperationsByTimeDesc = (operations) => {
     return [...operations].sort((a, b) => {
         const left = new Date(a?.operatedAt || 0).getTime()
@@ -82,6 +94,15 @@ export const taskList = ref([])
 // 当前用户的团队列表
 export const teamList = ref([])
 
+// 当前用户可恢复的已解散团队列表
+export const disbandedTeamList = ref([])
+
+// 当前用户的通知列表
+export const notifications = ref([])
+
+// 未读通知数量
+export const unreadCount = computed(() => notifications.value.filter(item => !item.isRead).length)
+
 // 重置任务列表
 export const resetTaskList = () => {
     taskList.value = []
@@ -90,6 +111,73 @@ export const resetTaskList = () => {
 // 重置团队列表
 export const resetTeamList = () => {
     teamList.value = []
+    disbandedTeamList.value = []
+}
+
+// 重置通知列表
+export const resetNotificationList = () => {
+    notifications.value = []
+}
+
+const normalizeNotification = (item) => ({
+    id: item.id,
+    text: item.text || '',
+    needOperation: Boolean(item.needOperation),
+    isRead: Boolean(item.isRead),
+    type: item.type || '',
+    sender: item.sender || '',
+    createdAt: item.createdAt || '',
+    metadata: item.metadata || null
+})
+
+// 初始化通知列表
+export const initNotificationList = async () => {
+    try {
+        const res = await api.getNotifications()
+        notifications.value = (res.data || []).map(normalizeNotification)
+    } catch (error) {
+        console.error('获取通知列表失败:', error)
+        notifications.value = []
+    }
+}
+
+// 标记单条通知为已读/已处理
+export const readNotification = async (notificationId) => {
+    await api.markNotificationRead(notificationId)
+    const index = notifications.value.findIndex(item => item.id === notificationId)
+    if (index !== -1) {
+        notifications.value[index] = {
+            ...notifications.value[index],
+            isRead: true
+        }
+    }
+}
+
+// 接受需要处理的通知，由后端执行对应业务动作
+export const acceptNotification = async (notificationId) => {
+    await api.acceptNotification(notificationId)
+    await initNotificationList()
+}
+
+// 拒绝需要处理的通知，由后端记录处理结果
+export const rejectNotification = async (notificationId) => {
+    await api.rejectNotification(notificationId)
+    await initNotificationList()
+}
+
+// 清空通知
+export const clearNotificationList = async () => {
+    await api.clearNotifications()
+    resetNotificationList()
+}
+
+// 全部标记为已读
+export const markAllNotificationsRead = async () => {
+    await api.markAllNotificationsRead()
+    notifications.value = notifications.value.map(item => ({
+        ...item,
+        isRead: true
+    }))
 }
 
 // 高亮任务的ID
@@ -227,6 +315,51 @@ export const addTeam = async (team) => {
         console.error('创建团队失败:', error)
         throw error
     }
+}
+
+export const renameTeam = async (teamId, title) => {
+    const res = await api.renameTeam(teamId, title)
+    const updatedTeam = res.data
+    const updateList = (list) => {
+        const index = list.findIndex(t => Number(t.id) === Number(teamId))
+        if (index !== -1) {
+            list[index] = {
+                ...list[index],
+                ...updatedTeam,
+                title: updatedTeam?.title || title
+            }
+        }
+    }
+    updateList(teamList.value)
+    updateList(disbandedTeamList.value)
+    return updatedTeam
+}
+
+export const initDisbandedTeamList = async (force = false) => {
+    if (!force && disbandedTeamList.value.length > 0) {
+        return
+    }
+    try {
+        const res = await api.getDisbandedTeams()
+        disbandedTeamList.value = res.data || []
+    } catch (error) {
+        console.error('获取已解散团队列表失败:', error)
+        disbandedTeamList.value = []
+    }
+}
+
+export const restoreTeam = async (teamId) => {
+    const res = await api.restoreTeam(teamId)
+    const restoredTeam = res.data
+    const index = disbandedTeamList.value.findIndex(t => Number(t.id) === Number(teamId))
+    if (index !== -1) {
+        disbandedTeamList.value.splice(index, 1)
+    }
+    if (restoredTeam && !teamList.value.some(t => Number(t.id) === Number(restoredTeam.id))) {
+        teamList.value.push(restoredTeam)
+    }
+    await initTeamList(true)
+    return restoredTeam
 }
 
 // 初始化任务列表
@@ -438,6 +571,7 @@ export const handleCancelAccount = () => {
             resetUserInfo()
             resetTaskList()
             resetTeamList()
+            resetNotificationList()
             sessionStorage.removeItem('isLoggedIn')
             sessionStorage.removeItem('username')
             sessionStorage.removeItem('token')
@@ -481,6 +615,7 @@ export const handleLogin = async ({ username, password }) => {
 
         await initTaskList()
         await initTeamList()
+        await initNotificationList()
 
         ElMessage.success('登录成功')
         
@@ -512,6 +647,7 @@ export const handleLogout = () => {
             resetUserInfo()
             resetTaskList()
             resetTeamList()
+            resetNotificationList()
             sessionStorage.removeItem('isLoggedIn')
             sessionStorage.removeItem('username')
             sessionStorage.removeItem('token')

@@ -1,7 +1,14 @@
 <script setup lang="js">
 import { computed } from "vue";
+import { getUserProfile, teamList, userProfileMap } from "@/store/user.js";
 
 const props = defineProps({
+  route: {
+    type: Object,
+    required: true,
+    default: null
+  },
+
   operations: {
     type: Array,
     required: true,
@@ -28,6 +35,16 @@ const pageData = computed(() => {
   return props.operations.slice(start, end)
 })
 
+const isTeamSpace = computed(() => {
+  return props.route.fullPath.includes('/space')
+})
+
+const currentTeam = computed(() => {
+  const teamId = Number(props.route.query?.teamId)
+  if (!teamId) return null
+  return teamList.value.find(team => Number(team.id) === teamId) || null
+})
+
 // 表格行样式回调
 const tableRowClassName = () => {
   return ''
@@ -48,6 +65,44 @@ const getObjectText = (object) => {
     return object.deleted ? `${title}（已删除）` : title
   }
   return object ?? ''
+}
+
+const formatOperator = (operation) => {
+  const operator = operation.operator
+  if (!operator) return '未知用户'
+  if (isTeamSpace.value && !isCurrentTeamMember(operator)) {
+    return `${operator}（已离队）`
+  }
+  return operator
+}
+
+const hideOperatorDetail = (operation) => {
+  const operator = operation.operator
+  return !operator
+}
+
+const isCurrentTeamMember = (username) => {
+  if (!username || !currentTeam.value) return true
+  const team = currentTeam.value
+  return team.owner === username ||
+      team.admin?.includes(username) ||
+      team.member?.includes(username)
+}
+
+const loadOperatorProfile = async (operation) => {
+  const username = operation.operator
+  if (!username || userProfileMap[username]) return
+
+  try {
+    await getUserProfile(username)
+  } catch (error) {
+    console.error('获取操作者信息失败:', error)
+  }
+}
+
+const getOperatorProfile = (operation) => {
+  const username = operation.operator
+  return username ? userProfileMap[username] : null
 }
 </script>
 
@@ -74,13 +129,54 @@ const getObjectText = (object) => {
         <el-table-column
             prop="operator"
             label="操作人"
+            v-if="isTeamSpace"
             min-width="15%"
             align="center"
-        />
+        >
+          <template v-slot:default="scope">
+            <span v-if="hideOperatorDetail(scope.row)">
+              {{ formatOperator(scope.row) }}
+            </span>
+            <el-popover
+                v-else
+                placement="bottom"
+                :fallback-placements="['bottom', 'top']"
+                :width="350"
+                :height="250"
+                :offset="0"
+                trigger="hover"
+                :append-to-body="true"
+                popper-class="user-detail-popover"
+                @show="loadOperatorProfile(scope.row)"
+            >
+              <template #reference>
+                <span class="assignee">
+                  {{ formatOperator(scope.row) }}
+                </span>
+              </template><div>
+              <h2 class="popover-title">
+                {{ formatOperator(scope.row) }}
+              </h2>
+              <p class="popover-info" v-if="getOperatorProfile(scope.row)?.lastName && getOperatorProfile(scope.row)?.firstName">
+                <span class="key">全名：</span>
+                {{ getOperatorProfile(scope.row).lastName }}{{ getOperatorProfile(scope.row).firstName }}
+              </p>
+              <p class="popover-info" v-if="getOperatorProfile(scope.row)?.phone">
+                <span class="key">电话号码：</span>
+                {{ getOperatorProfile(scope.row).phone }}
+              </p>
+              <p class="popover-info" v-if="getOperatorProfile(scope.row)?.email">
+                <span class="key">电子邮箱：</span>
+                {{ getOperatorProfile(scope.row).email }}
+              </p>
+            </div>
+            </el-popover>
+          </template>
+        </el-table-column>
         <el-table-column
             prop="description"
             label="描述"
-            min-width="55%"
+            :min-width="isTeamSpace ? '55%' : '70%'"
             align="center"
         />
         <el-table-column
@@ -107,6 +203,33 @@ const getObjectText = (object) => {
 .operation-table {
   width: 100%;
   box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
+}
+
+.user-detail-popover {
+  z-index: 100;
+}
+
+.user-detail-popover .popover-content {
+  position: relative;
+  z-index: 100;
+}
+
+.assignee:hover {
+  color: #409eff;
+  cursor: pointer;
+}
+
+.popover-title {
+  font-weight: bold;
+  text-align: center;
+}
+
+.popover-info {
+  padding: 3px 10px;
+}
+
+.key {
+  font-weight: bold;
 }
 
 .pagination {

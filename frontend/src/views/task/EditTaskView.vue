@@ -351,7 +351,9 @@ const saveChanges = async () => {
     }
     newTask.predecessor = newPredecessor.value.slice()
     ElMessage.success('任务创建成功')
+
   } else {
+
     // 更新任务
     const idx = scopeTaskList.value.findIndex(t => t.title === newTitle.value && t.id !== taskId.value)
     if (idx !== -1) {
@@ -368,6 +370,7 @@ const saveChanges = async () => {
       await updatePredecessors(taskId.value, predecessorIds)
     }
     ElMessage.success('任务更新成功')
+
   }
 
   // 返回来源页面

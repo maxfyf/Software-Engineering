@@ -7,7 +7,7 @@ const route = useRoute()
 const previousRoute = ref('/team/all')
 
 watch(() => route.path, (newPath) => {
-  if (!newPath.includes('/space')){
+  if (!newPath.includes('/disbanded') && !newPath.includes('/space')){
     previousRoute.value = newPath
   }
 }, { immediate: true })
@@ -25,7 +25,7 @@ const activeMenu = computed(() => {
   else if (route.path.startsWith('/team/member')) {
     return '/team/member'
   }
-  else if (route.path.includes('/space')) {
+  else if (route.path.includes('/disbanded') || route.path.includes('/space')) {
     return previousRoute.value
   }
   else
