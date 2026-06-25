@@ -3,7 +3,21 @@ from models import Notification, Team, TeamMember, User
 from schemas import NotificationCreate
 from typing import Optional, Dict, Any
 
-def create_notification(db: Session, notification: NotificationCreate) -> Notification:
+TASK_ASSIGNEE_NOTICE_TYPES = {
+    "task_assigned",
+    "task_unassigned",
+    "task_deleted",
+    "task_transferred_to_owner",
+}
+
+
+def create_notification(db: Session, notification: NotificationCreate) -> Optional[Notification]:
+    if (
+        notification.type in TASK_ASSIGNEE_NOTICE_TYPES
+        and notification.receiver_username == notification.sender_username
+    ):
+        return None
+
     db_notif = Notification(
         receiver_username=notification.receiver_username,
         sender_username=notification.sender_username,

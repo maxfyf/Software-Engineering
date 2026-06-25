@@ -81,10 +81,12 @@ def cleanup_task_notifications_for_delete(
     for task_id, receivers in read_assignment_receivers.items():
         snapshot = task_snapshots[task_id]
         for receiver_username in receivers:
+            if receiver_username == operator_username:
+                continue
             db.add(models.Notification(
                 receiver_username=receiver_username,
                 sender_username=operator_username,
-                text=f"您负责的任务「{snapshot['title']}」已被删除。",
+                text=f"任务「{snapshot['title']}」已被删除。",
                 type="task_deleted",
                 need_operation=False,
                 metadata_={
