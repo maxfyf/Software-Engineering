@@ -310,13 +310,13 @@ def update_team_member_role(
         return None, "团队权限不足"
 
     if role not in {ROLE_ADMIN, ROLE_MEMBER}:
-        return None, "角色只能设置为 Admin 或 Member"
+        return None, "角色只能设置为管理员或参与者"
 
     membership = get_team_membership(db, team_id, member_username)
     if not membership:
         return None, "团队成员不存在"
     if membership.role == ROLE_OWNER:
-        return None, "不能修改 Owner 角色"
+        return None, "不能修改拥有者角色"
 
     membership.role = role
     db.commit()
@@ -347,7 +347,7 @@ def remove_team_member(
         return False, "团队权限不足", []
     if membership.role == ROLE_OWNER:
         if not is_self_leave:
-            return False, "不能移除 Owner", []
+            return False, "不能移除拥有者", []
 
         new_owner = db.query(models.TeamMember).filter(
             models.TeamMember.team_id == team_id,
