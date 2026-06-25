@@ -47,6 +47,54 @@ def mark_task_logs_deleted(db: Session, task_ids: list[int] | set[int]) -> None:
         log.object = obj
 
 
+def cleanup_task_notifications_for_delete(
+    db: Session,
+    tasks: list[models.Task],
+    operator_username: str
+) -> None:
+    """删除任务时清理旧通知；已读分配通知的接收人会收到任务删除通知。"""
+    if not tasks:
+        return
+
+    task_snapshots = {
+        task.id: {
+            "title": task.title,
+            "team_id": task.team_id,
+        }
+        for task in tasks
+    }
+    read_assignment_receivers = {task_id: set() for task_id in task_snapshots}
+    related_notifications = []
+
+    for notification in db.query(models.Notification).all():
+        metadata = notification.metadata_ or {}
+        task_id = metadata.get("taskId") if isinstance(metadata, dict) else None
+        if task_id not in task_snapshots:
+            continue
+        related_notifications.append(notification)
+        if notification.type == "task_assigned" and notification.is_read:
+            read_assignment_receivers[task_id].add(notification.receiver_username)
+
+    for notification in related_notifications:
+        db.delete(notification)
+
+    for task_id, receivers in read_assignment_receivers.items():
+        snapshot = task_snapshots[task_id]
+        for receiver_username in receivers:
+            db.add(models.Notification(
+                receiver_username=receiver_username,
+                sender_username=operator_username,
+                text=f"您负责的任务「{snapshot['title']}」已被删除。",
+                type="task_deleted",
+                need_operation=False,
+                metadata_={
+                    "taskId": task_id,
+                    "taskTitle": snapshot["title"],
+                    "teamId": snapshot["team_id"]
+                }
+            ))
+
+
 def get_task_log_display_title(db: Session, task: models.Task) -> str:
     """返回任务日志应使用的标题快照，避免改名后删除日志丢失旧名标记。"""
     latest_log = db.query(models.OperationLog).filter(
@@ -1098,6 +1146,7 @@ def delete_task_with_deps(db: Session, task_id: int, cascade: bool = False, user
                 personal_user=task.owner_username
             )
         mark_task_logs_deleted(db, to_delete)
+        cleanup_task_notifications_for_delete(db, tasks_to_delete, username)
         # 删除所有涉及到的依赖关系（避免外键约束）
         db.query(models.TaskDependency).filter(
             models.TaskDependency.predecessor_id.in_(to_delete) |
@@ -1122,6 +1171,7 @@ def delete_task_with_deps(db: Session, task_id: int, cascade: bool = False, user
             successors=successor_tasks
         )
         mark_task_logs_deleted(db, {task_id})
+        cleanup_task_notifications_for_delete(db, [task], username)
         # 非级联：只删除当前任务，并清理所有与它相关的依赖（作为前置或后继）
         db.query(models.TaskDependency).filter(
             (models.TaskDependency.predecessor_id == task_id) |
