@@ -222,9 +222,10 @@ project_root/                                    # 项目根目录
 
 - `backend/tests/test_crud.py` 共 41 项，使用临时数据库直接验证 `crud.py`。覆盖团队软删除与恢复、注销账号时的物理清理、成员移除与离队、Owner 转移、任务访问与标题查重、任务删除、操作日志留存和日志读取权限。
 - `backend/tests/test_api.py` 共 14 项，直接调用 `api.py` 中的真实处理函数。覆盖团队名称校验、已解散团队名称复用、邀请与团队任务访问权限、任务状态参数、跨层前后继状态约束、依赖作用域限制和循环依赖拒绝。
-- `backend/tests/test_user_management_acceptance.py` 共 18 项，对应 `user_management_acceptance_cases.md` 中的 TC-UM-01～18。覆盖注册登录、团队创建与成员管理、离队任务转交、团队软删除、账号注销、操作日志内容与访问控制。
+- `backend/tests/test_user_management_acceptance.py` 共 18 项用户管理部分后端验收测试用例，对应 `user_management_acceptance_cases.md` 中的 TC-UM-01～18。覆盖注册登录、团队创建与成员管理、离队任务转交、团队软删除、账号注销、操作日志内容与访问控制。
+- `frontend/system_testing_cases.md` 共 15 项软件系统级测试用例 TC-SYS-01～15。覆盖注册登录、任务的创建与删除、团队的创建与解散、团队成员的权限变更、各种权限的相应操作、任务依赖关系的创建与删除、任务操作日志的记录。
 
-##### 4.2 测试设计说明
+##### 4.2 后端测试设计说明
 
 - 每个测试用例都会独立创建临时数据库、初始化表结构，并在用例结束后自动清理，避免测试之间相互污染。
 - CRUD 测试直接调用业务逻辑层方法，适合定位数据库状态迁移和权限规则问题。
