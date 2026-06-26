@@ -41,7 +41,7 @@ project_root/                                    # 项目根目录
 │   │   ├── test_api.py                          # 直接调用 API 处理函数的规则测试
 │   │   ├── test_crud.py                         # 业务逻辑层与数据库行为测试
 │   │   ├── test_user_management_acceptance.py   # 用户、团队与操作日志验收测试
-│   │   └── user_management_acceptance_cases.md  # TC-UM-01～18 验收用例与执行结果
+│   │   └── user_management_acceptance_cases.md  # TC-UM-01～18 后端验收用例与执行结果
 │   ├── api.py                                   # FastAPI 主入口，定义用户/任务接口与鉴权依赖
 │   ├── crud.py                                  # 数据操作层（含团队软删除/恢复、账号注销清理）
 │   ├── database.py                              # SQLAlchemy 与 SQLite 配置、会话管理
@@ -121,6 +121,7 @@ project_root/                                    # 项目根目录
 │   ├── jsconfig.json                            # Javascript 项目的根目录标识和配置核心
 │   ├── package.json                             # Node.js 项目核心配置文件
 |	├── package-lock.json                        # npm 锁定文件（安装前端依赖后生成）
+|	├── system_testing_cases.md                  # TC-SYS-01～15 系统验收用例
 │   └── vite.config.js                           # Vite 构建工具配置文件
 ├── .gitignore                                   # 不被纳入版本控制的配置文件
 └── README.md                                    # 项目说明文档（此文件）

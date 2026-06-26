@@ -1,5 +1,5 @@
 <script setup lang="js">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import Draggable from 'vuedraggable'
 import { useRoute, useRouter } from 'vue-router'
 import HeaderWrapper from "@/components/HeaderWrapper.vue"
@@ -40,6 +40,9 @@ const objects = computed(() => {
 const isDragging = ref(false)
 const draggedMemberName = ref(null)
 const trashList = ref([])
+const personnelRenderKey = ref(0)
+const personnelGroup = { name: 'personnel', pull: 'clone', put: true }
+const trashGroup = { name: 'personnel', pull: false, put: true }
 
 const isOwner = computed(() => team.value?.owner === currentUser.username)
 
@@ -88,37 +91,48 @@ const handleDragEnd = () => {
   }, 100)
 }
 
-const onDragChange = async (event) => {
+const resetDragPreview = async (reloadTeam = false) => {
+  trashList.value = []
+  if (reloadTeam) {
+    await initTeamList(true)
+  }
+  await nextTick()
+  personnelRenderKey.value += 1
+}
+
+const onRoleChange = async (newRole, event) => {
   if (!event.added) return
 
   const memberName = event.added.element.name
+  const currentRole = (team.value?.admin || []).includes(memberName)
+    ? 'admin'
+    : (team.value?.member || []).includes(memberName)
+      ? 'member'
+      : null
 
-  let newRole = null
-  if (objects.value.admin.some(a => a.name === memberName)) {
-    newRole = 'admin'
-  } else if (objects.value.member.some(m => m.name === memberName)) {
-    newRole = 'member'
+  if (!currentRole || currentRole === newRole) {
+    await resetDragPreview()
+    return
   }
-
-  if (!newRole) return
 
   try {
     await api.setMemberRole(teamId.value, memberName, newRole)
-    ElMessage.success('角色更改成功')
 
     const currentTeam = teamList.value.find(t => t.id === teamId.value)
     if (currentTeam) {
-      currentTeam.admin = currentTeam.admin.filter(a => a !== memberName)
-      currentTeam.member = currentTeam.member.filter(m => m !== memberName)
+      currentTeam.admin = (currentTeam.admin || []).filter(a => a !== memberName)
+      currentTeam.member = (currentTeam.member || []).filter(m => m !== memberName)
       if (newRole === 'admin') {
         currentTeam.admin.push(memberName)
       } else {
         currentTeam.member.push(memberName)
       }
     }
+    await resetDragPreview()
+    ElMessage.success('角色更改成功')
   } catch (error) {
     ElMessage.error('角色更改失败')
-    await initTeamList()
+    await resetDragPreview(true)
   }
 }
 
@@ -143,7 +157,7 @@ const handleTrashAdd = async (evt) => {
   const name = evt.element?.name || evt.item?.textContent?.trim()
   if (!name) {
     ElMessage.error('无法获取成员名称')
-    trashList.value = []
+    await resetDragPreview(true)
     return
   }
   trashList.value = []
@@ -156,7 +170,7 @@ const handleTrashAdd = async (evt) => {
 
   if (!removableMembers.includes(name)) {
     ElMessage.warning('该成员无法移除')
-    await initTeamList()
+    await resetDragPreview(true)
     return
   }
 
@@ -172,7 +186,7 @@ const handleTrashAdd = async (evt) => {
     )
     await doRemoveMember(name)
   } catch (error) {
-    await initTeamList()
+    await resetDragPreview(true)
   }
 }
 
@@ -250,10 +264,11 @@ const handleAddMember = async () => {
           <div v-if="isDragging" class="delete-button-wrapper">
             <Draggable
                 v-model="trashList"
-                group="personnel"
+                :group="trashGroup"
                 item-key="id"
                 :sort="false"
                 @add="handleTrashAdd"
+                :key="`trash-${personnelRenderKey}`"
                 class="trash-drop-zone"
             >
               <template #item="{ element }">
@@ -312,12 +327,13 @@ const handleAddMember = async () => {
           <div v-if="isOwner">
             <Draggable
                 v-model="objects.admin"
-                group="personnel"
+                :group="personnelGroup"
                 item-key="id"
+                :key="`admin-${personnelRenderKey}`"
                 class="draggable-list"
                 @start="handleDragStart"
                 @end="handleDragEnd"
-                @change="onDragChange"
+                @change="onRoleChange('admin', $event)"
                 :force-fallback="true"
             >
               <template #item="{ element }">
@@ -350,12 +366,13 @@ const handleAddMember = async () => {
           <div v-if="isOwner">
             <Draggable
                 v-model="objects.member"
-                group="personnel"
+                :group="personnelGroup"
                 item-key="id"
+                :key="`member-${personnelRenderKey}`"
                 class="draggable-list"
                 @start="handleDragStart"
                 @end="handleDragEnd"
-                @change="onDragChange"
+                @change="onRoleChange('member', $event)"
                 :force-fallback="true"
             >
               <template #item="{ element }">

@@ -3,7 +3,21 @@ from models import Notification, Team, TeamMember, User
 from schemas import NotificationCreate
 from typing import Optional, Dict, Any
 
-def create_notification(db: Session, notification: NotificationCreate) -> Notification:
+TASK_ASSIGNEE_NOTICE_TYPES = {
+    "task_assigned",
+    "task_unassigned",
+    "task_deleted",
+    "task_transferred_to_owner",
+}
+
+
+def create_notification(db: Session, notification: NotificationCreate) -> Optional[Notification]:
+    if (
+        notification.type in TASK_ASSIGNEE_NOTICE_TYPES
+        and notification.receiver_username == notification.sender_username
+    ):
+        return None
+
     db_notif = Notification(
         receiver_username=notification.receiver_username,
         sender_username=notification.sender_username,
@@ -89,7 +103,7 @@ def accept_notification(db: Session, notif_id: int, username: str):
         if not team:
             return None, "团队不存在"
         if team.owner_username != old_owner:
-            return None, "原Owner已变更"
+            return None, "原拥有者已变更"
         success, error = transfer_team_ownership(db, team_id, username, old_owner)
         if not success:
             return None, error
@@ -99,7 +113,7 @@ def accept_notification(db: Session, notif_id: int, username: str):
             create_notification(db, NotificationCreate(
                 receiver_username=old_owner,
                 sender_username=username,
-                text=f"{username} 已接受团队「{team.name}」的 Owner 转让请求。",
+                text=f"{username} 已接受团队「{team.name}」的拥有者转让请求。",
                 type="owner_transfer_accepted",
                 need_operation=False,
                 metadata={"teamId": team_id, "teamTitle": team.name}
@@ -145,7 +159,7 @@ def reject_notification(db: Session, notif_id: int, username: str):
             create_notification(db, NotificationCreate(
                 receiver_username=notif.sender_username,
                 sender_username=username,
-                text=f"{username} 已拒绝团队「{team.name if team else ''}」的 Owner 转让请求。",
+                text=f"{username} 已拒绝团队「{team.name if team else ''}」的拥有者转让请求。",
                 type="owner_transfer_rejected",
                 need_operation=False,
                 metadata={"teamId": team_id}

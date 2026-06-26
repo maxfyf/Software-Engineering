@@ -494,7 +494,7 @@ def create_task(task: TaskCreateRequest, current_user: User = Depends(get_curren
             text=f"您被分配为任务「{db_task.title}」的负责人。",
             type="task_assigned",
             need_operation=False,
-            metadata={"taskId": db_task.id, "taskTitle": db_task.title}
+            metadata={"taskId": db_task.id, "taskTitle": db_task.title, "teamId": db_task.team_id}
         ))
     return success_response("创建成功", serialize_task(db_task))
 
@@ -685,7 +685,7 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
                 text=f"您被分配为任务「{task.title}」的负责人。",
                 type="task_assigned",
                 need_operation=False,
-                metadata={"taskId": task.id, "taskTitle": task.title}
+                metadata={"taskId": task.id, "taskTitle": task.title, "teamId": task.team_id}
             ))
         # 处理旧负责人
         if old_assignee:
@@ -718,7 +718,7 @@ def update_task(task_id: int, task_update: TaskUpdateRequest, current_user: User
                         text=f"您不再是任务「{task.title}」的负责人。",
                         type="task_unassigned",
                         need_operation=False,
-                        metadata={"taskId": task.id, "taskTitle": task.title}
+                        metadata={"taskId": task.id, "taskTitle": task.title, "teamId": task.team_id}
                     ))
     return success_response("更新成功", serialize_task(task))
 
@@ -809,6 +809,28 @@ def get_existing_team_member_usernames(db: Session, team_id: int) -> list[str]:
         TeamMember.role != crud.ROLE_OWNER
     ).all()
     return [row[0] for row in rows]
+
+
+def notification_belongs_to_team(db: Session, notification: Notification, team_id: int) -> bool:
+    metadata = notification.metadata_ if isinstance(notification.metadata_, dict) else {}
+    if str(metadata.get("teamId")) == str(team_id):
+        return True
+
+    task_id = metadata.get("taskId")
+    if task_id is None:
+        return False
+
+    task_team = db.query(Task.team_id).filter(Task.id == task_id).first()
+    return bool(task_team and str(task_team[0]) == str(team_id))
+
+
+def clear_user_team_notifications(db: Session, username: str, team_id: int) -> None:
+    """用户离开团队后，清理其收到的所有与该团队有关的通知。"""
+    notifications = db.query(Notification).filter(Notification.receiver_username == username).all()
+    for notification in notifications:
+        if notification_belongs_to_team(db, notification, team_id):
+            db.delete(notification)
+    db.commit()
 
 def notify_team_disbanded(db: Session, team: Team, operator_username: str):
     for username in get_existing_team_member_usernames(db, team.id):
@@ -921,7 +943,7 @@ def add_member_endpoint(
     if not team:
         raise HTTPException(status_code=404, detail="团队不存在")
     if team.owner_username != current_user.username:
-        raise HTTPException(status_code=403, detail="只有 Owner 可发送邀请")
+        raise HTTPException(status_code=403, detail="只有拥有者可发送邀请")
     
     user = crud.get_user_by_username(db, username)
     if not user:
@@ -929,7 +951,7 @@ def add_member_endpoint(
     if crud.get_team_membership(db, team_id, username):
         raise HTTPException(status_code=400, detail="用户已在团队中")
     if role not in ["admin", "member"]:
-        raise HTTPException(status_code=400, detail="角色必须为 admin 或 member")
+        raise HTTPException(status_code=400, detail="角色必须为管理员或参与者")
     
     # 创建邀请通知（不直接加入）
     create_notification(db, NotificationCreate(
@@ -958,7 +980,8 @@ def remove_member_endpoint(
         raise HTTPException(status_code=400, detail=error)
 
     team = crud.get_team_by_id(db, team_id)
-    # 通知被移除者
+    clear_user_team_notifications(db, username, team_id)
+    # 通知被移除者。注意要在清理团队相关旧通知之后发送，避免新通知被一起删掉。
     create_notification(db, NotificationCreate(
         receiver_username=username,
         sender_username=current_user.username,
@@ -967,7 +990,7 @@ def remove_member_endpoint(
         need_operation=False,
         metadata={"teamId": team_id, "teamTitle": team.name}
     ))
-    # 通知 Owner 任务转交
+    # 通知拥有者任务转交
     for task in transferred_tasks:
         create_notification(db, NotificationCreate(
             receiver_username=team.owner_username,
@@ -1000,9 +1023,22 @@ def set_member_role_endpoint(
     if not backend_role:
         raise HTTPException(status_code=400, detail="无效的角色")
     
+    team = crud.get_team_by_id(db, team_id)
+    old_membership = crud.get_team_membership(db, team_id, username)
+    old_role = old_membership.role if old_membership else None
     membership, error = crud.update_team_member_role(db, team_id, username, backend_role, current_user.username)
     if error:
         raise HTTPException(status_code=400, detail=error)
+
+    if old_role != membership.role:
+        create_notification(db, NotificationCreate(
+            receiver_username=username,
+            sender_username=current_user.username,
+            text=f"您在团队「{team.name}」中的角色已由{'管理员' if old_role == crud.ROLE_ADMIN else '参与者'}变更为{'管理员' if membership.role == crud.ROLE_ADMIN else '参与者'}。",
+            type="team_role_changed",
+            need_operation=False,
+            metadata={"teamId": team_id, "teamTitle": team.name, "oldRole": old_role, "newRole": membership.role}
+        ))
     
     return success_response("角色更新成功")
 
@@ -1270,6 +1306,7 @@ def leave_team(
         raise HTTPException(status_code=400, detail=error)
 
     team = crud.get_team_by_id(db, team_id)
+    clear_user_team_notifications(db, current_user.username, team_id)
     for task in transferred_tasks:
         create_notification(db, NotificationCreate(
             receiver_username=team.owner_username,
@@ -1381,11 +1418,11 @@ def owner_transfer_request(
     if not team:
         raise HTTPException(status_code=404, detail="团队不存在")
     if team.owner_username != current_user.username:
-        raise HTTPException(status_code=403, detail="只有 Owner 可发起转让")
+        raise HTTPException(status_code=403, detail="只有拥有者可发起转让")
     if req.new_owner_id == current_user.username:
         raise HTTPException(status_code=400, detail="不能转让给自己")
     if not crud.get_team_membership(db, team_id, req.new_owner_id):
-        raise HTTPException(status_code=400, detail="新 Owner 不是团队成员")
+        raise HTTPException(status_code=400, detail="新拥有者不是团队成员")
     
     create_notification(db, NotificationCreate(
         receiver_username=req.new_owner_id,
