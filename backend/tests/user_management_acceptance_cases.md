@@ -25,7 +25,7 @@
 
 ## 测试运行方式
 
-以下命令均在项目根目录 `/Users/jasonzhao/Documents/Code/Software-Engineering` 下执行。后端单元测试使用临时 SQLite 数据库，不应污染项目已有数据库文件。
+以下命令均在本仓库的项目根目录下执行。后端单元测试使用临时 SQLite 数据库，不应污染项目已有数据库文件。
 
 ```bash
 python3 -m compileall -q backend
